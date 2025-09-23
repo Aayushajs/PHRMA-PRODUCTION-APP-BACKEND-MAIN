@@ -112,10 +112,12 @@ export const verifyOtp = catchAsyncErrors(async(req: Request, res: Response, nex
     console.log("otp : ",otp);
 
     if(!otp){
+        console.log("OTP not found");
         return next(new ApiError(400,"OTP expired"));
     }
 
     if(EnteredOtp !== otp){
+        console.log("Invalid OTP");
         return next(new ApiError(400,"Invalid OTP"));
     }
 
