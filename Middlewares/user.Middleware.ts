@@ -16,6 +16,7 @@ export const userMiddleware = catchAsyncErrors(async (req: Request, res: Respons
     console.log("Token from cookies or header : ", token);
 
     if (!token) {
+        console.log("No token provided[TOKEN] : ", token);
         return next(new ApiError(401, "Unauthorized: No token provided"));
     }
 

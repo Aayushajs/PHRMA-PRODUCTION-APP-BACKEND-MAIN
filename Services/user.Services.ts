@@ -6,12 +6,16 @@ import bcrypt from 'bcryptjs';
 import { handleResponse } from '../Utils/handleResponse';
 import { generateUserToken } from '../Utils/jwtToken';
 import { generateOtp } from '../Utils/OtpGenerator';
-import {redis} from '../config/redis';
+import { redis } from '../config/redis';
 import { sendEmail } from '../Utils/mailer';
+import { OAuth2Client, TokenPayload } from 'google-auth-library';
+
 
 
 export const signup = catchAsyncErrors(async (req: Request, res: Response, next: NextFunction) => {
     const { name, email, password, address, phone } = req.body;
+    console.log("Request Body : ", req.body);
+
 
     if (!name || !email || !password || !address || !phone) {
         return next(new ApiError(400, "All fields are required"));
@@ -61,6 +65,7 @@ export const login = catchAsyncErrors(async (req: Request, res: Response, next: 
 
 
     const userToken = generateUserToken(userExist)
+    console.log('userToken : ', userToken);
 
     res.cookie("userToken", userToken, {
         httpOnly: true,
@@ -79,77 +84,209 @@ export const login = catchAsyncErrors(async (req: Request, res: Response, next: 
     );
 });
 
-export const forgotPassword = catchAsyncErrors(async (req: Request, res: Response, next: NextFunction) => {
-    const {email} = req.body;
+export const logout = catchAsyncErrors(async (req: Request, res: Response, next: NextFunction) => {
+    res.cookie("userToken", null, {
+        httpOnly: true,
+        secure: false,
+        sameSite: 'lax',
+        maxAge: 24 * 60 * 60 * 1000
+    });
 
-    if(!email){
-        return next(new ApiError(400,"Email is required"));
+    return handleResponse(req, res, 200, "Logout Successful");
+})
+
+export const forgotPassword = catchAsyncErrors(async (req: Request, res: Response, next: NextFunction) => {
+    const { email } = req.body;
+
+    if (!email) {
+        return next(new ApiError(400, "Email is required"));
     }
 
-    const Existeduser = await UserModel.findOne({email});
-    if(!Existeduser){
-        return next(new ApiError(400,"User not found"));
+    const Existeduser = await UserModel.findOne({ email });
+    if (!Existeduser) {
+        return next(new ApiError(400, "User not found"));
     }
 
     const otp = generateOtp();
-    console.log("Generated OTP : ",otp);
+    console.log("Generated OTP : ", otp);
 
-    await redis.set(`otp:${Existeduser._id}`, otp, {'EX': 180});
+    await redis.set(`otp:${Existeduser._id}`, otp, { 'EX': 180 });
 
-    if(email){
+    if (email) {
         console.log(`Sending OTP ${otp} to email ${email}`);
         await sendEmail(email, otp);
     }
-    return handleResponse(req,res,200,"OTP sent to your email");
+    return handleResponse(req, res, 200, "OTP sent to your email");
 });
 
 
-export const verifyOtp = catchAsyncErrors(async(req: Request, res: Response, next: NextFunction)=>{
+export const verifyOtp = catchAsyncErrors(async (req: Request, res: Response, next: NextFunction) => {
     const userId = req.user?._id;
     const { EnteredOtp } = req.body;
 
     const otp = await redis.get(`otp:${userId}`);
-    console.log("otp : ",otp);
+    console.log("otp : ", otp);
 
-    if(!otp){
+    if (!otp) {
         console.log("OTP not found");
-        return next(new ApiError(400,"OTP expired"));
+        return next(new ApiError(400, "OTP expired"));
     }
 
-    if(EnteredOtp !== otp){
+    if (EnteredOtp !== otp) {
         console.log("Invalid OTP");
-        return next(new ApiError(400,"Invalid OTP"));
+        return next(new ApiError(400, "Invalid OTP"));
     }
 
-    return handleResponse(req,res,200,"OTP verified");
+    return handleResponse(req, res, 200, "OTP verified");
 })
 
-export const ResetPassword = catchAsyncErrors(async (req: Request, res: Response, next: NextFunction)=>{
-    const {newPassword} = req.body;
+export const ResetPassword = catchAsyncErrors(async (req: Request, res: Response, next: NextFunction) => {
+    const { newPassword } = req.body;
     const userId = req.user?._id;
 
-    if(!newPassword){
-        return next(new ApiError(400,"New password is required"));
+    if (!newPassword) {
+        return next(new ApiError(400, "New password is required"));
     }
 
     const salt = await bcrypt.genSalt(10);
     const newHashedPassword = await bcrypt.hash(newPassword, salt);
 
 
-    const user = await UserModel.findByIdAndUpdate(userId,{
+    const user = await UserModel.findByIdAndUpdate(userId, {
         password: newHashedPassword
-    },{
+    }, {
         new: true,
         runValidators: true,
         useFindAndModify: false
     });
-    console.log("User found : ",user);
+    console.log("User found : ", user);
 
-    if(!user){
-        return next(new ApiError(400,"User not found"));
+    if (!user) {
+        return next(new ApiError(400, "User not found"));
     }
 
-    return handleResponse(req,res,200,"Password reset successfully");
+    return handleResponse(req, res, 200, "Password reset successfully");
+})
+
+export const googleAuthLogin = catchAsyncErrors(async (req: Request, res: Response, next: NextFunction) => {
+    const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+    console.log("Clent : ", client)
+
+    const { userToken } = req.body;
+    console.log("User Token : ", userToken);
+
+    const ticket = await client.verifyIdToken({
+        idToken: userToken,
+        audience: process.env.GOOGLE_CLIENT_ID
+    });
+
+    console.log("Ticket : ", ticket);
+
+    const payload: TokenPayload | undefined = ticket.getPayload();
+    console.log("Payload : ", payload);
+    if (!payload) {
+        return next(new ApiError(400, "Invalid token"));
+    }
+
+    const name = payload.name ?? payload.given_name ?? "Unknown User";
+    const email = payload.email;
+
+    if (!name || !email) {
+        return next(new ApiError(400, "Invalid token"));
+    }
+
+    const userFind = await UserModel.findOne({ email });
+    if (!userFind) {
+        const userCreated = await UserModel.create({
+            name,
+            email
+        });
+        console.log("User created : ", userCreated);
+
+        const userToken = generateUserToken(userCreated);
+
+        res.cookie("userToken", userToken, {
+            httpOnly: true,
+            secure: false,
+            sameSite: 'lax',
+            maxAge: 24 * 60 * 60 * 1000
+        });
+
+        return handleResponse(
+            req,
+            res,
+            200,
+            "Login Successful",
+            { user: userCreated, token: userToken }
+        );
+    } else {
+        const userToken = generateUserToken(userFind);
+
+        res.cookie("userToken", userToken, {
+            httpOnly: true,
+            secure: false,
+            sameSite: 'lax',
+            maxAge: 24 * 60 * 60 * 1000
+        });
+
+        return handleResponse(
+            req,
+            res,
+            200,
+            "Login Successful",
+            { user: userFind, token: userToken }
+        );
+    }
+})
+
+export const getUserProfile = catchAsyncErrors(async (req: Request, res: Response, next: NextFunction) => {
+    const userId = req.user?._id;
+    console.log("User Id : ", userId);
+
+    if (!userId) {
+        console.log("Not get userId", userId);
+        return next(new ApiError(400, "User not found"));
+    }
+
+    const user = await UserModel.findById(userId);
+    console.log("User found : ", user);
+
+    if (!user) {
+        console.log("User not found", user);
+        return next(new ApiError(400, "User not found"));
+    }
+
+    return handleResponse(req, res, 200, "User found", user);
 })
 
 
+export const updateUserProfile = catchAsyncErrors(async (req: Request, res: Response, next: NextFunction) => {
+    const userId = req.user?._id;
+    console.log("User Id : ", userId);
+
+
+    const { name, email, address, phone, age, dob, avatar } = req.body;
+    console.log("Request Body : ", req.body);
+
+    const updateUserDetail = await UserModel.findByIdAndUpdate(
+        userId,
+        {
+            name,
+            email,
+            address,
+            phone,
+            age,
+            dob,
+            avatar
+        }, {
+        new: true,
+        runValidators: true
+    });
+    console.log("User updated : ", updateUserDetail);
+
+    if (!updateUserDetail) {
+        return next(new ApiError(400, "User not found"));
+    }
+    return handleResponse(req, res, 200, "User updated", updateUserDetail);
+
+})

@@ -1,5 +1,5 @@
-import { userSchema } from "../Schema/user.Schema.ts";
-import { Iuser } from "../Entities/user.Interface.ts";
+import { userSchema } from "../Schema/user.Schema";
+import { Iuser } from "../Entities/user.Interface";
 import {model} from 'mongoose';
 
 const User = model<Iuser>("User", userSchema);

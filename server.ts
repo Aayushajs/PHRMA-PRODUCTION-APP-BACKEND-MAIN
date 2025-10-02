@@ -11,10 +11,11 @@ dotenv.config({path: './config/.env'});
 const app: Express = express();
 
 //middlewares
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
-app.use(cookieParser());
+
 
 
 //router

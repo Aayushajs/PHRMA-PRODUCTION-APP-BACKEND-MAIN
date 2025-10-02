@@ -6,6 +6,8 @@ export interface Iuser {
     email: string;
     password: string;
     phone: string;
+    age : number;
+    dob : Date;
     address?: {
         street?: string;
         city?: string;

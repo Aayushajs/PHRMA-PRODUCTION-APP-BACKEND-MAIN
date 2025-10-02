@@ -1,4 +1,4 @@
-import { Iuser } from '../Entities/user.Interface.ts';
+import { Iuser } from '../Entities/user.Interface';
 import { Schema } from 'mongoose';
 
 export const userSchema = new Schema<Iuser>({
@@ -19,6 +19,12 @@ export const userSchema = new Schema<Iuser>({
     phone: {
         type: String,
         required: true
+    },
+    age: {
+        type: Number
+    },
+    dob: {
+        type: Date
     },
     address: {
         street: { type: String },

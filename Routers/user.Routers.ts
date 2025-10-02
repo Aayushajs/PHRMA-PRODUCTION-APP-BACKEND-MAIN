@@ -4,7 +4,10 @@ import {
     login,
     forgotPassword,
     verifyOtp,
-    ResetPassword
+    ResetPassword,
+    googleAuthLogin,
+    getUserProfile,
+    updateUserProfile
 } from "../Services/user.Services";
 import { userMiddleware } from '../Middlewares/user.Middleware'
 
@@ -22,6 +25,11 @@ userRouter.post('/login',login);
 userRouter.post('/forgot-password',forgotPassword);
 userRouter.post('/verify-otp',userMiddleware,verifyOtp);
 userRouter.post('/reset-password',userMiddleware,ResetPassword);
+userRouter.post('/google-login',googleAuthLogin);
+userRouter.get('/profile',userMiddleware,getUserProfile);
+userRouter.put('/update/profile',userMiddleware,updateUserProfile);
+
+
 
 
 export default userRouter;
