@@ -14,9 +14,9 @@ const transporter = nodemailer.createTransport({
     },
 })
 
-// console.log("GMAIL_USER:", process.env.GMAIL_USER);
-// console.log("GMAIL_PASS:", process.env.GMAIL_PASS? '******' : 'Not Set');
-// console.log("Nodemailer Transporter:", transporter);
+console.log("GMAIL_USER:", process.env.GMAIL_USER);
+console.log("GMAIL_PASS:", process.env.GMAIL_PASS? '******' : 'Not Set');
+console.log("Nodemailer Transporter:", transporter);
 
 
 export const sendEmail = async (email : string, otp: number) => { 
@@ -26,6 +26,9 @@ export const sendEmail = async (email : string, otp: number) => {
         subject: "Your OTP Code",
         text: `Your OTP code is ${otp}`,
     };
+
+    console.log(`Sending email to ${email} with OTP ${otp}`);
+    console.log("Mail Options:", mailOptions);
 
     return transporter.sendMail(mailOptions,(error : Error | null, info : any) => {
         if (error) {
