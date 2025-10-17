@@ -97,13 +97,16 @@ export const logout = catchAsyncErrors(async (req: Request, res: Response, next:
 
 export const forgotPassword = catchAsyncErrors(async (req: Request, res: Response, next: NextFunction) => {
     const { email } = req.body;
+    console.log("Request Body : ", req.body);
 
     if (!email) {
+        console.log("Email not found : ", email);
         return next(new ApiError(400, "Email is required"));
     }
 
     const Existeduser = await UserModel.findOne({ email });
     if (!Existeduser) {
+        console.log("User not found with this email : ", email);
         return next(new ApiError(400, "User not found"));
     }
 
