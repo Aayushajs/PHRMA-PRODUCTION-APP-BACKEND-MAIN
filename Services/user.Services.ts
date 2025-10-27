@@ -118,6 +118,7 @@ export const forgotPassword = catchAsyncErrors(async (req: Request, res: Respons
     if (email) {
         console.log(`Sending OTP ${otp} to email ${email}`);
         await sendEmail(email, otp);
+        console.log(sendEmail(email, otp));
     }
     return handleResponse(req, res, 200, "OTP sent to your email");
 });
