@@ -1,23 +1,33 @@
-// import { Types } from 'mongoose';
+import mongoose from "mongoose";
+import RoleIndex from "../../Utils/Roles.enum";
 
 export interface Iuser {
-    _id: string;
-    name: string;
-    email: string;
-    password: string;
-    phone: string;
-    age : number;
-    dob : Date;
-    address?: {
-        street?: string;
-        city?: string;
-        state?: string;
-        zip?: string;
-        country?: string;
+  _id?: mongoose.Types.ObjectId;
+  name: string;
+  email: string;
+  password: string;
+  phone: string;
+  age: number;
+  fcmToken?: string;
+  lastLogin?: Date;
+  category?: mongoose.Types.ObjectId[];
+  itemsPurchased?: mongoose.Types.ObjectId[];
+  viewedItems?: mongoose.Types.ObjectId[];
+  dob: Date;
+  address?: {
+    street?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    country?: string;
+    location?: {
+      longitude: number;
+      latitude: number;
     };
-    role?: "user" | "admin";
-    avatar?: string;
-    wishlist?: string[];
-    createdAt?: Date;
-    updatedAt?: Date;
+  };
+  role: RoleIndex;
+  ProfileImage?: string[];
+  wishlist?: string[];
+  createdAt?: Date;
+  updatedAt?: Date;
 }

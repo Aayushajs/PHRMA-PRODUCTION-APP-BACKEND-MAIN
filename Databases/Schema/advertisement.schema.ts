@@ -53,18 +53,18 @@ export const advertisementSchema = new Schema<IAdvertisement & Document>(
       required: true,
     },
     adClickTracking: {
-        type: [
-            {
-                userId: {
-                    type: mongoose.Schema.Types.ObjectId,
-                    ref: "User",
-                },
-                timestamp: {
-                    type: Date,
-                    default: Date.now,
-                },
-            },
-        ],
+      type: [
+        {
+          userId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+          },
+          timestamp: {
+            type: Date,
+            default: Date.now,
+          },
+        },
+      ],
     },
     isActive: {
       type: Boolean,
@@ -89,3 +89,5 @@ export const advertisementSchema = new Schema<IAdvertisement & Document>(
   },
   { timestamps: true }
 );
+
+
