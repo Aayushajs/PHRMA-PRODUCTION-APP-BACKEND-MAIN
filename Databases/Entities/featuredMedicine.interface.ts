@@ -12,6 +12,8 @@ export interface IFeaturedMedicine {
   featured: boolean;         
   ratings?: number;          
   createdAt?: Date;
+  remarks: string[];
   updatedAt?: Date;
   updatedBy?: mongoose.Schema.Types.ObjectId;
+  createdBy?:mongoose.Schema.Types.ObjectId
 }

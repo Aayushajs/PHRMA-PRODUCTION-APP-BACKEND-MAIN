@@ -29,7 +29,10 @@ app.use('/api/v1', mainRouter);
 
 app.use(errorHandler)
 
-connectDB();
+// Initialize database connection
+connectDB().catch(err => {
+  console.error("Database initialization failed:", err);
+});
 
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, async ()=>{

@@ -59,10 +59,23 @@ export const featuredMedicineSchema = new Schema<IFeaturedMedicine & Document>(
       type: Date,
       default: Date.now,
     },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
+   remarks: {
+     type: [
+       {
+         type: String,
+         trim: true,
+       },
+     ],
+     default: [],
+   },
   },
   {
     timestamps: true,

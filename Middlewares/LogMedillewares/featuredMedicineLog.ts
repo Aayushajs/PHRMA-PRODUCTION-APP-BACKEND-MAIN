@@ -11,9 +11,11 @@ export const FeaturedMedicineLogger = (featuredMedicineSchema: Schema) => {
   featuredMedicineSchema.post("save", async function (doc: any) {
     await FeaturedLog.create({
       medicineId: doc._id,
+      operation: "CREATE",
       action: "CREATE",
-      performedBy: doc.updatedBy || null,
+      performedBy: doc.createdBy || doc.updatedBy || null,
       newData: doc,
+      summary: `Featured medicine '${doc.title}' was created`,
     });
   });
 
@@ -30,10 +32,12 @@ export const FeaturedMedicineLogger = (featuredMedicineSchema: Schema) => {
     if (doc) {
       await FeaturedLog.create({
         medicineId: doc._id,
+        operation: "UPDATE",
         action: "UPDATE",
         performedBy: doc.updatedBy || null,
         oldData,
         newData: doc,
+        summary: `Featured medicine '${doc.title}' was updated`,
       });
     }
   });
@@ -51,9 +55,11 @@ export const FeaturedMedicineLogger = (featuredMedicineSchema: Schema) => {
     if (doc) {
       await FeaturedLog.create({
         medicineId: doc._id,
+        operation: "DELETE",
         action: "DELETE",
         performedBy: doc.updatedBy || null,
         oldData,
+        summary: `Featured medicine '${oldData?.title || 'Unknown'}' was deleted`,
       });
     }
   });

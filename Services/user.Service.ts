@@ -10,7 +10,7 @@ import { redis } from "../config/redis";
 import { sendEmail } from "../Utils/mailer";
 import { OAuth2Client, TokenPayload } from "google-auth-library";
 import RoleIndex from "../Utils/Roles.enum";
-import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
+import { uploadToCloudinary } from "../utils/cloudinaryUpload";
 
 // Signup
 export const signup = catchAsyncErrors(
@@ -71,7 +71,7 @@ export const signup = catchAsyncErrors(
       lastLogin: new Date(),
       fcmToken: fcmToken || "",
     };
-    
+
     if (address) {
       userData.address = {
         street: address.street || "",
@@ -89,21 +89,24 @@ export const signup = catchAsyncErrors(
       }
     }
 
-    // Handle profile image if provided during signup
     if (req.file) {
       try {
-        const uploadResult = await uploadToCloudinary(req.file.buffer, {
-          folder: `Epharma/profiles`,
-        });
-        userData.ProfileImage = [uploadResult.secure_url];
-      } catch (error) {
-        console.error("Image upload failed:", error);
-        // Continue signup without image if upload fails
+        const result = await uploadToCloudinary(
+          req.file.buffer,
+          "Epharma/profiles"
+        );
+        userData.ProfileImage = [result.secure_url];
+      } catch (error: any) {
+        return next(
+          new ApiError(
+            500,
+            `Profile image upload failed: ${error.message || error}`
+          )
+        );
       }
     }
 
     const user = await UserModel.create(userData);
-    console.log("User created successfully with all fields");
 
     const User = {
       _id: user._id,
@@ -127,14 +130,14 @@ export const signup = catchAsyncErrors(
 export const login = catchAsyncErrors(
   async (req: Request, res: Response, next: NextFunction) => {
     const { email, password, fcmToken, location } = req.body;
-    console.log("Request Body : ", req.body);
 
     if (!email || !password) {
       return next(new ApiError(400, "Email and password are required"));
     }
 
-    const userExist = await UserModel.findOne({ email }).select("+password");
-    console.log("User found : ", userExist);
+    const userExist = await UserModel.findOne({
+      email,
+    }).select("+password");
 
     if (!userExist) {
       return next(new ApiError(400, "User does not exist"));
@@ -439,7 +442,7 @@ export const updateUserProfile = catchAsyncErrors(
       return next(new ApiError(400, "User not found"));
     }
 
-    // Check email uniqueness
+    
     if (email && email !== user.email) {
       const existingUser = await UserModel.findOne({ email });
       if (existingUser) {
@@ -448,7 +451,7 @@ export const updateUserProfile = catchAsyncErrors(
       user.email = email;
     }
 
-    // Check phone uniqueness
+  
     if (phone && phone !== user.phone) {
       const existingUser = await UserModel.findOne({ phone });
       if (existingUser) {
@@ -462,30 +465,33 @@ export const updateUserProfile = catchAsyncErrors(
     if (age !== undefined) user.age = age;
     if (dob) user.dob = dob;
 
-    // Handle profile image update
     if (req.file) {
       try {
-        const uploadResult = await uploadToCloudinary(req.file.buffer, {
-          folder: `Epharma/profiles/${userId}`,
-        });
-        
-        // Add to array and keep last 5
+        console.log("Uploading profile image for user update...");
+        const uploadResult = await uploadToCloudinary(
+          req.file.buffer,
+          `Epharma/profiles/${userId}`
+        );
         if (!user.ProfileImage) user.ProfileImage = [];
         user.ProfileImage.push(uploadResult.secure_url);
-        if (user.ProfileImage.length > 5) {
-          user.ProfileImage = user.ProfileImage.slice(-5);
-        }
-      } catch (error) {
-        console.error("Image upload error:", error);
-        return next(new ApiError(500, "Failed to upload image"));
+      } catch (error: any) {
+        return next(
+          new ApiError(500, `Failed to upload image: ${error.message || error}`)
+        );
       }
     }
 
-    // Update ProfileImage from body if provided
     if (ProfileImage && Array.isArray(ProfileImage)) {
-      user.ProfileImage = ProfileImage;
-    }
+      user.ProfileImage = [...(user.ProfileImage || []), ...ProfileImage];
 
+      if (user.ProfileImage.length > 5) {
+        user.ProfileImage = user.ProfileImage.slice(-5);
+      }
+    } else {
+      if (user.ProfileImage && user.ProfileImage.length > 5) {
+        user.ProfileImage = user.ProfileImage.slice(-5);
+      }
+    }
     // Update address
     if (address) {
       user.address = {
@@ -508,62 +514,5 @@ export const updateUserProfile = catchAsyncErrors(
       "User profile updated successfully",
       userWithoutPassword
     );
-  }
-);
-
-// Upload Profile Image
-export const uploadProfileImage = catchAsyncErrors(
-  async (req: Request, res: Response, next: NextFunction) => {
-    const userId = req.user?._id;
-    console.log("User Id : ", userId);
-
-    if (!userId) {
-      return next(new ApiError(400, "User not found"));
-    }
-
-    if (!req.file) {
-      return next(new ApiError(400, "No file uploaded"));
-    }
-
-    try {
-      // Upload to Cloudinary
-      const uploadResult = await uploadToCloudinary(req.file.buffer, {
-        folder: `Epharma/profiles/${userId}`,
-      });
-
-      console.log("File uploaded to Cloudinary:", uploadResult);
-
-      // Find user and update ProfileImage array
-      const user = await UserModel.findById(userId);
-
-      if (!user) {
-        return next(new ApiError(404, "User not found"));
-      }
-
-      // Add new image URL to ProfileImage array
-      if (!user.ProfileImage) {
-        user.ProfileImage = [];
-      }
-
-      user.ProfileImage.push(uploadResult.secure_url);
-
-      // Keep only last 5 images (optional - aap remove kar sakte ho)
-      if (user.ProfileImage.length > 5) {
-        user.ProfileImage = user.ProfileImage.slice(-5);
-      }
-
-      await user.save();
-      console.log("User profile image updated");
-
-      return handleResponse(req, res, 200, "Profile image uploaded successfully", {
-        imageUrl: uploadResult.secure_url,
-        allImages: user.ProfileImage,
-      });
-    } catch (error: any) {
-      console.error("Error uploading profile image:", error);
-      return next(
-        new ApiError(500, error.message || "Failed to upload profile image")
-      );
-    }
   }
 );

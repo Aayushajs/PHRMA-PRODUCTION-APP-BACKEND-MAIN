@@ -1,69 +1,45 @@
-import { cloudinary } from "../config/cloudinary";
-import { ApiError } from "./ApiError";
+import { v2 as cloudinary } from "cloudinary";
+import type { UploadApiResponse } from "cloudinary";
+import dotenv from "dotenv";
 
-interface UploadOptions {
-  folder?: string;
-  resource_type?: "image" | "video" | "raw" | "auto";
-  public_id?: string;
-}
+dotenv.config({ path: './config/.env' });
 
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
-export const uploadToCloudinary = async (
-  fileBuffer: Buffer,
-  options: UploadOptions = {}
-): Promise<{ secure_url: string; public_id: string }> => {
-  return new Promise((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream(
-      {
-        folder: options.folder || "Epharma/profiles",
-        resource_type: options.resource_type || "image",
-        public_id: options.public_id,
-      },
-      (error, result) => {
-        if (error) {
-          console.error("Cloudinary upload error:", error);
-          reject(new ApiError(500, `Failed to upload file: ${error.message}`));
-        } else if (result) {
-          resolve({
-            secure_url: result.secure_url,
-            public_id: result.public_id,
-          });
-        } else {
-          reject(new ApiError(500, "Unknown error during upload"));
-        }
-      }
-    );
-
-    uploadStream.end(fileBuffer);
-  });
-};
-
-
-export const deleteFromCloudinary = async (publicId: string): Promise<void> => {
-  try {
-    const result = await cloudinary.uploader.destroy(publicId);
-    if (result.result !== "ok") {
-      console.warn(`Warning: File ${publicId} deletion result: ${result.result}`);
+export const uploadToCloudinary = async (fileBuffer: Buffer, folder: string) => {
+  return new Promise<UploadApiResponse>((resolve, reject) => {
+    // Validate input
+    if (!fileBuffer || fileBuffer.length === 0) {
+      return reject(new Error("Invalid file buffer"));
     }
-  } catch (error) {
-    console.error("Error deleting from Cloudinary:", error);
-    throw new ApiError(500, "Failed to delete file from Cloudinary");
-  }
-};
 
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      return reject(new Error("Cloudinary credentials not configured"));
+    }
 
-export const uploadMultipleToCloudinary = async (
-  fileBuffers: Buffer[],
-  folder: string = "Epharma/profiles"
-): Promise<{ secure_url: string; public_id: string }[]> => {
-  const uploadPromises = fileBuffers.map((buffer) =>
-    uploadToCloudinary(buffer, { folder })
-  );
-
-  try {
-    return await Promise.all(uploadPromises);
-  } catch (error) {
-    console.error("Error uploading multiple files:", error);
-    throw error;
-  }
+    cloudinary.uploader
+      .upload_stream(
+        { 
+          folder: folder || "Epharma",
+          resource_type: "image"
+        }, 
+        (error, result) => {
+          if (error) {
+            console.error("Cloudinary upload error:", error);
+            return reject(error);
+          }
+          if (result) {
+            resolve(result);
+          } else {
+            reject(new Error("Upload failed - no result"));
+          }
+        }
+      )
+      .end(fileBuffer);
+  });
 };

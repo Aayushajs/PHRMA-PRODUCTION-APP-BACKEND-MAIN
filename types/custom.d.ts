@@ -1,4 +1,4 @@
-import { Iuser } from '../Databases/Entities/user.Interface'; // adjust path
+import { Iuser } from '../Databases/Entities/user.Interface';
 
 declare global {
   namespace Express {
@@ -7,3 +7,5 @@ declare global {
     }
   }
 }
+
+export {};
