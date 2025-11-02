@@ -1,4 +1,5 @@
 import { CategoryModel } from "../Databases/Models/Category.model";
+import CategoryLogModel from "../Databases/Models/categoryLog.model";
 import { Request, Response, NextFunction } from "express";
 import type { SortOrder } from "mongoose";
 import { getCache, setCache, deleteCache, deleteCachePattern } from "../Utils/cache";
@@ -709,6 +710,21 @@ export class CategoryLogService {
   private static CACHE_PREFIX = "categoryLogs";
   private static CACHE_TTL = 1800;
 
+  // Debug method to check database connection and data
+  public static getDebugInfo = catchAsyncErrors(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const totalLogs = await CategoryLogModel.countDocuments({});
+      const sampleLogs = await CategoryLogModel.find({}).limit(5).lean();
+      
+      return handleResponse(req, res, 200, "Debug info fetched", {
+        totalLogs,
+        sampleLogs,
+        modelName: CategoryLogModel.modelName,
+        collectionName: CategoryLogModel.collection.name
+      });
+    }
+  );
+
   public static getAllLogs = catchAsyncErrors(
     async (req: Request, res: Response, next: NextFunction) => {
       const {
@@ -827,8 +843,7 @@ export class CategoryLogService {
         }
       ];
 
-      const CategoryLog = mongoose.connection.db?.collection("categorylogs");
-      const [result] = await CategoryLog?.aggregate(pipeline).toArray() || [{ logs: [], totalCount: [{ count: 0 }] }];
+      const [result] = await CategoryLogModel.aggregate(pipeline).exec();
       
       const totalLogs = result?.totalCount[0]?.count || 0;
       const logs = result?.logs || [];
@@ -921,8 +936,7 @@ export class CategoryLogService {
         }
       ];
 
-      const CategoryLog = mongoose.connection.db?.collection("categorylogs");
-      const [log] = await CategoryLog?.aggregate(pipeline).toArray() || [];
+      const [log] = await CategoryLogModel.aggregate(pipeline).exec();
 
       if (!log) {
         return next(new ApiError(404, "Category log not found"));
@@ -990,8 +1004,7 @@ export class CategoryLogService {
         { $limit: limitNum }
       ];
 
-      const CategoryLog = mongoose.connection.db?.collection("categorylogs");
-      const result = await CategoryLog?.aggregate(pipeline).toArray() || [];
+      const result = await CategoryLogModel.aggregate(pipeline).exec();
 
       return handleResponse(req, res, 200, "Category date range logs fetched successfully", {
         dateRange: { startDate, endDate },
@@ -1057,8 +1070,7 @@ export class CategoryLogService {
         }
       ];
 
-      const CategoryLog = mongoose.connection.db?.collection("categorylogs");
-      const [stats] = await CategoryLog?.aggregate(pipeline).toArray() || [null];
+      const [stats] = await CategoryLogModel.aggregate(pipeline).exec() || [null];
 
       const responseData = {
         period,

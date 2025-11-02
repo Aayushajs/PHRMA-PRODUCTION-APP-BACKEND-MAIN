@@ -16,10 +16,15 @@ r.post(
   ]),
   CategoryService.createCategory
 );
-
 r.get("/", CategoryService.getAllCategory);
 
 r.get("/list", CategoryService.getCategoriesSimple);
+
+r.get("/logs/debug", CategoryLogService.getDebugInfo);
+r.get("/logs", CategoryLogService.getAllLogs);
+r.get("/logs/stats", CategoryLogService.getLogStats);
+r.get("/logs/date-range", CategoryLogService.getLogsByDateRange);
+r.get("/logs/:id", CategoryLogService.getLogById);
 
 r.get("/:id", CategoryService.getCategoryById);
 
@@ -38,10 +43,5 @@ r.delete("/:id", adminMiddleware, CategoryService.ActiovationCategory);
 r.patch(
   "/bulk/toggle-active",adminMiddleware, CategoryService.bulkToggleActive
 );
-
-r.get("/logs", adminMiddleware, CategoryLogService.getAllLogs);
-r.get("/logs/stats", adminMiddleware, CategoryLogService.getLogStats);
-r.get("/logs/date-range", adminMiddleware, CategoryLogService.getLogsByDateRange);
-r.get("/logs/:id", adminMiddleware, CategoryLogService.getLogById);
 
 export default router;
