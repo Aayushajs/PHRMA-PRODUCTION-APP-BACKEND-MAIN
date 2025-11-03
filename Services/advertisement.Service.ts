@@ -2,7 +2,7 @@ import Advertisement from '../Databases/Models/advertisement.model';
 import { Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import crypto from 'crypto';
-import { getCache, setCache, deleteCache, deleteCachePattern } from '../utils/cache';
+import { getCache, setCache, deleteCache, deleteCachePattern } from '../Utils/cache';
 import { ApiError } from '../Utils/ApiError';
 import { handleResponse } from '../Utils/handleResponse';
 import { catchAsyncErrors } from '../Utils/catchAsyncErrors';

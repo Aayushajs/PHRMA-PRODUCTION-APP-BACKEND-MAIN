@@ -1,4 +1,4 @@
-import {featuredMedicineSchema} from '../Schema/featuredMedicine';
+import {featuredMedicineSchema} from '../Schema/featuredMedicine.Schema';
 import { IFeaturedMedicine } from '../Entities/featuredMedicine.interface';
 import { model } from 'mongoose';
 import { FeaturedMedicineLogger } from '../../Middlewares/LogMedillewares/featuredMedicineLog';

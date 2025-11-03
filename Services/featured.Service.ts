@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import FeaturedMedicine from "../Databases/Models/FeaturedMedicine.model";
 import FeaturedMedicineLog from "../Databases/Models/feturedLog.model";
-import { getCache, setCache, deleteCache } from "../utils/cache";
+import { getCache, setCache, deleteCache } from "../Utils/cache";
 import { catchAsyncErrors } from "../Utils/catchAsyncErrors";
 import { ApiError } from "../Utils/ApiError";
 import { handleResponse } from "../Utils/handleResponse";

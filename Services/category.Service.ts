@@ -2,7 +2,7 @@ import { CategoryModel } from "../Databases/Models/Category.model";
 import CategoryLogModel from "../Databases/Models/categoryLog.model";
 import { Request, Response, NextFunction } from "express";
 import type { SortOrder } from "mongoose";
-import { getCache, setCache, deleteCache, deleteCachePattern } from "../utils/cache";
+import { getCache, setCache, deleteCache, deleteCachePattern } from "../Utils/cache";
 import crypto from "crypto";
 import { ApiError } from "../Utils/ApiError";
 import { handleResponse } from "../Utils/handleResponse";
