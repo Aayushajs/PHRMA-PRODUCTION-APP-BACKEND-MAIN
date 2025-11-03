@@ -7,7 +7,7 @@ import { getCache, setCache, deleteCache, deleteCachePattern } from '../Utils/ca
 import { ApiError } from '../Utils/ApiError';
 import { handleResponse } from '../Utils/handleResponse';
 import { catchAsyncErrors } from '../Utils/catchAsyncErrors';
-import { uploadToCloudinary } from "../utils/cloudinaryUpload";
+import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
 import { IAdvertisement } from '../Databases/Entities/advertisement.interface';
 import User from '../Databases/Models/user.Models';
 

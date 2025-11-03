@@ -5,7 +5,7 @@ import { getCache, setCache, deleteCache } from "../Utils/cache";
 import { catchAsyncErrors } from "../Utils/catchAsyncErrors";
 import { ApiError } from "../Utils/ApiError";
 import { handleResponse } from "../Utils/handleResponse";
-import { uploadToCloudinary } from "../utils/cloudinaryUpload";
+import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
 import crypto from "crypto";
 import mongoose from "mongoose";
 
