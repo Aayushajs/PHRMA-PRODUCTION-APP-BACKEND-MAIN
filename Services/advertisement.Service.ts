@@ -1,14 +1,13 @@
 import Advertisement from '../Databases/Models/advertisement.model';
 import { Request, Response, NextFunction } from 'express';
-import type { SortOrder } from 'mongoose';
 import mongoose from 'mongoose';
 import crypto from 'crypto';
-import { getCache, setCache, deleteCache, deleteCachePattern } from '../Utils/cache';
+import { getCache, setCache, deleteCache, deleteCachePattern } from '../utils/cache';
 import { ApiError } from '../Utils/ApiError';
 import { handleResponse } from '../Utils/handleResponse';
 import { catchAsyncErrors } from '../Utils/catchAsyncErrors';
 import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
-import { IAdvertisement } from '../Databases/Entities/advertisement.interface';
+
 import User from '../Databases/Models/user.Models';
 
 export default class AdvertisementService {

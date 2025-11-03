@@ -7,4 +7,4 @@ import { FeaturedMedicineLogger } from '../../Middlewares/LogMedillewares/featur
 // log middleware
 FeaturedMedicineLogger(featuredMedicineSchema);
 const FeaturedMedicine = model<IFeaturedMedicine>("FeaturedMedicine", featuredMedicineSchema);
-export default FeaturedMedicine;
+export default FeaturedMedicine;                                                    
