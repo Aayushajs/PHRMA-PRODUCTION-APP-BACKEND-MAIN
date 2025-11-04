@@ -275,7 +275,7 @@ export default class NotificationLogService {
 
   public static getUserLogs = catchAsyncErrors(
     async (req: Request, res: Response, next: NextFunction) => {
-      const userId = req.user?._id;
+      const { userId } = req.params;
       const {
         page = 1,
         limit = 20,
@@ -343,6 +343,7 @@ export default class NotificationLogService {
         const pipeline: any[] = [
           { $match: matchStage },
 
+          // Similar lookup logic as getActiveLogs
           {
             $lookup: {
               from: "categories",
@@ -395,6 +396,7 @@ export default class NotificationLogService {
             },
           },
 
+          // Filter out logs where related entity is deleted or inactive (same logic)
           {
             $match: {
               $or: [
@@ -508,6 +510,9 @@ export default class NotificationLogService {
     }
   );
 
+  /**
+   * Get a specific notification log by ID
+   */
   public static getLogById = catchAsyncErrors(
     async (req: Request, res: Response, next: NextFunction) => {
       const { id } = req.params;
@@ -679,6 +684,7 @@ export default class NotificationLogService {
           );
         }
 
+        // Clear related caches
         await Promise.all([
           deleteCache(`${CACHE_PREFIX}:single:${id}`),
           deleteCachePattern(`${CACHE_PREFIX}:user:${userId}:*`),
@@ -701,7 +707,7 @@ export default class NotificationLogService {
 
   public static getUserStats = catchAsyncErrors(
     async (req: Request, res: Response, next: NextFunction) => {
-      const userId = req.user?._id;
+      const { userId } = req.params;
       const { period = "7d" } = req.query;
 
       if (!userId || !mongoose.isValidObjectId(userId)) {

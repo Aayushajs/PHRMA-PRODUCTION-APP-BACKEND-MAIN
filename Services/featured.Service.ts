@@ -1,16 +1,15 @@
 import { Request, Response, NextFunction } from "express";
-import FeaturedMedicine from "../Databases/Models/featuredMedicine.Model";
+import FeaturedMedicine from "../Databases/Models/FeaturedMedicine.model";
 import FeaturedMedicineLog from "../Databases/Models/feturedLog.model";
-import { getCache, setCache, deleteCache } from "../utils/cache";
-import { catchAsyncErrors } from "../utils/catchAsyncErrors";
-import { ApiError } from "../utils/ApiError";
-import { handleResponse } from "../utils/handleResponse";
-import { uploadToCloudinary } from "../utils/cloudinaryUpload";
-import { sendPushNotification } from "../utils/notification";
-import User from "../Databases/Models/user.Models";
-import { NotificationService } from '../Middlewares/LogMedillewares/notificationLogger';
+import { getCache, setCache, deleteCache } from "../Utils/cache";
+import { catchAsyncErrors } from "../Utils/catchAsyncErrors";
+import { ApiError } from "../Utils/ApiError";
+import { handleResponse } from "../Utils/handleResponse";
+import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
 import crypto from "crypto";
 import mongoose from "mongoose";
+import NotificationService from "../Middlewares/LogMedillewares/notificationLogger";
+import User from "../Databases/Models/user.Models";
 
 const CACHE_KEY = "featuredMedicines";
 const CACHE_TTL = 3000;

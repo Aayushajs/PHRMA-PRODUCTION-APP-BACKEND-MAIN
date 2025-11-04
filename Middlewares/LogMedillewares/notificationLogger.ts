@@ -1,4 +1,4 @@
-import { sendPushNotification } from '../../utils/notification';
+import { sendPushNotification } from '../../Utils/notification';
 import NotificationLogModel from '../../Databases/Models/notificationLog.model';
 import { INotificationLogCreate } from '../../Databases/Entities/notificationLog.interface';
 import mongoose from 'mongoose';
