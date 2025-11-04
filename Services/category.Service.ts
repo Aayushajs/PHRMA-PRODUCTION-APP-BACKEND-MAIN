@@ -8,7 +8,6 @@ import {
   deleteCache,
   deleteCachePattern,
 } from "../Utils/cache";
-import { sendPushNotification } from "../Utils/notification";
 import crypto from "crypto";
 import { ApiError } from "../Utils/ApiError";
 import { handleResponse } from "../Utils/handleResponse";

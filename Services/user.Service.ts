@@ -439,54 +439,75 @@ public static getUserProfile = catchAsyncErrors(
 public static updateUserProfile = catchAsyncErrors(
   async (req: Request, res: Response, next: NextFunction) => {
     const userId = req.user?._id;
-    console.log("User Id : ", userId);
 
-    const { name, email, address, phone, age, dob, ProfileImage, fcmToken } = req.body;
+    const requestBody = req.body || {};
+    const { 
+      name, 
+      email, 
+      address, 
+      phone, 
+      age, 
+      dob, 
+      ProfileImage, 
+      fcmToken 
+    } = requestBody;
 
-    console.log("Request Body : ", req.body);
+    if (!userId) {
+      return next(new ApiError(400, "User authentication required"));
+    }
 
     const user = await UserModel.findById(userId);
 
     if (!user) {
-      return next(new ApiError(400, "User not found"));
+      return next(new ApiError(404, "User not found"));
     }
 
-    
-    if (email && email !== user.email) {
-      const existingUser = await UserModel.findOne({ email });
+    if (email && email.trim() !== user.email) {
+      const existingUser = await UserModel.findOne({ email: email.trim() });
       if (existingUser) {
         return next(new ApiError(400, "Email already exists"));
       }
-      user.email = email;
+      user.email = email.trim().toLowerCase();
     }
 
-  
-    if (phone && phone !== user.phone) {
-      const existingUser = await UserModel.findOne({ phone });
+    if (phone && phone.trim() !== user.phone) {
+      const existingUser = await UserModel.findOne({ phone: phone.trim() });
       if (existingUser) {
         return next(new ApiError(400, "Phone number already exists"));
       }
-      user.phone = phone;
+      user.phone = phone.trim();
     }
 
-    if (fcmToken) {
-      user.fcmToken = fcmToken;
+    // FCM token update
+    if (fcmToken && fcmToken.trim()) {
+      user.fcmToken = fcmToken.trim();
     }
 
-    // Update other fields
-    if (name) user.name = name;
-    if (age !== undefined) user.age = age;
-    if (dob) user.dob = dob;
+    // Update other basic fields
+    if (name && name.trim()) {
+      user.name = name.trim();
+    }
+    
+    if (age !== undefined && age !== null && age !== "") {
+      const ageNumber = parseInt(age);
+      if (ageNumber >= 0 && ageNumber <= 150) {
+        user.age = ageNumber;
+      }
+    }
+    
+    if (dob) {
+      user.dob = new Date(dob);
+    }
 
+    // Handle file upload for profile image
     if (req.file) {
       try {
-        console.log("Uploading profile image for user update...");
         const uploadResult = await uploadToCloudinary(
           req.file.buffer,
           `Epharma/profiles/${userId}`
         );
-        if (!user.ProfileImage) user.ProfileImage = [];
-        user.ProfileImage.push(uploadResult.secure_url);
+        
+        user.ProfileImage = [uploadResult.secure_url];
       } catch (error: any) {
         return next(
           new ApiError(500, `Failed to upload image: ${error.message || error}`)
@@ -494,40 +515,89 @@ public static updateUserProfile = catchAsyncErrors(
       }
     }
 
-    if (
-      ProfileImage && Array.isArray(ProfileImage)
-    ) {
-      user.ProfileImage = [...(user.ProfileImage || []), ...ProfileImage];
-
-      if (user.ProfileImage.length > 5) {
-        user.ProfileImage = user.ProfileImage.slice(-5);
-      }
-    } else {
-      if (user.ProfileImage && user.ProfileImage.length > 5) {
-        user.ProfileImage = user.ProfileImage.slice(-5);
+    if (ProfileImage && typeof ProfileImage === 'string' && ProfileImage.trim()) {
+      user.ProfileImage = [ProfileImage.trim()];
+    } else if (ProfileImage && Array.isArray(ProfileImage) && ProfileImage.length > 0) {
+      const validUrl = ProfileImage.find(url => url && typeof url === 'string' && url.trim());
+      if (validUrl) {
+        user.ProfileImage = [validUrl.trim()];
       }
     }
-    // Update address
-    if (address) {
-      user.address = {
-        ...user.address,
-        ...address,
-      };
+
+    if (address && typeof address === 'object') {
+      try {
+        let addressData = address;
+        if (typeof address === 'string') {
+          addressData = JSON.parse(address);
+        }
+
+        if (!user.address) {
+          user.address = {
+            street: "",
+            city: "",
+            state: "",
+            zip: "",
+            country: "India"
+          };
+        }
+
+        if (addressData.street !== undefined) user.address.street = addressData.street || "";
+        if (addressData.city !== undefined) user.address.city = addressData.city || "";
+        if (addressData.state !== undefined) user.address.state = addressData.state || "";
+        if (addressData.zip !== undefined) user.address.zip = addressData.zip || "";
+        if (addressData.country !== undefined) user.address.country = addressData.country || "India";
+
+        // Handle location coordinates
+        if (addressData.location && typeof addressData.location === 'object') {
+          if (!user.address.location) {
+            user.address.location = { longitude: 0, latitude: 0 };
+          }
+          
+          if (addressData.location.longitude !== undefined) {
+            user.address.location.longitude = parseFloat(addressData.location.longitude) || 0;
+          }
+          if (addressData.location.latitude !== undefined) {
+            user.address.location.latitude = parseFloat(addressData.location.latitude) || 0;
+          }
+        }
+
+      } catch (addressError: any) {
+        return next(new ApiError(400, "Invalid address format"));
+      }
     }
 
-    await user.save();
-    console.log("User updated successfully");
+    try {
+      await user.save();
+    } catch (saveError: any) {
+      return next(new ApiError(500, `Failed to update user: ${saveError.message}`));
+    }
 
-    // Remove password from response
-    const userWithoutPassword = user.toObject();
-    delete (userWithoutPassword as any).password;
+    // Prepare response data
+    const userResponse = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      age: user.age,
+      dob: user.dob,
+      role: user.role,
+      fcmToken: user.fcmToken,
+      address: user.address || {},
+      ProfileImage: user.ProfileImage || [],
+      lastLogin: user.lastLogin,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      wishlist: user.wishlist || [],
+      viewedItems: user.viewedItems || [],
+      itemsPurchased: user.itemsPurchased || []
+    };
 
     return handleResponse(
       req,
       res,
       200,
       "User profile updated successfully",
-      userWithoutPassword
+      userResponse
     );
   }
 );
