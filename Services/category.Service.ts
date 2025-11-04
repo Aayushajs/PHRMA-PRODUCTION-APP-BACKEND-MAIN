@@ -7,13 +7,13 @@ import {
   setCache,
   deleteCache,
   deleteCachePattern,
-} from "../utils/cache";
-import { sendPushNotification } from "../utils/notification";
+} from "../Utils/cache";
+import { sendPushNotification } from "../Utils/notification";
 import crypto from "crypto";
-import { ApiError } from "../utils/ApiError";
-import { handleResponse } from "../utils/handleResponse";
-import { uploadToCloudinary } from "../utils/cloudinaryUpload";
-import { catchAsyncErrors } from "../utils/catchAsyncErrors";
+import { ApiError } from "../Utils/ApiError";
+import { handleResponse } from "../Utils/handleResponse";
+import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
+import { catchAsyncErrors } from "../Utils/catchAsyncErrors";
 import mongoose from "mongoose";
 import {
   ICategory,

@@ -1,11 +1,11 @@
 import { Request, Response, NextFunction } from "express";
 import FeaturedMedicine from "../Databases/Models/FeaturedMedicine.model";
 import FeaturedMedicineLog from "../Databases/Models/feturedLog.model";
-import { getCache, setCache, deleteCache } from "../utils/cache";
-import { catchAsyncErrors } from "../utils/catchAsyncErrors";
-import { ApiError } from "../utils/ApiError";
-import { handleResponse } from "../utils/handleResponse";
-import { uploadToCloudinary } from "../utils/cloudinaryUpload";
+import { getCache, setCache, deleteCache } from "../Utils/cache";
+import { catchAsyncErrors } from "../Utils/catchAsyncErrors";
+import { ApiError } from "../Utils/ApiError";
+import { handleResponse } from "../Utils/handleResponse";
+import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
 import crypto from "crypto";
 import mongoose from "mongoose";
 

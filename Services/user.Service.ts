@@ -1,16 +1,16 @@
 import { Response, Request, NextFunction } from "express";
-import { catchAsyncErrors } from "../utils/catchAsyncErrors";
-import { ApiError } from "../utils/ApiError";
+import { catchAsyncErrors } from "../Utils/catchAsyncErrors";
+import { ApiError } from "../Utils/ApiError";
 import UserModel from "../Databases/Models/user.Models";
 import bcrypt from "bcryptjs";
-import { handleResponse } from "../utils/handleResponse";
-import { generateUserToken } from "../utils/jwtToken";
-import { generateOtp } from "../utils/OtpGenerator";
+import { handleResponse } from "../Utils/handleResponse";
+import { generateUserToken } from "../Utils/jwtToken";
+import { generateOtp } from "../Utils/OtpGenerator";
 import { redis } from "../config/redis";
-import { sendEmail } from "../utils/mailer";
+import { sendEmail } from "../Utils/mailer";
 import { OAuth2Client, TokenPayload } from "google-auth-library";
-import RoleIndex from "../utils/Roles.enum";
-import { uploadToCloudinary } from "../utils/cloudinaryUpload";
+import RoleIndex from "../Utils/Roles.enum";
+import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
 
 export default class UserService {
   public static  signup = catchAsyncErrors(

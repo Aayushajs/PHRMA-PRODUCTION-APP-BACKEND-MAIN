@@ -7,7 +7,7 @@
 └───────────────────────────────────────────────────────────────────────┘
 */
 
-import RoleIndex from "../../utils/Roles.enum";
+import RoleIndex from "../../Utils/Roles.enum";
 import { Iuser } from "../Entities/user.Interface";
 import { Schema, Document } from "mongoose";
 
