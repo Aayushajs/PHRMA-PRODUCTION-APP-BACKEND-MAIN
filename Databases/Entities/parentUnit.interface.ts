@@ -12,7 +12,9 @@ export interface IParentUnit {
   code: string;
   description?: string;
   isActive: boolean;
-  createdBy: Schema.Types.ObjectId;
-  updatedBy: Schema.Types.ObjectId;
+  createdBy?: Schema.Types.ObjectId;
+  updatedBy?: Schema.Types.ObjectId;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 

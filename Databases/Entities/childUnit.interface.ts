@@ -9,4 +9,6 @@ export interface IChildUnit {
   isActive: boolean;
   createdBy: Schema.Types.ObjectId;
   updatedBy: Schema.Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
 }

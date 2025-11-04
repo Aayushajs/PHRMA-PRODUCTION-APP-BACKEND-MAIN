@@ -1,13 +1,5 @@
 import { Schema, Document } from "mongoose";
-
-export interface IParentUnit {
-  name: string;
-  code: string;
-  description?: string;
-  isActive: boolean;
-  createdBy: Schema.Types.ObjectId;
-  updatedBy: Schema.Types.ObjectId;
-}
+import { IParentUnit } from "../Entities/parentUnit.interface";
 
 export const parentUnitSchema = new Schema<IParentUnit & Document>(
   {
@@ -34,13 +26,19 @@ export const parentUnitSchema = new Schema<IParentUnit & Document>(
     },
     createdBy: {
       type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true
+      ref: "User"
     },
     updatedBy: {
       type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true
+      ref: "User"
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    },
+    updatedAt: {
+      type: Date,
+      default: Date.now
     }
   },
   { timestamps: true }
