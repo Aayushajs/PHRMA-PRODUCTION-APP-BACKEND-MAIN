@@ -63,10 +63,10 @@ export class NotificationService {
     }
   ) {
     const results = [];
-
+    
     for (const user of users) {
       if (!user.fcmToken) continue;
-
+      
       const result = await this.sendNotificationWithLog(
         user._id,
         user.fcmToken,

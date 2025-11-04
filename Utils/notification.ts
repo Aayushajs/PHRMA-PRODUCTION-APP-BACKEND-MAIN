@@ -19,7 +19,7 @@ export const sendPushNotification = async (
       body,
       data,
     };
-
+console.log(" Sending notification:", message);
     const response = await axios.post("https://exp.host/--/api/v2/push/send", message, {
       headers: {
         "Accept": "application/json",
