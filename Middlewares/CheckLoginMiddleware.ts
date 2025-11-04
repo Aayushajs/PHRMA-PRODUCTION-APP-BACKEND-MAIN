@@ -1,9 +1,9 @@
 import jwt from "jsonwebtoken";
 import { Request, Response, NextFunction } from "express";
-import { ApiError } from "../Utils/ApiError";
+import { ApiError } from "../utils/ApiError";
 import userModel from "../Databases/Models/user.Models";
-import { catchAsyncErrors } from "../Utils/catchAsyncErrors";
-import RoleIndex from "../Utils/Roles.enum";
+import { catchAsyncErrors } from "../utils/catchAsyncErrors";
+import RoleIndex from "../utils/Roles.enum";
 import dotenv from "dotenv";
 dotenv.config({ path: "./config/.env" });
 

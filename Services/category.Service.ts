@@ -2,18 +2,25 @@ import { CategoryModel } from "../Databases/Models/Category.model";
 import CategoryLogModel from "../Databases/Models/categoryLog.model";
 import { Request, Response, NextFunction } from "express";
 import type { SortOrder } from "mongoose";
-import { getCache, setCache, deleteCache, deleteCachePattern } from "../Utils/cache";
+import {
+  getCache,
+  setCache,
+  deleteCache,
+  deleteCachePattern,
+} from "../utils/cache";
+import { sendPushNotification } from "../utils/notification";
 import crypto from "crypto";
-import { ApiError } from "../Utils/ApiError";
-import { handleResponse } from "../Utils/handleResponse";
-import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
-import { catchAsyncErrors } from "../Utils/catchAsyncErrors";
+import { ApiError } from "../utils/ApiError";
+import { handleResponse } from "../utils/handleResponse";
+import { uploadToCloudinary } from "../utils/cloudinaryUpload";
+import { catchAsyncErrors } from "../utils/catchAsyncErrors";
 import mongoose from "mongoose";
 import {
   ICategory,
   CategoryServiceResponse,
-  CATEGORY_CONSTANTS
+  CATEGORY_CONSTANTS,
 } from "../types/Category";
+import User from "../Databases/Models/user.Models";
 
 const {
   CACHE_PREFIX,
@@ -37,14 +44,22 @@ const genCodeFromName = (name: string) =>
     .slice(0, 60);
 
 export default class CategoryService {
-  // Create new category
   public static async createCategory(
     req: Request,
     res: Response,
     next: NextFunction
   ): CategoryServiceResponse {
     try {
-      const { name, title, description, code, offerText, priority = 0, isFeatured = false, isActive = true } = req.body;
+      const {
+        name,
+        title,
+        description,
+        code,
+        offerText,
+        priority = 0,
+        isFeatured = false,
+        isActive = true,
+      } = req.body;
       const files = req.files as any;
 
       if (!name || !title || !offerText || !files?.imageUrl) {
@@ -53,7 +68,7 @@ export default class CategoryService {
 
       const trimmedName = name.trim();
       const finalCode = code?.trim() || genCodeFromName(trimmedName);
-      
+
       const categoryData: Partial<ICategory> = {
         name: trimmedName,
         title: title.trim(),
@@ -66,7 +81,7 @@ export default class CategoryService {
         createdBy: (req as any).user?._id,
         updatedBy: (req as any).user?._id,
         imageUrl: ["temp"],
-        bannerUrl: ["temp"]
+        bannerUrl: ["temp"],
       };
 
       const categories = await CategoryModel.insertMany([categoryData]);
@@ -78,26 +93,56 @@ export default class CategoryService {
 
       process.nextTick(async () => {
         try {
-          const imageFiles = Array.isArray(files.imageUrl) ? files.imageUrl : [files.imageUrl];
-          const bannerFiles = files.bannerUrl ? (Array.isArray(files.bannerUrl) ? files.bannerUrl : [files.bannerUrl]) : [];
-          
+          const imageFiles = Array.isArray(files.imageUrl)
+            ? files.imageUrl
+            : [files.imageUrl];
+          const bannerFiles = files.bannerUrl
+            ? Array.isArray(files.bannerUrl)
+              ? files.bannerUrl
+              : [files.bannerUrl]
+            : [];
+
           const [imageResults, bannerResults] = await Promise.all([
-            Promise.all(imageFiles.map((f: any) => uploadToCloudinary(f.buffer, CLOUDINARY_FOLDERS.IMAGES))),
-            bannerFiles.length ? Promise.all(bannerFiles.map((f: any) => uploadToCloudinary(f.buffer, CLOUDINARY_FOLDERS.BANNERS))) : []
+            Promise.all(
+              imageFiles.map((f: any) =>
+                uploadToCloudinary(f.buffer, CLOUDINARY_FOLDERS.IMAGES)
+              )
+            ),
+            bannerFiles.length
+              ? Promise.all(
+                  bannerFiles.map((f: any) =>
+                    uploadToCloudinary(f.buffer, CLOUDINARY_FOLDERS.BANNERS)
+                  )
+                )
+              : [],
           ]);
 
           await CategoryModel.updateOne(
             { _id: category._id },
-            { 
-              imageUrl: imageResults.map(r => r.secure_url),
-              bannerUrl: bannerResults.map(r => r.secure_url)
+            {
+              imageUrl: imageResults.map((r) => r.secure_url),
+              bannerUrl: bannerResults.map((r) => r.secure_url),
             }
           );
         } catch (err) {
-          console.error('Upload error:', err);
+          console.error("Upload error:", err);
         }
       });
 
+      // send notification about new category creation
+      const users = await User.find({ fcmToken: { $ne: null } }).select(
+        "name fcmToken"
+      );
+
+      for (const user of users) {
+        if (!user.fcmToken) continue;
+        await sendPushNotification(
+          user.fcmToken,
+          " New Category Added!",
+          `${category.title} has been added to the store.`,
+          { categoryId: category._id }
+        );
+      }
       return handleResponse(req, res, 201, "Category created successfully", {
         _id: category._id,
         name: category.name,
@@ -110,7 +155,9 @@ export default class CategoryService {
         isActive: category.isActive,
       });
     } catch (error: any) {
-      return next(new ApiError(500, `Failed to create category: ${error.message}`));
+      return next(
+        new ApiError(500, `Failed to create category: ${error.message}`)
+      );
     }
   }
 
@@ -216,7 +263,12 @@ export default class CategoryService {
     next: NextFunction
   ): CategoryServiceResponse {
     try {
-      const { search = "", page = 1, limit = 10, isActive = "true" } = req.query;
+      const {
+        search = "",
+        page = 1,
+        limit = 10,
+        isActive = "true",
+      } = req.query;
 
       const pageNum = parseInt(page as string) || 1;
       const limitNum = parseInt(limit as string) || 10;
@@ -543,7 +595,7 @@ export default class CategoryService {
       await Promise.all([
         deleteCache(`${CACHE_PREFIX}:single:${id}`),
         deleteCachePattern(`${CACHE_PREFIX}:list:*`),
-        deleteCachePattern(`${CACHE_PREFIX}:simple:*`)
+        deleteCachePattern(`${CACHE_PREFIX}:simple:*`),
       ]);
 
       return handleResponse(
@@ -678,7 +730,7 @@ export default class CategoryService {
       const cachePromises = [
         deleteCachePattern(`${CACHE_PREFIX}:list:*`),
         deleteCachePattern(`${CACHE_PREFIX}:simple:*`),
-        ...categoryIds.map(id => deleteCache(`${CACHE_PREFIX}:single:${id}`))
+        ...categoryIds.map((id) => deleteCache(`${CACHE_PREFIX}:single:${id}`)),
       ];
 
       await Promise.all(cachePromises);
@@ -715,12 +767,12 @@ export class CategoryLogService {
     async (req: Request, res: Response, next: NextFunction) => {
       const totalLogs = await CategoryLogModel.countDocuments({});
       const sampleLogs = await CategoryLogModel.find({}).limit(5).lean();
-      
+
       return handleResponse(req, res, 200, "Debug info fetched", {
         totalLogs,
         sampleLogs,
         modelName: CategoryLogModel.modelName,
-        collectionName: CategoryLogModel.collection.name
+        collectionName: CategoryLogModel.collection.name,
       });
     }
   );
@@ -737,7 +789,7 @@ export class CategoryLogService {
         startDate,
         endDate,
         sortBy = "createdAt",
-        order = "desc"
+        order = "desc",
       } = req.query;
 
       const pageNum = parseInt(page as string) || 1;
@@ -746,12 +798,31 @@ export class CategoryLogService {
 
       const cacheKey = `${this.CACHE_PREFIX}:all:${crypto
         .createHash("md5")
-        .update(JSON.stringify({ page, limit, search, action, userId, categoryId, startDate, endDate, sortBy, order }))
+        .update(
+          JSON.stringify({
+            page,
+            limit,
+            search,
+            action,
+            userId,
+            categoryId,
+            startDate,
+            endDate,
+            sortBy,
+            order,
+          })
+        )
         .digest("hex")}`;
 
       const cachedData = await getCache(cacheKey);
       if (cachedData) {
-        return handleResponse(req, res, 200, "Category logs fetched from cache", cachedData);
+        return handleResponse(
+          req,
+          res,
+          200,
+          "Category logs fetched from cache",
+          cachedData
+        );
       }
 
       const matchStage: any = {};
@@ -763,22 +834,28 @@ export class CategoryLogService {
           { "userDetails.name": { $regex: searchRegex } },
           { action: { $regex: searchRegex } },
           { operation: { $regex: searchRegex } },
-          { summary: { $regex: searchRegex } }
+          { summary: { $regex: searchRegex } },
         ];
       }
 
       if (action) matchStage.action = action;
-      if (userId && mongoose.isValidObjectId(userId)) matchStage.performedBy = new mongoose.Types.ObjectId(userId as string);
-      if (categoryId && mongoose.isValidObjectId(categoryId)) matchStage.categoryId = new mongoose.Types.ObjectId(categoryId as string);
+      if (userId && mongoose.isValidObjectId(userId))
+        matchStage.performedBy = new mongoose.Types.ObjectId(userId as string);
+      if (categoryId && mongoose.isValidObjectId(categoryId))
+        matchStage.categoryId = new mongoose.Types.ObjectId(
+          categoryId as string
+        );
 
       if (startDate || endDate) {
         matchStage.timestamp = {};
-        if (startDate) matchStage.timestamp.$gte = new Date(startDate as string);
+        if (startDate)
+          matchStage.timestamp.$gte = new Date(startDate as string);
         if (endDate) matchStage.timestamp.$lte = new Date(endDate as string);
       }
 
       const sortOrder = order === "asc" ? 1 : -1;
-      const finalSortBy = sortBy === "createdAt" ? "timestamp" : sortBy as string;
+      const finalSortBy =
+        sortBy === "createdAt" ? "timestamp" : (sortBy as string);
       const sortObj = { [finalSortBy]: sortOrder } as any;
 
       const pipeline: any[] = [
@@ -789,8 +866,8 @@ export class CategoryLogService {
             localField: "categoryId",
             foreignField: "_id",
             as: "categoryDetails",
-            pipeline: [{ $project: { name: 1, code: 1, imageUrl: 1 } }]
-          }
+            pipeline: [{ $project: { name: 1, code: 1, imageUrl: 1 } }],
+          },
         },
         {
           $lookup: {
@@ -798,14 +875,14 @@ export class CategoryLogService {
             localField: "performedBy",
             foreignField: "_id",
             as: "userDetails",
-            pipeline: [{ $project: { name: 1, email: 1 } }]
-          }
+            pipeline: [{ $project: { name: 1, email: 1 } }],
+          },
         },
         {
           $addFields: {
             categoryInfo: { $arrayElemAt: ["$categoryDetails", 0] },
-            userInfo: { $arrayElemAt: ["$userDetails", 0] }
-          }
+            userInfo: { $arrayElemAt: ["$userDetails", 0] },
+          },
         },
         {
           $project: {
@@ -820,31 +897,31 @@ export class CategoryLogService {
               $cond: {
                 if: { $ne: ["$categoryInfo", null] },
                 then: "$categoryInfo",
-                else: { name: "Unknown Category", code: "", imageUrl: [] }
-              }
+                else: { name: "Unknown Category", code: "", imageUrl: [] },
+              },
             },
             userInfo: {
               $cond: {
                 if: { $ne: ["$userInfo", null] },
                 then: "$userInfo",
-                else: { name: "Unknown User", email: "" }
-              }
+                else: { name: "Unknown User", email: "" },
+              },
             },
             createdAt: 1,
-            updatedAt: 1
-          }
+            updatedAt: 1,
+          },
         },
         { $sort: sortObj },
         {
           $facet: {
             logs: [{ $skip: skip }, { $limit: limitNum }],
-            totalCount: [{ $count: "count" }]
-          }
-        }
+            totalCount: [{ $count: "count" }],
+          },
+        },
       ];
 
       const [result] = await CategoryLogModel.aggregate(pipeline).exec();
-      
+
       const totalLogs = result?.totalCount[0]?.count || 0;
       const logs = result?.logs || [];
 
@@ -856,15 +933,21 @@ export class CategoryLogService {
           totalItems: totalLogs,
           itemsPerPage: limitNum,
           hasNextPage: pageNum < Math.ceil(totalLogs / limitNum),
-          hasPrevPage: pageNum > 1
+          hasPrevPage: pageNum > 1,
         },
         filters: { search, action, userId, categoryId, startDate, endDate },
-        meta: { sortBy, order, aggregationUsed: true }
+        meta: { sortBy, order, aggregationUsed: true },
       };
 
       await setCache(cacheKey, responseData, this.CACHE_TTL);
 
-      return handleResponse(req, res, 200, "Category logs fetched successfully", responseData);
+      return handleResponse(
+        req,
+        res,
+        200,
+        "Category logs fetched successfully",
+        responseData
+      );
     }
   );
 
@@ -880,7 +963,13 @@ export class CategoryLogService {
       const cachedData = await getCache(cacheKey);
 
       if (cachedData) {
-        return handleResponse(req, res, 200, "Category log fetched from cache", cachedData);
+        return handleResponse(
+          req,
+          res,
+          200,
+          "Category log fetched from cache",
+          cachedData
+        );
       }
 
       const pipeline: any[] = [
@@ -890,22 +979,22 @@ export class CategoryLogService {
             from: "categories",
             localField: "categoryId",
             foreignField: "_id",
-            as: "categoryDetails"
-          }
+            as: "categoryDetails",
+          },
         },
         {
           $lookup: {
             from: "users",
             localField: "performedBy",
             foreignField: "_id",
-            as: "userDetails"
-          }
+            as: "userDetails",
+          },
         },
         {
           $addFields: {
             categoryInfo: { $arrayElemAt: ["$categoryDetails", 0] },
-            userInfo: { $arrayElemAt: ["$userDetails", 0] }
-          }
+            userInfo: { $arrayElemAt: ["$userDetails", 0] },
+          },
         },
         {
           $project: {
@@ -920,20 +1009,20 @@ export class CategoryLogService {
               $cond: {
                 if: { $ne: ["$categoryInfo", null] },
                 then: "$categoryInfo",
-                else: null
-              }
+                else: null,
+              },
             },
             userInfo: {
               $cond: {
                 if: { $ne: ["$userInfo", null] },
                 then: "$userInfo",
-                else: null
-              }
+                else: null,
+              },
             },
             createdAt: 1,
-            updatedAt: 1
-          }
-        }
+            updatedAt: 1,
+          },
+        },
       ];
 
       const [log] = await CategoryLogModel.aggregate(pipeline).exec();
@@ -944,7 +1033,13 @@ export class CategoryLogService {
 
       await setCache(cacheKey, log, this.CACHE_TTL);
 
-      return handleResponse(req, res, 200, "Category log fetched successfully", log);
+      return handleResponse(
+        req,
+        res,
+        200,
+        "Category log fetched successfully",
+        log
+      );
     }
   );
 
@@ -959,8 +1054,8 @@ export class CategoryLogService {
       const matchStage: any = {
         timestamp: {
           $gte: new Date(startDate as string),
-          $lte: new Date(endDate as string)
-        }
+          $lte: new Date(endDate as string),
+        },
       };
 
       if (action) matchStage.action = action;
@@ -972,12 +1067,20 @@ export class CategoryLogService {
         {
           $group: {
             _id: {
-              date: { $dateToString: { format: "%Y-%m-%d", date: "$timestamp" } },
-              action: "$action"
+              date: {
+                $dateToString: { format: "%Y-%m-%d", date: "$timestamp" },
+              },
+              action: "$action",
             },
             count: { $sum: 1 },
-            logs: { $push: { _id: "$_id", summary: "$summary", timestamp: "$timestamp" } }
-          }
+            logs: {
+              $push: {
+                _id: "$_id",
+                summary: "$summary",
+                timestamp: "$timestamp",
+              },
+            },
+          },
         },
         {
           $group: {
@@ -986,31 +1089,37 @@ export class CategoryLogService {
               $push: {
                 action: "$_id.action",
                 count: "$count",
-                logs: { $slice: ["$logs", 5] }
-              }
+                logs: { $slice: ["$logs", 5] },
+              },
             },
-            totalCount: { $sum: "$count" }
-          }
+            totalCount: { $sum: "$count" },
+          },
         },
         {
           $project: {
             _id: 0,
             date: "$_id",
             actions: 1,
-            totalCount: 1
-          }
+            totalCount: 1,
+          },
         },
-        { $sort: { "date": -1 } },
-        { $limit: limitNum }
+        { $sort: { date: -1 } },
+        { $limit: limitNum },
       ];
 
       const result = await CategoryLogModel.aggregate(pipeline).exec();
 
-      return handleResponse(req, res, 200, "Category date range logs fetched successfully", {
-        dateRange: { startDate, endDate },
-        data: result,
-        totalDays: result.length
-      });
+      return handleResponse(
+        req,
+        res,
+        200,
+        "Category date range logs fetched successfully",
+        {
+          dateRange: { startDate, endDate },
+          data: result,
+          totalDays: result.length,
+        }
+      );
     }
   );
 
@@ -1039,21 +1148,27 @@ export class CategoryLogService {
       const cachedData = await getCache(cacheKey);
 
       if (cachedData) {
-        return handleResponse(req, res, 200, "Category log stats fetched from cache", cachedData);
+        return handleResponse(
+          req,
+          res,
+          200,
+          "Category log stats fetched from cache",
+          cachedData
+        );
       }
 
       const pipeline: any[] = [
         {
           $match: {
-            timestamp: { $gte: startDate, $lte: endDate }
-          }
+            timestamp: { $gte: startDate, $lte: endDate },
+          },
         },
         {
           $group: {
             _id: "$action",
             count: { $sum: 1 },
-            latestLog: { $max: "$timestamp" }
-          }
+            latestLog: { $max: "$timestamp" },
+          },
         },
         {
           $group: {
@@ -1062,27 +1177,35 @@ export class CategoryLogService {
               $push: {
                 action: "$_id",
                 count: "$count",
-                latestLog: "$latestLog"
-              }
+                latestLog: "$latestLog",
+              },
             },
-            totalLogs: { $sum: "$count" }
-          }
-        }
+            totalLogs: { $sum: "$count" },
+          },
+        },
       ];
 
-      const [stats] = await CategoryLogModel.aggregate(pipeline).exec() || [null];
+      const [stats] = (await CategoryLogModel.aggregate(pipeline).exec()) || [
+        null,
+      ];
 
       const responseData = {
         period,
         dateRange: { startDate, endDate },
         totalLogs: stats?.totalLogs || 0,
         actionBreakdown: stats?.actions || [],
-        generatedAt: new Date()
+        generatedAt: new Date(),
       };
 
       await setCache(cacheKey, responseData, 600);
 
-      return handleResponse(req, res, 200, "Category log statistics fetched successfully", responseData);
+      return handleResponse(
+        req,
+        res,
+        200,
+        "Category log statistics fetched successfully",
+        responseData
+      );
     }
   );
 }

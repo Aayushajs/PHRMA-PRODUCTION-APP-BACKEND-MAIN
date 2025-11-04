@@ -1,16 +1,16 @@
 import { Response, Request, NextFunction } from "express";
-import { catchAsyncErrors } from "../Utils/catchAsyncErrors";
-import { ApiError } from "../Utils/ApiError";
+import { catchAsyncErrors } from "../utils/catchAsyncErrors";
+import { ApiError } from "../utils/ApiError";
 import UserModel from "../Databases/Models/user.Models";
 import bcrypt from "bcryptjs";
-import { handleResponse } from "../Utils/handleResponse";
-import { generateUserToken } from "../Utils/jwtToken";
-import { generateOtp } from "../Utils/OtpGenerator";
+import { handleResponse } from "../utils/handleResponse";
+import { generateUserToken } from "../utils/jwtToken";
+import { generateOtp } from "../utils/OtpGenerator";
 import { redis } from "../config/redis";
-import { sendEmail } from "../Utils/mailer";
+import { sendEmail } from "../utils/mailer";
 import { OAuth2Client, TokenPayload } from "google-auth-library";
-import RoleIndex from "../Utils/Roles.enum";
-import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
+import RoleIndex from "../utils/Roles.enum";
+import { uploadToCloudinary } from "../utils/cloudinaryUpload";
 
 export default class UserService {
   public static  signup = catchAsyncErrors(
@@ -441,7 +441,7 @@ public static updateUserProfile = catchAsyncErrors(
     const userId = req.user?._id;
     console.log("User Id : ", userId);
 
-    const { name, email, address, phone, age, dob, ProfileImage } = req.body;
+    const { name, email, address, phone, age, dob, ProfileImage, fcmToken } = req.body;
 
     console.log("Request Body : ", req.body);
 
@@ -467,6 +467,10 @@ public static updateUserProfile = catchAsyncErrors(
         return next(new ApiError(400, "Phone number already exists"));
       }
       user.phone = phone;
+    }
+
+    if (fcmToken) {
+      user.fcmToken = fcmToken;
     }
 
     // Update other fields
