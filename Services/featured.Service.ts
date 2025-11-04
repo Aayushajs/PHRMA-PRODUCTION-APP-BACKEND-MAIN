@@ -6,6 +6,9 @@ import { catchAsyncErrors } from "../utils/catchAsyncErrors";
 import { ApiError } from "../utils/ApiError";
 import { handleResponse } from "../utils/handleResponse";
 import { uploadToCloudinary } from "../utils/cloudinaryUpload";
+import { sendPushNotification } from "../utils/notification";
+import User from "../Databases/Models/user.Models";
+import { NotificationService } from '../Middlewares/LogMedillewares/notificationLogger';
 import crypto from "crypto";
 import mongoose from "mongoose";
 
@@ -84,6 +87,38 @@ export default class FeaturedMedicineService {
     const newMedicine = await FeaturedMedicine.create(cleanData);
 
     await deleteCache(CACHE_KEY).catch(() => null);
+
+    // Fire-and-forget: notify users about new featured medicine with a friendly, high-conversion message
+    process.nextTick(async () => {
+      try {
+        const users = await User.find({ fcmToken: { $ne: null } }).select(
+          "_id name fcmToken"
+        );
+
+        if (!users || users.length === 0) return;
+
+        const title = `Just Arrived: ${newMedicine.title}!`;
+        const body = `Grab ${newMedicine.title} now — limited stock available. Enjoy exclusive savings and fast delivery. Tap to view and order before it's gone!`;
+
+        await NotificationService.sendNotificationToMultipleUsers(
+          users.filter(u => u.fcmToken).map(u => ({
+            _id: u._id.toString(),
+            fcmToken: u.fcmToken as string,
+            name: u.name
+          })),
+          title,
+          body,
+          {
+            type: "FEATURED_CREATED",
+            relatedEntityId: newMedicine._id.toString(),
+            relatedEntityType: "FeaturedMedicine",
+            payload: { medicineId: newMedicine._id }
+          }
+        );
+      } catch (err) {
+        console.error("Notification (createFeaturedMedicine) error:", err);
+      }
+    });
 
     return handleResponse(
       req,
@@ -244,6 +279,39 @@ public static updateFeaturedMedicine = catchAsyncErrors(
     if (!updatedMedicine) return next(new ApiError(404, "Medicine not found"));
 
     await deleteCache(CACHE_KEY).catch(() => null);
+
+    // Fire-and-forget: notify users about featured medicine update with an engaging message
+    process.nextTick(async () => {
+      try {
+        const users = await User.find({ fcmToken: { $ne: null } }).select(
+          "_id name fcmToken"
+        );
+
+        if (!users || users.length === 0) return;
+
+        const titleText = (updatedMedicine as any).title || "An item";
+        const title = `Update: ${titleText} just got better!`;
+        const body = `Good news! ${titleText} has been updated — improved details, availability or savings may await. Tap to check the latest offer and secure yours.`;
+
+        await NotificationService.sendNotificationToMultipleUsers(
+          users.filter(u => u.fcmToken).map(u => ({
+            _id: u._id.toString(),
+            fcmToken: u.fcmToken as string,
+            name: u.name
+          })),
+          title,
+          body,
+          {
+            type: "FEATURED_UPDATED",
+            relatedEntityId: updatedMedicine._id.toString(),
+            relatedEntityType: "FeaturedMedicine",
+            payload: { medicineId: updatedMedicine._id }
+          }
+        );
+      } catch (err) {
+        console.error("Notification (updateFeaturedMedicine) error:", err);
+      }
+    });
 
     return handleResponse(
       req,

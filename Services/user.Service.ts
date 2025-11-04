@@ -206,7 +206,7 @@ public static login = catchAsyncErrors(
       httpOnly: true,
       secure: false,
       sameSite: "lax",
-      maxAge: 24 * 60 * 60 * 1000,
+      maxAge:  14 * 24 * 60 * 60 * 1000,
     });
 
     return handleResponse(req, res, 200, "Login Successful", {
@@ -223,7 +223,7 @@ public static logout = catchAsyncErrors(
       httpOnly: true,
       secure: false,
       sameSite: "lax",
-      maxAge: 24 * 60 * 60 * 1000,
+      maxAge: 14 * 24 * 60 * 60 * 1000,
     });
 
     return handleResponse(req, res, 200, "Logout Successful");
@@ -365,7 +365,7 @@ public static googleAuthLogin = catchAsyncErrors(
         httpOnly: true,
         secure: false,
         sameSite: "lax",
-        maxAge: 24 * 60 * 60 * 1000,
+        maxAge: 14 * 24 * 60 * 60 * 1000,
       });
 
       return handleResponse(req, res, 200, "Login Successful", {
@@ -379,7 +379,7 @@ public static googleAuthLogin = catchAsyncErrors(
         httpOnly: true,
         secure: false,
         sameSite: "lax",
-        maxAge: 24 * 60 * 60 * 1000,
+        maxAge: 14 * 24 * 60 * 60 * 1000,
       });
 
       return handleResponse(req, res, 200, "Login Successful", {
