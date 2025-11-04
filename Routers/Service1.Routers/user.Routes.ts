@@ -1,33 +1,25 @@
 import {Router} from "express";
-import {
-    signup,
-    login,
-    forgotPassword,
-    verifyOtp,
-    ResetPassword,
-    googleAuthLogin,
-    getUserProfile,
-    updateUserProfile
-} from "../../Services/user.Service";
+import UserService from "../../Services/user.Service";
 import { customersMiddleware } from '../../Middlewares/CheckLoginMiddleware'
 import  uploadImage  from "../../config/multer";
 
 const userRouter = Router();
+const r = userRouter
 
-userRouter.get('/verify-token',customersMiddleware, (req, res) => {
+r.get('/verify-token',customersMiddleware, (req, res) => {
     res.status(200).json({
         success: true,
         message: "Token is valid",
         user: req.user
     });
 });
-userRouter.post('/signup', uploadImage.single('profileImage'), signup);
-userRouter.post('/login',login);
-userRouter.post('/forgot-password',forgotPassword);
-userRouter.post('/verify-otp',customersMiddleware,verifyOtp);
-userRouter.post('/reset-password',customersMiddleware,ResetPassword);
-userRouter.post('/google-login',googleAuthLogin);
-userRouter.get('/get-profile',customersMiddleware,getUserProfile);
-userRouter.put('/update/profile', customersMiddleware, uploadImage.single('profileImage'), updateUserProfile);
+r.post('/signup', uploadImage.single('profileImage'), UserService.signup);
+r.post('/login', UserService.login);
+r.post('/forgot-password', UserService.forgotPassword);
+r.post('/verify-otp', customersMiddleware, UserService.verifyOtp);
+r.post('/reset-password', customersMiddleware, UserService.ResetPassword);
+r.post('/google-login', UserService.googleAuthLogin);
+r.get('/get-profile', customersMiddleware, UserService.getUserProfile);
+r.put('/update/profile', customersMiddleware, uploadImage.single('profileImage'), UserService.updateUserProfile);
 
 export default userRouter;

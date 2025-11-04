@@ -1,28 +1,29 @@
 import { Router } from "express";
-import {
-  createFeaturedMedicine,
-  getFeaturedMedicines,
-  updateFeaturedMedicine
-} from "../../Services/featured.Service";
+import FeaturedMedicineService, { FeaturedMedicineLogService } from "../../Services/featured.Service";
 import upload from "../../config/multer";
 import { adminMiddleware } from "../../Middlewares/CheckLoginMiddleware";
 
 const featuredRouter = Router();
+const r = featuredRouter;
 
-featuredRouter.post(
-  "/create", 
-  adminMiddleware, 
-  upload.single("imageUrl"), 
-  createFeaturedMedicine
+r.post("/create",adminMiddleware,upload.single("imageUrl"),
+  FeaturedMedicineService.createFeaturedMedicine
 );
 
-featuredRouter.get("/", getFeaturedMedicines); // check krna bcha hai 
+r.get("/", FeaturedMedicineService.getFeaturedMedicines);
 
-featuredRouter.put(
-  "/:id", 
-  adminMiddleware, 
-  upload.single("imageUrl"), 
-  updateFeaturedMedicine
+r.put("/:id", adminMiddleware, upload.single("imageUrl"),
+  FeaturedMedicineService.updateFeaturedMedicine
 );
+
+r.delete("/:id",adminMiddleware,
+  FeaturedMedicineService.deleteFeaturedMedicine
+);
+
+// LOG ROUTES
+r.get("/logs", adminMiddleware, FeaturedMedicineLogService.getAllLogs);
+r.get("/logs/stats", adminMiddleware, FeaturedMedicineLogService.getLogStats);
+r.get("/logs/date-range", adminMiddleware, FeaturedMedicineLogService.getLogsByDateRange);
+r.get("/logs/:id", adminMiddleware, FeaturedMedicineLogService.getLogById);
 
 export default featuredRouter;

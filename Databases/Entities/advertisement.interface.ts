@@ -9,7 +9,7 @@ export interface IAdvertisement {
     itemId?: mongoose.Schema.Types.ObjectId;
     categoryId?: mongoose.Schema.Types.ObjectId;
     offerText?: string;
-    startDate: Date; 
+    startDate: Date;
     endDate: Date;
     isActive: boolean;
     adClickTracking: {

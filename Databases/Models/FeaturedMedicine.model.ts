@@ -1,4 +1,4 @@
-import {featuredMedicineSchema} from '../Schema/featuredMedicine';
+import {featuredMedicineSchema} from '../Schema/featuredMedicine.Schema';
 import { IFeaturedMedicine } from '../Entities/featuredMedicine.interface';
 import { model } from 'mongoose';
 import { FeaturedMedicineLogger } from '../../Middlewares/LogMedillewares/featuredMedicineLog';
@@ -7,4 +7,4 @@ import { FeaturedMedicineLogger } from '../../Middlewares/LogMedillewares/featur
 // log middleware
 FeaturedMedicineLogger(featuredMedicineSchema);
 const FeaturedMedicine = model<IFeaturedMedicine>("FeaturedMedicine", featuredMedicineSchema);
-export default FeaturedMedicine;
+export default FeaturedMedicine;                                                    

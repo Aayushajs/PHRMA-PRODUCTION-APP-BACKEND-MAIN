@@ -1,21 +1,23 @@
 import { Request, Response, NextFunction } from "express";
-import FeaturedMedicine from "../Databases/Models/featuredMedicine.Model";
-import { getCache, setCache, deleteCache } from "../Utils/cache"; // using your reusable cache utils
+import FeaturedMedicine from "../Databases/Models/FeaturedMedicine.model";
+import FeaturedMedicineLog from "../Databases/Models/feturedLog.model";
+import { getCache, setCache, deleteCache } from "../Utils/cache";
 import { catchAsyncErrors } from "../Utils/catchAsyncErrors";
 import { ApiError } from "../Utils/ApiError";
 import { handleResponse } from "../Utils/handleResponse";
-import { uploadToCloudinary } from "../utils/cloudinaryUpload";
+import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
 import crypto from "crypto";
 import mongoose from "mongoose";
 
 const CACHE_KEY = "featuredMedicines";
 const CACHE_TTL = 3000;
 
-//CREATE-----------------------------------------------------------------
-export const createFeaturedMedicine = catchAsyncErrors(
-  async (req: Request, res: Response, next: NextFunction) => {
-    const {
-      title,
+export default class FeaturedMedicineService {
+  //CREATE-----------------------------------------------------------------
+  public static createFeaturedMedicine = catchAsyncErrors(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const {
+        title,
       remarks,
       description = "",
       category,
@@ -81,7 +83,7 @@ export const createFeaturedMedicine = catchAsyncErrors(
 
     const newMedicine = await FeaturedMedicine.create(cleanData);
 
-    await deleteCache(CACHE_KEY);
+    await deleteCache(CACHE_KEY).catch(() => null);
 
     return handleResponse(
       req,
@@ -94,7 +96,7 @@ export const createFeaturedMedicine = catchAsyncErrors(
 );
 
 // ALL GET -----------------------------------------------------
-export const getFeaturedMedicines = catchAsyncErrors(
+public static getFeaturedMedicines = catchAsyncErrors(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const cachedData = await getCache<{ data: any[]; checksum: string }>(
@@ -119,10 +121,9 @@ export const getFeaturedMedicines = catchAsyncErrors(
             as: "categoryDetails",
           },
         },
-        { $unwind: "$categoryDetails" },
         {
           $addFields: {
-            categoryName: "$categoryDetails.name",
+            categoryInfo: { $arrayElemAt: ["$categoryDetails", 0] },
             discountValue: {
               $round: [
                 { $multiply: ["$stock", { $divide: ["$discount", 100] }] },
@@ -147,7 +148,14 @@ export const getFeaturedMedicines = catchAsyncErrors(
             _id: 1,
             title: 1,
             description: 1,
-            category: "$categoryName",
+            category: {
+              $cond: {
+                if: { $ne: ["$categoryInfo", null] },
+                then: "$categoryInfo.name",
+                else: "Unknown Category"
+              }
+            },
+            categoryId: "$category",
             stock: 1,
             discount: 1,
             discountValue: 1,
@@ -185,7 +193,7 @@ export const getFeaturedMedicines = catchAsyncErrors(
 );
 
 //UPDATE ------------------------------------------------------
-export const updateFeaturedMedicine = catchAsyncErrors(
+public static updateFeaturedMedicine = catchAsyncErrors(
   async (req: Request, res: Response, next: NextFunction) => {
     const { id } = req.params;
     const updates = req.body;
@@ -235,7 +243,7 @@ export const updateFeaturedMedicine = catchAsyncErrors(
 
     if (!updatedMedicine) return next(new ApiError(404, "Medicine not found"));
 
-    await deleteCache(CACHE_KEY);
+    await deleteCache(CACHE_KEY).catch(() => null);
 
     return handleResponse(
       req,
@@ -246,3 +254,391 @@ export const updateFeaturedMedicine = catchAsyncErrors(
     );
   }
 );
+
+// delete ------------------------------------------------------
+public static deleteFeaturedMedicine = catchAsyncErrors(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { id } = req.params;
+    if (!id) return next(new ApiError(400, "Invalid medicine ID"));
+
+    const deletedMedicine = await FeaturedMedicine.findByIdAndDelete(id);
+    if (!deletedMedicine) {
+      return next(new ApiError(404, "Medicine not found"));
+    }
+    await deleteCache(CACHE_KEY).catch(() => null);
+    return handleResponse(
+      req,
+      res,
+      200,
+      "Medicine deleted successfully",
+      deletedMedicine
+    );
+  }
+);
+}
+
+export class FeaturedMedicineLogService {
+  private static CACHE_PREFIX = "featuredLogs";
+  private static CACHE_TTL = 1800;
+
+  public static getAllLogs = catchAsyncErrors(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const {
+        page = 1,
+        limit = 20,
+        search = "",
+        action,
+        userId,
+        medicineId,
+        startDate,
+        endDate,
+        sortBy = "createdAt",
+        order = "desc"
+      } = req.query;
+
+      const pageNum = parseInt(page as string) || 1;
+      const limitNum = Math.min(100, parseInt(limit as string) || 20);
+      const skip = (pageNum - 1) * limitNum;
+
+      const cacheKey = `${this.CACHE_PREFIX}:all:${crypto
+        .createHash("md5")
+        .update(JSON.stringify({ page, limit, search, action, userId, medicineId, startDate, endDate, sortBy, order }))
+        .digest("hex")}`;
+
+      const cachedData = await getCache(cacheKey);
+      if (cachedData) {
+        return handleResponse(req, res, 200, "Logs fetched from cache", cachedData);
+      }
+
+      const matchStage: any = {};
+
+      if (search && search.toString().trim()) {
+        const searchRegex = new RegExp(search.toString().trim(), "i");
+        matchStage.$or = [
+          { "medicineDetails.title": { $regex: searchRegex } },
+          { "userDetails.name": { $regex: searchRegex } },
+          { action: { $regex: searchRegex } },
+          { operation: { $regex: searchRegex } },
+          { summary: { $regex: searchRegex } }
+        ];
+      }
+
+      if (action) matchStage.action = action;
+      if (userId && mongoose.isValidObjectId(userId)) matchStage.performedBy = new mongoose.Types.ObjectId(userId as string);
+      if (medicineId && mongoose.isValidObjectId(medicineId)) matchStage.medicineId = new mongoose.Types.ObjectId(medicineId as string);
+
+      if (startDate || endDate) {
+        matchStage.timestamp = {};
+        if (startDate) matchStage.timestamp.$gte = new Date(startDate as string);
+        if (endDate) matchStage.timestamp.$lte = new Date(endDate as string);
+      }
+
+      const sortOrder = order === "asc" ? 1 : -1;
+      const finalSortBy = sortBy === "createdAt" ? "timestamp" : sortBy as string;
+      const sortObj = { [finalSortBy]: sortOrder } as any;
+
+      const pipeline: any[] = [
+        { $match: matchStage },
+        {
+          $lookup: {
+            from: "featuredmedicines",
+            localField: "medicineId",
+            foreignField: "_id",
+            as: "medicineDetails",
+            pipeline: [{ $project: { title: 1, imageUrl: 1, stock: 1 } }]
+          }
+        },
+        {
+          $lookup: {
+            from: "users",
+            localField: "performedBy",
+            foreignField: "_id",
+            as: "userDetails",
+            pipeline: [{ $project: { name: 1, email: 1 } }]
+          }
+        },
+        {
+          $addFields: {
+            medicineInfo: { $arrayElemAt: ["$medicineDetails", 0] },
+            userInfo: { $arrayElemAt: ["$userDetails", 0] }
+          }
+        },
+        {
+          $project: {
+            _id: 1,
+            action: 1,
+            operation: 1,
+            summary: 1,
+            timestamp: 1,
+            oldData: 1,
+            newData: 1,
+            medicineInfo: {
+              $cond: {
+                if: { $ne: ["$medicineInfo", null] },
+                then: "$medicineInfo",
+                else: { title: "Unknown Medicine", imageUrl: "", stock: 0 }
+              }
+            },
+            userInfo: {
+              $cond: {
+                if: { $ne: ["$userInfo", null] },
+                then: "$userInfo",
+                else: { name: "Unknown User", email: "" }
+              }
+            },
+            createdAt: 1,
+            updatedAt: 1
+          }
+        },
+        { $sort: sortObj },
+        {
+          $facet: {
+            logs: [{ $skip: skip }, { $limit: limitNum }],
+            totalCount: [{ $count: "count" }]
+          }
+        }
+      ];
+
+      const [result] = await FeaturedMedicineLog.aggregate(pipeline);
+      
+      const totalLogs = result?.totalCount[0]?.count || 0;
+      const logs = result?.logs || [];
+
+      const responseData = {
+        logs,
+        pagination: {
+          currentPage: pageNum,
+          totalPages: Math.ceil(totalLogs / limitNum),
+          totalItems: totalLogs,
+          itemsPerPage: limitNum,
+          hasNextPage: pageNum < Math.ceil(totalLogs / limitNum),
+          hasPrevPage: pageNum > 1
+        },
+        filters: { search, action, userId, medicineId, startDate, endDate },
+        meta: { sortBy, order, aggregationUsed: true }
+      };
+
+      await setCache(cacheKey, responseData, this.CACHE_TTL);
+
+      return handleResponse(req, res, 200, "Logs fetched successfully", responseData);
+    }
+  );
+
+  public static getLogById = catchAsyncErrors(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const { id } = req.params;
+
+      if (!id || !mongoose.isValidObjectId(id)) {
+        return next(new ApiError(400, "Invalid log ID"));
+      }
+
+      const cacheKey = `${this.CACHE_PREFIX}:single:${id}`;
+      const cachedData = await getCache(cacheKey);
+
+      if (cachedData) {
+        return handleResponse(req, res, 200, "Log fetched from cache", cachedData);
+      }
+
+      const pipeline: any[] = [
+        { $match: { _id: new mongoose.Types.ObjectId(id) } },
+        {
+          $lookup: {
+            from: "featuredmedicines",
+            localField: "medicineId",
+            foreignField: "_id",
+            as: "medicineDetails"
+          }
+        },
+        {
+          $lookup: {
+            from: "users",
+            localField: "performedBy",
+            foreignField: "_id",
+            as: "userDetails"
+          }
+        },
+        {
+          $addFields: {
+            medicineInfo: { $arrayElemAt: ["$medicineDetails", 0] },
+            userInfo: { $arrayElemAt: ["$userDetails", 0] }
+          }
+        },
+        {
+          $project: {
+            _id: 1,
+            action: 1,
+            operation: 1,
+            summary: 1,
+            timestamp: 1,
+            oldData: 1,
+            newData: 1,
+            medicineInfo: {
+              $cond: {
+                if: { $ne: ["$medicineInfo", null] },
+                then: "$medicineInfo",
+                else: null
+              }
+            },
+            userInfo: {
+              $cond: {
+                if: { $ne: ["$userInfo", null] },
+                then: "$userInfo",
+                else: null
+              }
+            },
+            createdAt: 1,
+            updatedAt: 1
+          }
+        }
+      ];
+
+      const [log] = await FeaturedMedicineLog.aggregate(pipeline);
+
+      if (!log) {
+        return next(new ApiError(404, "Log not found"));
+      }
+
+      await setCache(cacheKey, log, this.CACHE_TTL);
+
+      return handleResponse(req, res, 200, "Log fetched successfully", log);
+    }
+  );
+
+  public static getLogsByDateRange = catchAsyncErrors(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const { startDate, endDate, action, limit = 50 } = req.query;
+
+      if (!startDate || !endDate) {
+        return next(new ApiError(400, "Start date and end date are required"));
+      }
+
+      const matchStage: any = {
+        timestamp: {
+          $gte: new Date(startDate as string),
+          $lte: new Date(endDate as string)
+        }
+      };
+
+      if (action) matchStage.action = action;
+
+      const limitNum = Math.min(200, parseInt(limit as string) || 50);
+
+      const pipeline: any[] = [
+        { $match: matchStage },
+        {
+          $group: {
+            _id: {
+              date: { $dateToString: { format: "%Y-%m-%d", date: "$timestamp" } },
+              action: "$action"
+            },
+            count: { $sum: 1 },
+            logs: { $push: { _id: "$_id", summary: "$summary", timestamp: "$timestamp" } }
+          }
+        },
+        {
+          $group: {
+            _id: "$_id.date",
+            actions: {
+              $push: {
+                action: "$_id.action",
+                count: "$count",
+                logs: { $slice: ["$logs", 5] }
+              }
+            },
+            totalCount: { $sum: "$count" }
+          }
+        },
+        {
+          $project: {
+            _id: 0,
+            date: "$_id",
+            actions: 1,
+            totalCount: 1
+          }
+        },
+        { $sort: { "date": -1 } },
+        { $limit: limitNum }
+      ];
+
+      const result = await FeaturedMedicineLog.aggregate(pipeline);
+
+      return handleResponse(req, res, 200, "Date range logs fetched successfully", {
+        dateRange: { startDate, endDate },
+        data: result,
+        totalDays: result.length
+      });
+    }
+  );
+
+  public static getLogStats = catchAsyncErrors(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const { period = "7d" } = req.query;
+
+      let startDate: Date;
+      const endDate = new Date();
+
+      switch (period) {
+        case "24h":
+          startDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
+          break;
+        case "7d":
+          startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case "30d":
+          startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+          break;
+        default:
+          startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      }
+
+      const cacheKey = `${this.CACHE_PREFIX}:stats:${period}`;
+      const cachedData = await getCache(cacheKey);
+
+      if (cachedData) {
+        return handleResponse(req, res, 200, "Stats fetched from cache", cachedData);
+      }
+
+      const pipeline: any[] = [
+        {
+          $match: {
+            timestamp: { $gte: startDate, $lte: endDate }
+          }
+        },
+        {
+          $group: {
+            _id: "$action",
+            count: { $sum: 1 },
+            latestLog: { $max: "$timestamp" }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            actions: {
+              $push: {
+                action: "$_id",
+                count: "$count",
+                latestLog: "$latestLog"
+              }
+            },
+            totalLogs: { $sum: "$count" }
+          }
+        }
+      ];
+
+      const [stats] = await FeaturedMedicineLog.aggregate(pipeline);
+
+      const responseData = {
+        period,
+        dateRange: { startDate, endDate },
+        totalLogs: stats?.totalLogs || 0,
+        actionBreakdown: stats?.actions || [],
+        generatedAt: new Date()
+      };
+
+      await setCache(cacheKey, responseData, 600);
+
+      return handleResponse(req, res, 200, "Log statistics fetched successfully", responseData);
+    }
+  );
+}
