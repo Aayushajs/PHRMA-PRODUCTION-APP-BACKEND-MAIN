@@ -34,6 +34,7 @@ export default class NotificationLogService {
       const limitNum = Math.min(100, parseInt(limit as string) || 20);
       const skip = (pageNum - 1) * limitNum;
 
+      
       const cacheKey = `${CACHE_PREFIX}:active:${crypto
         .createHash("md5")
         .update(
