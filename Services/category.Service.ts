@@ -8,7 +8,6 @@ import {
   deleteCache,
   deleteCachePattern,
 } from "../Utils/cache";
-import { sendPushNotification } from "../Utils/notification";
 import crypto from "crypto";
 import { ApiError } from "../Utils/ApiError";
 import { handleResponse } from "../Utils/handleResponse";
@@ -21,6 +20,7 @@ import {
   CATEGORY_CONSTANTS,
 } from "../types/Category";
 import User from "../Databases/Models/user.Models";
+import NotificationService from "../Middlewares/LogMedillewares/notificationLogger";
 
 const {
   CACHE_PREFIX,
@@ -124,25 +124,38 @@ export default class CategoryService {
               bannerUrl: bannerResults.map((r) => r.secure_url),
             }
           );
+
+          // Send notification after image upload is complete
+          const users = await User.find({ fcmToken: { $ne: null } }).select(
+            "_id name fcmToken"
+          );
+
+          const notificationTitle = "New Category Added!";
+          const body = `${category.title} has been added to the store.`;
+
+          await NotificationService.sendNotificationToMultipleUsers(
+            users.filter(u => u.fcmToken).map(u => ({
+              _id: u._id.toString(),
+              fcmToken: u.fcmToken as string,
+              name: u.name
+            })),
+            notificationTitle,
+            body,
+            {
+              type: "CATEGORY_CREATED",
+              relatedEntityId: category._id.toString(),
+              relatedEntityType: "Category",
+              payload: {
+                categoryId: category._id,
+                imageUrl: imageResults.length > 0 ? imageResults[0].secure_url : null
+              },
+
+            }
+          );
         } catch (err) {
           console.error("Upload error:", err);
         }
       });
-
-      // send notification about new category creation
-      const users = await User.find({ fcmToken: { $ne: null } }).select(
-        "name fcmToken"
-      );
-
-      for (const user of users) {
-        if (!user.fcmToken) continue;
-        await sendPushNotification(
-          user.fcmToken,
-          " New Category Added!",
-          `${category.title} has been added to the store.`,
-          { categoryId: category._id }
-        );
-      }
       return handleResponse(req, res, 201, "Category created successfully", {
         _id: category._id,
         name: category.name,
@@ -153,6 +166,8 @@ export default class CategoryService {
         priority: category.priority,
         isFeatured: category.isFeatured,
         isActive: category.isActive,
+        imageUrl: category.imageUrl,
+        bannerUrl: category.bannerUrl,
       });
     } catch (error: any) {
       return next(
@@ -597,6 +612,45 @@ export default class CategoryService {
         deleteCachePattern(`${CACHE_PREFIX}:list:*`),
         deleteCachePattern(`${CACHE_PREFIX}:simple:*`),
       ]);
+
+      // Fire-and-forget: notify users about category update (similar to createCategory)
+      process.nextTick(async () => {
+        try {
+          const users = await User.find({ fcmToken: { $ne: null } }).select(
+            "_id name fcmToken"
+          );
+
+          if (!users || users.length === 0) return;
+
+          const actorName = (req as any).user?.name || 'Admin';
+          const updatedTitle = (updatedCategory as any)?.title || (updatedCategory as any)?.name || existingCategory.name;
+          const notificationTitle = "Category Updated";
+          const body = `${actorName} updated category: "${updatedTitle}"`;
+
+          await NotificationService.sendNotificationToMultipleUsers(
+            users.filter(u => u.fcmToken).map(u => ({
+              _id: u._id.toString(),
+              fcmToken: u.fcmToken as string,
+              name: u.name
+            })),
+            notificationTitle,
+            body,
+            {
+              type: "CATEGORY_UPDATED",
+              relatedEntityId: id,
+              relatedEntityType: "Category",
+              payload: {
+                categoryId: id,
+                updatedBy: actorName,
+                timestamp: new Date().toISOString(),
+                imageUrl: (updatedCategory as any)?.imageUrl?.length > 0 ? (updatedCategory as any)?.imageUrl[0] : null
+              }
+            }
+          );
+        } catch (err) {
+          console.error("Notification (updateCategory) error:", err);
+        }
+      });
 
       return handleResponse(
         req,

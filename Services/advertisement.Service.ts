@@ -9,6 +9,8 @@ import { catchAsyncErrors } from '../Utils/catchAsyncErrors';
 import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
 import { IAdvertisement } from '../Databases/Entities/advertisement.interface';
 import User from '../Databases/Models/user.Models';
+import { sendPushNotification } from '../Utils/notification';
+import { NotificationService } from '../Middlewares/LogMedillewares/notificationLogger';
 
 export default class AdvertisementService {
     private static CACHE_PREFIX = "advertisements";
@@ -141,6 +143,38 @@ export default class AdvertisementService {
                     ]);
                 } catch (error) {
                     console.error('Cache clearing failed:', error);
+                }
+            });
+
+            // Fire-and-forget: notify users about new advertisement
+            process.nextTick(async () => {
+                try {
+                    const users = await User.find({ fcmToken: { $ne: null } }).select(
+                        "_id name fcmToken"
+                    );
+
+                    if (!users || users.length === 0) return;
+
+                    const title = "New Advertisement";
+                    const body = `${advertisement.title} is now live!`;
+
+                    await NotificationService.sendNotificationToMultipleUsers(
+                        users.filter(u => u.fcmToken).map(u => ({
+                            _id: u._id.toString(),
+                            fcmToken: u.fcmToken as string,
+                            name: u.name
+                        })),
+                        title,
+                        body,
+                        {
+                            type: "AD_CREATED",
+                            relatedEntityId: advertisement._id.toString(),
+                            relatedEntityType: "Advertisement",
+                            payload: { adId: advertisement._id }
+                        }
+                    );
+                } catch (err) {
+                    console.error('Notification (createAd) error:', err);
                 }
             });
 
@@ -308,6 +342,39 @@ export default class AdvertisementService {
                     ]);
                 } catch (error) {
                     console.error('Cache clearing failed:', error);
+                }
+            });
+
+            // Fire-and-forget: notify users about advertisement update
+            process.nextTick(async () => {
+                try {
+                    const users = await User.find({ fcmToken: { $ne: null } }).select(
+                        "_id name fcmToken"
+                    );
+
+                    if (!users || users.length === 0) return;
+
+                    const actorName = (req as any).user?.name || 'Admin';
+                    const title = "Advertisement Updated";
+                    const body = `${actorName} updated advertisement: ${updatedAd.title || updatedAd.description || ''}`;
+
+                    await NotificationService.sendNotificationToMultipleUsers(
+                        users.filter(u => u.fcmToken).map(u => ({
+                            _id: u._id.toString(),
+                            fcmToken: u.fcmToken as string,
+                            name: u.name
+                        })),
+                        title,
+                        body,
+                        {
+                            type: "AD_UPDATED",
+                            relatedEntityId: updatedAd._id.toString(),
+                            relatedEntityType: "Advertisement",
+                            payload: { adId: updatedAd._id, updatedBy: actorName }
+                        }
+                    );
+                } catch (err) {
+                    console.error('Notification (updateAd) error:', err);
                 }
             });
 
@@ -658,6 +725,47 @@ export default class AdvertisementService {
             } as any);
 
             await advertisement.save();
+
+            // Notify the advertisement creator and last updater about this click (background)
+            process.nextTick(async () => {
+                try {
+                    const actor = await User.findById(userId).select('name fcmToken');
+
+                    const recipients: { _id: any; name?: string; fcmToken?: string }[] = [];
+                    if (advertisement.createdBy) {
+                        const creator = await User.findById(advertisement.createdBy).select('_id name fcmToken');
+                        if (creator) recipients.push(creator as any);
+                    }
+                    if (advertisement.updatedBy && advertisement.updatedBy.toString() !== advertisement.createdBy?.toString()) {
+                        const updater = await User.findById(advertisement.updatedBy).select('_id name fcmToken');
+                        if (updater) recipients.push(updater as any);
+                    }
+
+                    if (recipients.length === 0) return;
+
+                    const actorName = (actor as any)?.name || 'Someone';
+                    const title = 'Advertisement Clicked';
+                    const body = `Your advertisement "${advertisement.title}" was clicked by ${actorName}`;
+
+                    await NotificationService.sendNotificationToMultipleUsers(
+                        recipients.filter(r => (r as any).fcmToken).map(r => ({
+                            _id: (r as any)._id.toString(),
+                            fcmToken: (r as any).fcmToken as string,
+                            name: (r as any).name
+                        })),
+                        title,
+                        body,
+                        {
+                            type: 'AD_CLICKED',
+                            relatedEntityId: advertisement._id.toString(),
+                            relatedEntityType: "Advertisement",
+                            payload: { adId: advertisement._id, clickedBy: actorName }
+                        }
+                    );
+                } catch (err) {
+                    console.error('Notification (trackClick) error:', err);
+                }
+            });
 
             return handleResponse(
                 req,

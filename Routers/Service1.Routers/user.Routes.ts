@@ -19,7 +19,7 @@ r.post('/forgot-password', UserService.forgotPassword);
 r.post('/verify-otp', customersMiddleware, UserService.verifyOtp);
 r.post('/reset-password', customersMiddleware, UserService.ResetPassword);
 r.post('/google-login', UserService.googleAuthLogin);
-r.get('/get-profile', customersMiddleware, UserService.getUserProfile);
+r.get('/profile', customersMiddleware, UserService.getUserProfile);
 r.put('/update/profile', customersMiddleware, uploadImage.single('profileImage'), UserService.updateUserProfile);
 
 export default userRouter;
