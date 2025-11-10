@@ -7,6 +7,9 @@ import ItemModel from "../Databases/Models/item.Model"
 import { Iuser } from "../Databases/Entities/user.Interface";
 import ChildUnitModel from "../Databases/Models/childUnit.model";
 import ParentUnitModel from "../Databases/Models/parentUnit.model";
+import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
+import { v2 as cloudinary } from "cloudinary";
+
 
 
 declare global {
@@ -55,12 +58,36 @@ export default class ItemServices {
                 finalParentUnit = parentUnitId._id;
             }
 
+            let imageUrls: string[] = [];
 
+            // If files are uploaded via form-data
+            if (req.files && Array.isArray(req.files)) {
+                try {
+                    const uploadResults = await Promise.all(
+                        (req.files as Express.Multer.File[]).map(file =>
+                            uploadToCloudinary(file.buffer, "Epharma/items") // Folder name
+                        )
+                    );
+                    imageUrls = uploadResults.map(r => r.secure_url);
+                } catch (error) {
+                    console.error("Cloudinary upload error:", error);
+                    return next(new ApiError(500, "Failed to upload item images"));
+                }
+            }
+            // If frontend sends existing URLs (string or array)
+            else if (req.body.itemImages) {
+                if (Array.isArray(req.body.itemImages)) {
+                    imageUrls = req.body.itemImages;
+                } else if (typeof req.body.itemImages === "string") {
+                    imageUrls = [req.body.itemImages];
+                }
+            }
 
             const newItemData: any = {
                 itemName,
                 itemPrice,
                 itemDescription,
+                itemImages: imageUrls,
                 itemCategory,
                 itemMfgDate,
                 itemParentUnit: finalParentUnit,
@@ -71,8 +98,9 @@ export default class ItemServices {
             }
 
             const newItem: any = await ItemModel.create(newItemData);
+            await redis.del("deals:of-the-day");
 
-            handleResponse(req, res, 201, "Item created successfully", newItem);
+            return handleResponse(req, res, 201, "Item created successfully", newItem);
         }
     )
 
@@ -84,14 +112,38 @@ export default class ItemServices {
         ) => {
             const itemId = req.params.itemId;
             const updateData = req.body;
+            const existingItem = await ItemModel.findById(itemId);
+            if (!existingItem) {
+                return next(new ApiError(404, "Item not found"));
+            }
 
-            // console.log("Item ID:", itemId);
-            // console.log("Update Data:", updateData);    
+            let imageUrls: string[] = existingItem.itemImages || [];
+            if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+                try {
+                    const uploadResults = await Promise.all(
+                        (req.files as Express.Multer.File[]).map(file =>
+                            uploadToCloudinary(file.buffer, "Epharma/items") // Folder name
+                        )
+                    );
+                    imageUrls = uploadResults.map(r => r.secure_url);
+                } catch (error) {
+                    console.error("Cloudinary upload error:", error);
+                    return next(new ApiError(500, "Failed to upload item images"));
+                }
+            }
+            else if (req.body.itemImages) {
+                if (Array.isArray(req.body.itemImages)) {
+                    imageUrls = req.body.itemImages;
+                } else if (typeof req.body.itemImages === "string") {
+                    imageUrls = [req.body.itemImages];
+                }
+            }
 
             const updatedItem: any = await ItemModel.findByIdAndUpdate(
                 itemId,
                 {
                     ...updateData,
+                    itemImages: imageUrls,
                     updatedBy: req.user?._id,
                 },
                 { new: true }
@@ -101,6 +153,8 @@ export default class ItemServices {
                     new ApiError(404, "Item not found")
                 );
             }
+
+            await redis.del("deals:of-the-day");
 
             handleResponse(req, res, 200, "Item updated successfully", updatedItem);
         }
@@ -112,7 +166,39 @@ export default class ItemServices {
             res: Response,
             next: NextFunction
         ) => {
-            const itemId = req.params.id;
+            const itemId = req.params.itemId;
+
+            const existingItem = await ItemModel.findById(itemId);
+            if (!existingItem) {
+                return next(new ApiError(404, "Item not found"));
+            }
+
+            if (existingItem.itemImages && existingItem.itemImages.length > 0) {
+                try {
+                    // Extract public IDs from Cloudinary URLs
+                    const publicIds = existingItem.itemImages.map((url: string) => {
+                        const parts = url.split("/");
+                        const fileName = parts[parts.length - 1];
+                        const publicId = fileName ? fileName.split(".")[0] : "";
+                        return `Epharma/items/${publicId}`;
+                    });
+
+                    // Delete all images in parallel
+                    await Promise.all(
+                        publicIds.map(async (pid) => {
+                            try {
+                                await cloudinary.uploader.destroy(pid);
+                            } catch (err) {
+                                console.warn(`Cloudinary delete failed for ${pid}:`, err);
+                            }
+                        })
+                    );
+
+                    console.log(`Deleted ${publicIds.length} images from Cloudinary`);
+                } catch (err) {
+                    console.error("Error deleting images from Cloudinary:", err);
+                }
+            }
 
             const deletedItem: any = await ItemModel.findByIdAndDelete(itemId, {
                 data: {
@@ -125,6 +211,17 @@ export default class ItemServices {
                     new ApiError(404, "Item not found")
                 );
             }
+
+            try {
+                const redisKeys = await redis.keys("items:*");
+                if (redisKeys.length > 0) {
+                    await redis.del(redisKeys);
+                    console.log(`Cleared ${redisKeys.length} Redis cache keys`);
+                }
+            } catch (err) {
+                console.error("Redis cache cleanup failed:", err);
+            }
+
 
             handleResponse(req, res, 200, "Item deleted successfully", deletedItem);
         }
@@ -141,14 +238,14 @@ export default class ItemServices {
             const redisKey = `items:page=${page}:limit=${limit}`;
             const cachedItems = await redis.get(redisKey);
             if (cachedItems) {
-                return handleResponse(req, res, 200, "Items retrieved successfully", JSON.parse(cachedItems))   ;
+                return handleResponse(req, res, 200, "Items retrieved successfully", JSON.parse(cachedItems));
             }
 
             const items: any = await ItemModel.find()
                 .skip((page - 1) * limit)
                 .limit(limit);
 
-            console.log("total items : ",items.length);
+            console.log("total items : ", items.length);
 
             if (items.length === 0) {
                 return next(
@@ -190,6 +287,72 @@ export default class ItemServices {
             await redis.set(redisKey, JSON.stringify(items), { EX: 3600 });
 
             handleResponse(req, res, 200, "Items retrieved successfully", items);
+        }
+    )
+
+    public static getDealsOfTheDay = catchAsyncErrors(
+        async (
+            req: Request,
+            res: Response,
+            next: NextFunction
+        ) => {
+            const Min_Discount = 40;
+            const Max_Deals = 7;
+
+            const cacheKey = `deals:of-the-day`;
+            const cachedDeals = await redis.get(cacheKey);
+
+            redis.del(cacheKey);
+            // if (cachedDeals) {
+            //     //Check if newer deals exist in DB
+            //     const latestDeal = await ItemModel.findOne({ itemDiscount: { $gte: Min_Discount } })
+            //         .sort({ updatedAt: -1 })
+            //         .select("updatedAt")
+            //         .lean();
+
+            //     console.log("Latest deal in DB updated at:", latestDeal?.updatedAt);
+            //     const cacheMeta = JSON.parse(cachedDeals)?.[0]?.updatedAt;
+
+            //     console.log("Cached deals updated at:", cacheMeta); 
+
+            //     if (latestDeal && cacheMeta && new Date(latestDeal.updatedAt ?? 0) > new Date(cacheMeta)) {
+            //         console.log("⚡ Newer deals found — refreshing cache...");
+            //         await redis.del(cacheKey); // Clear old cache
+            //     } else {
+            //         console.log("Serving deals from cache");
+            //         return handleResponse(req, res, 200, "Deals retrieved successfully (cached)", JSON.parse(cachedDeals));
+            //     }
+            // }
+
+            if (cachedDeals) {
+                return handleResponse(req, res, 200, "Deals retrieved successfully", JSON.parse(cachedDeals));
+            }
+
+            const deals = await ItemModel
+                .find({ itemDiscount: { $gte: 40 } })
+                .sort({ itemDiscount: -1, updatedAt: -1 })
+                .limit(Max_Deals)
+                .select("_id itemName itemPrice itemDiscount itemImages itemCategory itemBrand updatedAt")
+                .lean();
+
+            console.log(`Found ${deals.length} deals of the day`);
+            console.log("Deals:", deals);
+
+            if (deals.length === 0) {
+                return next(new ApiError(404, "No deals found today"));
+            }
+
+            const formattedDeals = deals.map((deal) => ({
+                ...deal,
+                originalPrice: deal.itemPrice,
+                discountedPrice: +(deal.itemPrice * (1 - (Number(deal.itemDiscount ?? 0) / 100))).toFixed(2),
+            }));
+
+            console.log("Formatted Deals:", formattedDeals);
+
+            await redis.set(cacheKey, JSON.stringify(formattedDeals), { EX: 21600 });
+
+            return handleResponse(req, res, 200, "Deals fetched successfully", formattedDeals);
         }
     )
 }

@@ -1,84 +1,84 @@
-import {Iitem} from '../Entities/item.Interface';
+import { Iitem } from '../Entities/item.Interface';
 import { Schema, Document } from "mongoose";
 
 export const itemSchema = new Schema<Iitem & Document>(
     {
-        itemName : {
+        itemName: {
             type: String,
             required: true,
             trim: true,
         },
-        itemDescription : {
+        itemDescription: {
             type: String,
             trim: true,
         },
-        itemPrice : {
+        itemPrice: {
             type: Number,
             required: true,
         },
-        itemParentUnit:{
+        itemParentUnit: {
             type: Schema.Types.ObjectId,
             ref: "ParentUnit"
         },
-        itemChildUnit:{
+        itemChildUnit: {
             type: Schema.Types.ObjectId,
             ref: "ChildUnit",
             required: true,
         },
-        itemCategory : {
+        itemCategory: {
             type: Schema.Types.ObjectId,
             ref: "Category",
             required: true,
         },
-        itemMfgDate : {
-            type: Date,
-            required: true, 
-        },
-        itemExpiryDate : {
+        itemMfgDate: {
             type: Date,
             required: true,
         },
-        itemImages : {
+        itemExpiryDate: {
+            type: Date,
+            required: true,
+        },
+        itemImages: {
             type: [String],
             default: [],
         },
-        itemBrand : {
+        itemBrand: {
             type: String,
             trim: true,
         },
-        itemBatchNumber : {
+        itemBatchNumber: {
             type: String,
             trim: true,
         },
-        itemDiscount : {
+        itemDiscount: {
             type: Number,
             default: 0,
         },
-        itemRatings : {
+        itemRatings: {
             type: Number,
-            default: 0, 
+            default: 0,
         },
-        createdBy : {
+        createdBy: {
             type: Schema.Types.ObjectId,
             ref: "User"
         },
-        updatedBy : {
+        updatedBy: {
             type: Schema.Types.ObjectId,
             ref: "User",
         },
-        createdAt : {
+        createdAt: {
             type: Date,
             default: Date.now,
         },
-        updatedAt : {
+        updatedAt: {
             type: Date,
             default: Date.now,
         },
-        deletedBy : {
+        deletedBy: {
             type: Schema.Types.ObjectId,
             ref: "User"
         },
-        deletedAt : {
+        deletedAt: {
             type: Date,
         },
     },

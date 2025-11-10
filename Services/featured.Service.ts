@@ -20,328 +20,328 @@ export default class FeaturedMedicineService {
     async (req: Request, res: Response, next: NextFunction) => {
       const {
         title,
-      remarks,
-      description = "",
-      category,
-      discount = 0,
-      stock,
-      featured = false,
-      ratings = 0,
-      createdBy,
-    } = req.body;
+        remarks,
+        description = "",
+        category,
+        discount = 0,
+        stock,
+        featured = false,
+        ratings = 0,
+        createdBy,
+      } = req.body;
 
-    const createdById = (req as any).user?._id ?? createdBy;
-    if (!title?.trim() || !category || stock == null) {
-      return next(new ApiError(400, "Missing or invalid required fields"));
-    }
-
-    if (!mongoose.isValidObjectId(category)) {
-      return next(new ApiError(400, "Invalid category ID"));
-    }
-
-    // image upload
-    let imageUrl = "";
-    if (req.file) {
-      try {
-        const uploadResult = await uploadToCloudinary(
-          req.file.buffer,
-          "Epharma/medicines"
-        );
-        imageUrl = uploadResult.secure_url;
-      } catch (error) {
-        console.error("Image upload error:", error);
-        return next(new ApiError(500, "Failed to upload image"));
+      const createdById = (req as any).user?._id ?? createdBy;
+      if (!title?.trim() || !category || stock == null) {
+        return next(new ApiError(400, "Missing or invalid required fields"));
       }
-    } else if (req.body.imageUrl?.trim()) {
-      imageUrl = req.body.imageUrl.trim();
-    } else {
-      return next(
-        new ApiError(400, "Either upload an image file or provide imageUrl")
-      );
-    }
 
-    // Check for existing medicine with same title
-    const existingMedicine = await FeaturedMedicine.findOne({
-      title: title.trim(),
-    });
-    if (existingMedicine) {
-      return next(
-        new ApiError(409, "Featured medicine with same title already exists")
-      );
-    }
+      if (!mongoose.isValidObjectId(category)) {
+        return next(new ApiError(400, "Invalid category ID"));
+      }
 
-    const cleanData = {
-      title: title.trim(),
-      description: description.trim(),
-      category,
-      remarks,
-      discount: Math.min(100, Math.max(0, discount)),
-      stock: Math.max(0, stock),
-      imageUrl,
-      featured: Boolean(featured),
-      ratings: Math.min(5, Math.max(0, ratings)),
-      createdBy: createdById,
-    };
-
-    const newMedicine = await FeaturedMedicine.create(cleanData);
-
-    await deleteCache(CACHE_KEY).catch(() => null);
-
-    // Fire-and-forget: notify users about new featured medicine with a friendly, high-conversion message
-    process.nextTick(async () => {
-      try {
-        const users = await User.find({ fcmToken: { $ne: null } }).select(
-          "_id name fcmToken"
+      // image upload
+      let imageUrl = "";
+      if (req.file) {
+        try {
+          const uploadResult = await uploadToCloudinary(
+            req.file.buffer,
+            "Epharma/medicines"
+          );
+          imageUrl = uploadResult.secure_url;
+        } catch (error) {
+          console.error("Image upload error:", error);
+          return next(new ApiError(500, "Failed to upload image"));
+        }
+      } else if (req.body.imageUrl?.trim()) {
+        imageUrl = req.body.imageUrl.trim();
+      } else {
+        return next(
+          new ApiError(400, "Either upload an image file or provide imageUrl")
         );
+      }
 
-        if (!users || users.length === 0) return;
+      // Check for existing medicine with same title
+      const existingMedicine = await FeaturedMedicine.findOne({
+        title: title.trim(),
+      });
+      if (existingMedicine) {
+        return next(
+          new ApiError(409, "Featured medicine with same title already exists")
+        );
+      }
 
-        const title = `Just Arrived: ${newMedicine.title}!`;
-        const body = `Grab ${newMedicine.title} now — limited stock available. Enjoy exclusive savings and fast delivery. Tap to view and order before it's gone!`;
+      const cleanData = {
+        title: title.trim(),
+        description: description.trim(),
+        category,
+        remarks,
+        discount: Math.min(100, Math.max(0, discount)),
+        stock: Math.max(0, stock),
+        imageUrl,
+        featured: Boolean(featured),
+        ratings: Math.min(5, Math.max(0, ratings)),
+        createdBy: createdById,
+      };
 
-        await NotificationService.sendNotificationToMultipleUsers(
-          users.filter(u => u.fcmToken).map(u => ({
-            _id: u._id.toString(),
-            fcmToken: u.fcmToken as string,
-            name: u.name
-          })),
-          title,
-          body,
+      const newMedicine = await FeaturedMedicine.create(cleanData);
+
+      await deleteCache(CACHE_KEY).catch(() => null);
+
+      // Fire-and-forget: notify users about new featured medicine with a friendly, high-conversion message
+      process.nextTick(async () => {
+        try {
+          const users = await User.find({ fcmToken: { $ne: null } }).select(
+            "_id name fcmToken"
+          );
+
+          if (!users || users.length === 0) return;
+
+          const title = `Just Arrived: ${newMedicine.title}!`;
+          const body = `Grab ${newMedicine.title} now — limited stock available. Enjoy exclusive savings and fast delivery. Tap to view and order before it's gone!`;
+
+          await NotificationService.sendNotificationToMultipleUsers(
+            users.filter(u => u.fcmToken).map(u => ({
+              _id: u._id.toString(),
+              fcmToken: u.fcmToken as string,
+              name: u.name
+            })),
+            title,
+            body,
+            {
+              type: "FEATURED_CREATED",
+              relatedEntityId: newMedicine._id.toString(),
+              relatedEntityType: "FeaturedMedicine",
+              payload: { medicineId: newMedicine._id }
+            }
+          );
+        } catch (err) {
+          console.error("Notification (createFeaturedMedicine) error:", err);
+        }
+      });
+
+      return handleResponse(
+        req,
+        res,
+        201,
+        "Featured medicine created successfully",
+        newMedicine
+      );
+    }
+  );
+
+  // ALL GET -----------------------------------------------------
+  public static getFeaturedMedicines = catchAsyncErrors(
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const cachedData = await getCache<{ data: any[]; checksum: string }>(
+          CACHE_KEY
+        );
+        if (cachedData) {
+          return handleResponse(
+            req,
+            res,
+            200,
+            "Data fetched from Redis Cache",
+            cachedData
+          );
+        }
+
+        const medicines = await FeaturedMedicine.aggregate([
           {
-            type: "FEATURED_CREATED",
-            relatedEntityId: newMedicine._id.toString(),
-            relatedEntityType: "FeaturedMedicine",
-            payload: { medicineId: newMedicine._id }
-          }
-        );
-      } catch (err) {
-        console.error("Notification (createFeaturedMedicine) error:", err);
-      }
-    });
+            $lookup: {
+              from: "categories",
+              localField: "category",
+              foreignField: "_id",
+              as: "categoryDetails",
+            },
+          },
+          {
+            $addFields: {
+              categoryInfo: { $arrayElemAt: ["$categoryDetails", 0] },
+              discountValue: {
+                $round: [
+                  { $multiply: ["$stock", { $divide: ["$discount", 100] }] },
+                  2,
+                ],
+              },
+              effectivePrice: {
+                $round: [
+                  {
+                    $multiply: [
+                      "$stock",
+                      { $divide: [{ $subtract: [100, "$discount"] }, 100] },
+                    ],
+                  },
+                  2,
+                ],
+              },
+            },
+          },
+          {
+            $project: {
+              _id: 1,
+              title: 1,
+              description: 1,
+              category: {
+                $cond: {
+                  if: { $ne: ["$categoryInfo", null] },
+                  then: "$categoryInfo.name",
+                  else: "Unknown Category"
+                }
+              },
+              categoryId: "$category",
+              stock: 1,
+              discount: 1,
+              discountValue: 1,
+              effectivePrice: 1,
+              imageUrl: 1,
+              ratings: 1,
+              featured: 1,
+              createdAt: 1,
+            },
+          },
+          { $sort: { createdAt: -1 } },
+        ]);
 
-    return handleResponse(
-      req,
-      res,
-      201,
-      "Featured medicine created successfully",
-      newMedicine
-    );
-  }
-);
+        const checksum = crypto
+          .createHash("sha256")
+          .update(JSON.stringify(medicines))
+          .digest("hex");
 
-// ALL GET -----------------------------------------------------
-public static getFeaturedMedicines = catchAsyncErrors(
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const cachedData = await getCache<{ data: any[]; checksum: string }>(
-        CACHE_KEY
-      );
-      if (cachedData) {
+        const payload = { data: medicines, checksum };
+
+        await setCache(CACHE_KEY, payload, CACHE_TTL);
+
         return handleResponse(
           req,
           res,
           200,
-          "Data fetched from Redis Cache",
-          cachedData
+          " Data fetched from MongoDB",
+          payload
         );
+      } catch (error: any) {
+        console.error("Redis/Mongo Fetch Error:", error);
+        return next(new ApiError(500, "Internal Server Error"));
+      }
+    }
+  );
+
+  //UPDATE ------------------------------------------------------
+  public static updateFeaturedMedicine = catchAsyncErrors(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const { id } = req.params;
+      const updates = req.body;
+
+      if (!id) return next(new ApiError(400, "Invalid medicine ID"));
+
+      const allowedFields = [
+        "title",
+        "description",
+        "category",
+        "discount",
+        "stock",
+        "imageUrl",
+        "featured",
+        "ratings",
+        "updatedBy",
+        "remarks",
+      ];
+
+      // Filter allowed fields
+      for (const key in updates) {
+        if (!allowedFields.includes(key)) delete updates[key];
       }
 
-      const medicines = await FeaturedMedicine.aggregate([
-        {
-          $lookup: {
-            from: "categories",
-            localField: "category",
-            foreignField: "_id",
-            as: "categoryDetails",
-          },
-        },
-        {
-          $addFields: {
-            categoryInfo: { $arrayElemAt: ["$categoryDetails", 0] },
-            discountValue: {
-              $round: [
-                { $multiply: ["$stock", { $divide: ["$discount", 100] }] },
-                2,
-              ],
-            },
-            effectivePrice: {
-              $round: [
-                {
-                  $multiply: [
-                    "$stock",
-                    { $divide: [{ $subtract: [100, "$discount"] }, 100] },
-                  ],
-                },
-                2,
-              ],
-            },
-          },
-        },
-        {
-          $project: {
-            _id: 1,
-            title: 1,
-            description: 1,
-            category: {
-              $cond: {
-                if: { $ne: ["$categoryInfo", null] },
-                then: "$categoryInfo.name",
-                else: "Unknown Category"
-              }
-            },
-            categoryId: "$category",
-            stock: 1,
-            discount: 1,
-            discountValue: 1,
-            effectivePrice: 1,
-            imageUrl: 1,
-            ratings: 1,
-            featured: 1,
-            createdAt: 1,
-          },
-        },
-        { $sort: { createdAt: -1 } },
-      ]);
+      // Handle image upload if new file is provided
+      if (req.file) {
+        try {
+          const uploadResult = await uploadToCloudinary(
+            req.file.buffer,
+            "Epharma/medicines"
+          );
+          updates.imageUrl = uploadResult.secure_url;
+        } catch (error) {
+          console.error("Image upload error:", error);
+          return next(new ApiError(500, "Failed to upload image"));
+        }
+      }
 
-      const checksum = crypto
-        .createHash("sha256")
-        .update(JSON.stringify(medicines))
-        .digest("hex");
+      const updatedMedicine = await FeaturedMedicine.findByIdAndUpdate(
+        id,
+        updates,
+        {
+          new: true,
+          runValidators: true,
+        }
+      );
 
-      const payload = { data: medicines, checksum };
+      if (!updatedMedicine) return next(new ApiError(404, "Medicine not found"));
 
-      await setCache(CACHE_KEY, payload, CACHE_TTL);
+      await deleteCache(CACHE_KEY).catch(() => null);
+
+      // Fire-and-forget: notify users about featured medicine update with an engaging message
+      process.nextTick(async () => {
+        try {
+          const users = await User.find({ fcmToken: { $ne: null } }).select(
+            "_id name fcmToken"
+          );
+
+          if (!users || users.length === 0) return;
+
+          const titleText = (updatedMedicine as any).title || "An item";
+          const title = `Update: ${titleText} just got better!`;
+          const body = `Good news! ${titleText} has been updated — improved details, availability or savings may await. Tap to check the latest offer and secure yours.`;
+
+          await NotificationService.sendNotificationToMultipleUsers(
+            users.filter(u => u.fcmToken).map(u => ({
+              _id: u._id.toString(),
+              fcmToken: u.fcmToken as string,
+              name: u.name
+            })),
+            title,
+            body,
+            {
+              type: "FEATURED_UPDATED",
+              relatedEntityId: updatedMedicine._id.toString(),
+              relatedEntityType: "FeaturedMedicine",
+              payload: { medicineId: updatedMedicine._id }
+            }
+          );
+        } catch (err) {
+          console.error("Notification (updateFeaturedMedicine) error:", err);
+        }
+      });
 
       return handleResponse(
         req,
         res,
         200,
-        " Data fetched from MongoDB",
-        payload
+        "Medicine updated successfully",
+        updatedMedicine
       );
-    } catch (error: any) {
-      console.error("Redis/Mongo Fetch Error:", error);
-      return next(new ApiError(500, "Internal Server Error"));
     }
-  }
-);
+  );
 
-//UPDATE ------------------------------------------------------
-public static updateFeaturedMedicine = catchAsyncErrors(
-  async (req: Request, res: Response, next: NextFunction) => {
-    const { id } = req.params;
-    const updates = req.body;
+  // delete ------------------------------------------------------
+  public static deleteFeaturedMedicine = catchAsyncErrors(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const { id } = req.params;
+      if (!id) return next(new ApiError(400, "Invalid medicine ID"));
 
-    if (!id) return next(new ApiError(400, "Invalid medicine ID"));
-
-    const allowedFields = [
-      "title",
-      "description",
-      "category",
-      "discount",
-      "stock",
-      "imageUrl",
-      "featured",
-      "ratings",
-      "updatedBy",
-      "remarks",
-    ];
-
-    // Filter allowed fields
-    for (const key in updates) {
-      if (!allowedFields.includes(key)) delete updates[key];
-    }
-
-    // Handle image upload if new file is provided
-    if (req.file) {
-      try {
-        const uploadResult = await uploadToCloudinary(
-          req.file.buffer,
-          "Epharma/medicines"
-        );
-        updates.imageUrl = uploadResult.secure_url;
-      } catch (error) {
-        console.error("Image upload error:", error);
-        return next(new ApiError(500, "Failed to upload image"));
+      const deletedMedicine = await FeaturedMedicine.findByIdAndDelete(id);
+      if (!deletedMedicine) {
+        return next(new ApiError(404, "Medicine not found"));
       }
+      await deleteCache(CACHE_KEY).catch(() => null);
+      return handleResponse(
+        req,
+        res,
+        200,
+        "Medicine deleted successfully",
+        deletedMedicine
+      );
     }
-
-    const updatedMedicine = await FeaturedMedicine.findByIdAndUpdate(
-      id,
-      updates,
-      {
-        new: true,
-        runValidators: true,
-      }
-    );
-
-    if (!updatedMedicine) return next(new ApiError(404, "Medicine not found"));
-
-    await deleteCache(CACHE_KEY).catch(() => null);
-
-    // Fire-and-forget: notify users about featured medicine update with an engaging message
-    process.nextTick(async () => {
-      try {
-        const users = await User.find({ fcmToken: { $ne: null } }).select(
-          "_id name fcmToken"
-        );
-
-        if (!users || users.length === 0) return;
-
-        const titleText = (updatedMedicine as any).title || "An item";
-        const title = `Update: ${titleText} just got better!`;
-        const body = `Good news! ${titleText} has been updated — improved details, availability or savings may await. Tap to check the latest offer and secure yours.`;
-
-        await NotificationService.sendNotificationToMultipleUsers(
-          users.filter(u => u.fcmToken).map(u => ({
-            _id: u._id.toString(),
-            fcmToken: u.fcmToken as string,
-            name: u.name
-          })),
-          title,
-          body,
-          {
-            type: "FEATURED_UPDATED",
-            relatedEntityId: updatedMedicine._id.toString(),
-            relatedEntityType: "FeaturedMedicine",
-            payload: { medicineId: updatedMedicine._id }
-          }
-        );
-      } catch (err) {
-        console.error("Notification (updateFeaturedMedicine) error:", err);
-      }
-    });
-
-    return handleResponse(
-      req,
-      res,
-      200,
-      "Medicine updated successfully",
-      updatedMedicine
-    );
-  }
-);
-
-// delete ------------------------------------------------------
-public static deleteFeaturedMedicine = catchAsyncErrors(
-  async (req: Request, res: Response, next: NextFunction) => {
-    const { id } = req.params;
-    if (!id) return next(new ApiError(400, "Invalid medicine ID"));
-
-    const deletedMedicine = await FeaturedMedicine.findByIdAndDelete(id);
-    if (!deletedMedicine) {
-      return next(new ApiError(404, "Medicine not found"));
-    }
-    await deleteCache(CACHE_KEY).catch(() => null);
-    return handleResponse(
-      req,
-      res,
-      200,
-      "Medicine deleted successfully",
-      deletedMedicine
-    );
-  }
-);
+  );
 }
 
 export class FeaturedMedicineLogService {
@@ -467,7 +467,7 @@ export class FeaturedMedicineLogService {
       ];
 
       const [result] = await FeaturedMedicineLog.aggregate(pipeline);
-      
+
       const totalLogs = result?.totalCount[0]?.count || 0;
       const logs = result?.logs || [];
 
