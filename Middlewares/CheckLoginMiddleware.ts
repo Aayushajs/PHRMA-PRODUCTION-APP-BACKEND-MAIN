@@ -10,19 +10,19 @@ dotenv.config({ path: "./config/.env" });
 // CUSTOMER ONLY MIDDLEWARE (Original)
 export const customersMiddleware = catchAsyncErrors(
   async (req: Request, res: Response, next: NextFunction) => {
-    const headerToken = req.headers.authorization?.split(" ")[1];
+    const token = req.cookies.userToken;
+    console.log("Token from cookies   : ", token);
+
+    const headerToken = req.headers.authorization?.split(" ")[1] || token;
     console.log("Token from header : ", headerToken);
 
-    const token = req.cookies.userToken || headerToken;
-    console.log("Token from cookies or header : ", token);
-
-    if (!token) {
-      console.log("No token provided[TOKEN] : ", token);
+    if (!headerToken) {
+      console.log("No token provided[TOKEN] : ", headerToken);
       return next(new ApiError(401, "Unauthorized: No token provided"));
     }
 
     const decoded = jwt.verify(
-      token,
+      headerToken,
       process.env.USER_SECRET_KEY as string
     ) as { _id: string };
 

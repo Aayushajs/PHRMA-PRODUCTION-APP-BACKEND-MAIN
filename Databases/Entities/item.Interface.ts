@@ -10,6 +10,8 @@ export interface Iitem {
     itemExpiryDate: Date;
     itemImages?: string[];
     itemBrand?: string;
+    itemParentUnit?: mongoose.Types.ObjectId;
+    itemChildUnit: mongoose.Types.ObjectId;
     itemBatchNumber?: string;
     itemDiscount?: number;
     itemRatings?: number;

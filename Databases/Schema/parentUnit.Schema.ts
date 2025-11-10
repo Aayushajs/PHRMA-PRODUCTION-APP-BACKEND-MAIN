@@ -16,6 +16,10 @@ export const parentUnitSchema = new Schema<IParentUnit & Document>(
       trim: true,
       uppercase: true
     },
+    childUnitId:{
+      type: Schema.Types.ObjectId,
+      ref: "ChildUnit"
+    },
     description: {
       type: String,
       trim: true

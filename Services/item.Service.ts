@@ -5,6 +5,8 @@ import { handleResponse } from "../Utils/handleResponse";
 import { redis } from "../config/redis";
 import ItemModel from "../Databases/Models/item.Model"
 import { Iuser } from "../Databases/Entities/user.Interface";
+import ChildUnitModel from "../Databases/Models/childUnit.model";
+import ParentUnitModel from "../Databases/Models/parentUnit.model";
 
 
 declare global {
@@ -22,9 +24,9 @@ export default class ItemServices {
             res: Response,
             next: NextFunction
         ) => {
-            const { itemName, itemDescription, itemCategory, itemMfgDate, itemExpiryDate } = req.body;
+            const { itemName, itemPrice, itemDescription, itemCategory, itemMfgDate, itemExpiryDate, itemParentUnit, itemChildUnit } = req.body;
 
-            const fields = { itemName, itemCategory, itemMfgDate, itemExpiryDate };
+            const fields = { itemName, itemPrice, itemCategory, itemMfgDate, itemExpiryDate, itemChildUnit };
             const missing = (Object.keys(fields) as Array<keyof typeof fields>)
                 .filter(key => !fields[key]);
 
@@ -41,11 +43,28 @@ export default class ItemServices {
                 return next(new ApiError(409, `Item already exists ${itemName} name`));
             }
 
+            const childUnit = await ChildUnitModel.findById(itemChildUnit);
+            if (!childUnit) {
+                return next(new ApiError(404, "Child Unit not found"));
+            }
+
+            let finalParentUnit = undefined;
+            if (itemParentUnit) {
+                const parentUnitId = await ParentUnitModel.findById(itemParentUnit);
+                if (!parentUnitId) return next(new ApiError(404, "Parent Unit not found"));
+                finalParentUnit = parentUnitId._id;
+            }
+
+
+
             const newItemData: any = {
                 itemName,
+                itemPrice,
                 itemDescription,
                 itemCategory,
                 itemMfgDate,
+                itemParentUnit: finalParentUnit,
+                itemChildUnit,
                 itemExpiryDate,
                 createdBy: req.user?._id,
                 createAt: Date.now()
@@ -53,7 +72,7 @@ export default class ItemServices {
 
             const newItem: any = await ItemModel.create(newItemData);
 
-            handleResponse(req, res, 201, newItem, "Item created successfully");
+            handleResponse(req, res, 201, "Item created successfully", newItem);
         }
     )
 
@@ -63,8 +82,11 @@ export default class ItemServices {
             res: Response,
             next: NextFunction
         ) => {
-            const itemId = req.params.id;
+            const itemId = req.params.itemId;
             const updateData = req.body;
+
+            // console.log("Item ID:", itemId);
+            // console.log("Update Data:", updateData);    
 
             const updatedItem: any = await ItemModel.findByIdAndUpdate(
                 itemId,
@@ -80,7 +102,7 @@ export default class ItemServices {
                 );
             }
 
-            handleResponse(req, res, 200, updatedItem, "Item updated successfully");
+            handleResponse(req, res, 200, "Item updated successfully", updatedItem);
         }
     )
 
@@ -104,7 +126,7 @@ export default class ItemServices {
                 );
             }
 
-            handleResponse(req, res, 200, deletedItem, "Item deleted successfully");
+            handleResponse(req, res, 200, "Item deleted successfully", deletedItem);
         }
     )
 
@@ -119,12 +141,14 @@ export default class ItemServices {
             const redisKey = `items:page=${page}:limit=${limit}`;
             const cachedItems = await redis.get(redisKey);
             if (cachedItems) {
-                return handleResponse(req, res, 200, cachedItems, "Items retrieved successfully");
+                return handleResponse(req, res, 200, "Items retrieved successfully", JSON.parse(cachedItems))   ;
             }
 
             const items: any = await ItemModel.find()
                 .skip((page - 1) * limit)
                 .limit(limit);
+
+            console.log("total items : ",items.length);
 
             if (items.length === 0) {
                 return next(
@@ -134,7 +158,7 @@ export default class ItemServices {
 
             await redis.set(redisKey, JSON.stringify(items), { EX: 3600 });
 
-            handleResponse(req, res, 200, items, "Items retrieved successfully");
+            handleResponse(req, res, 200, "Items retrieved successfully", items);
         }
     )
 
@@ -150,7 +174,7 @@ export default class ItemServices {
             const redisKey = `items:category=${categoryId}:page=${page}:limit=${limit}`;
             const cachedItems = await redis.get(redisKey);
             if (cachedItems) {
-                return handleResponse(req, res, 200, cachedItems, "Items retrieved successfully");
+                return handleResponse(req, res, 200, "Items retrieved successfully", JSON.parse(cachedItems));
             }
 
             const items: any = await ItemModel.find({ itemCategory: categoryId })
@@ -165,7 +189,7 @@ export default class ItemServices {
 
             await redis.set(redisKey, JSON.stringify(items), { EX: 3600 });
 
-            handleResponse(req, res, 200, items, "Items retrieved successfully");
+            handleResponse(req, res, 200, "Items retrieved successfully", items);
         }
     )
 }

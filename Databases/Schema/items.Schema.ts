@@ -16,6 +16,15 @@ export const itemSchema = new Schema<Iitem & Document>(
             type: Number,
             required: true,
         },
+        itemParentUnit:{
+            type: Schema.Types.ObjectId,
+            ref: "ParentUnit"
+        },
+        itemChildUnit:{
+            type: Schema.Types.ObjectId,
+            ref: "ChildUnit",
+            required: true,
+        },
         itemCategory : {
             type: Schema.Types.ObjectId,
             ref: "Category",

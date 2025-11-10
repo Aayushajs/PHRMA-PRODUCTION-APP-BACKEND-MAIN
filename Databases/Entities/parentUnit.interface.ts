@@ -10,6 +10,7 @@ import { Schema } from "mongoose";
 export interface IParentUnit {
   name: string;
   code: string;
+  childUnitId?: Schema.Types.ObjectId;
   description?: string;
   isActive: boolean;
   createdBy?: Schema.Types.ObjectId;

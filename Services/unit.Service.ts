@@ -16,14 +16,19 @@ class ParentUnitServices {
 
             const parentUnitData: IParentUnit = req.body;
 
-            const checktExistingUnit = await parentUnitModel.findOne({ code: parentUnitData.code });
+            const checktExistingUnit = await parentUnitModel.findOne({
+                $or:[
+                    { code: parentUnitData.code }, 
+                    { name: parentUnitData.name }
+                ]
+            });
 
             if (checktExistingUnit) {
                 return next(new ApiError(400, 'Parent Unit with this code already exists'));
             }
 
             const newParentUnit = await parentUnitModel.create({
-                ...parentUnitData, 
+                ...parentUnitData,
                 createdBy: req.user?._id,//
                 createdAt: new Date()
             });
@@ -75,7 +80,7 @@ class ParentUnitServices {
         async (req: Request, res: Response, next: NextFunction) => {
             const parentUnitId = req.params.id;
             const updateData: Partial<IParentUnit> = req.body;
-            
+
             const updatedParentUnit = await parentUnitModel.findByIdAndUpdate(
                 parentUnitId,
                 { ...updateData, updatedBy: req.user?._id, updatedAt: new Date() },
@@ -95,6 +100,9 @@ class ParentUnitServices {
     public static deleteParentUnit = catchAsyncErrors(
         async (req: Request, res: Response, next: NextFunction) => {
             const parentUnitId = req.params.id;
+            if (!parentUnitId) {
+                return next(new ApiError(400, 'Correct Parent Unit ID is required'));
+            }
 
             const deleteParentUnitId = await parentUnitModel.findByIdAndDelete(parentUnitId);
 
@@ -116,13 +124,20 @@ class ChildUnitServices {
         async (req: Request, res: Response, next: NextFunction) => {
             const childUnitData: IChildUnit = req.body;
 
-            const checktExistingUnit = await childUnit.findOne({ code: childUnitData.code });
+            const checkExistingUnit = await childUnit.findOne({
+                $or: [
+                    { code: childUnitData.code },
+                    { name: childUnitData.name }
+                ]
+            });
 
-            if (checktExistingUnit) {
+
+            if (checkExistingUnit) {
                 return next(new ApiError(400, 'Child Unit with this code already exists'));
             }
 
-            const newChildUnit = await childUnit.create(childUnitData, {
+            const newChildUnit = await childUnit.create({
+                ...childUnitData,
                 createdBy: req.user?._id,
                 createdAt: new Date()
             });
@@ -157,7 +172,7 @@ class ChildUnitServices {
                 .find(childFilter)
                 .limit(10)
                 .select("_id name code parentUnit")
-                .populate('parentUnit', 'name code')
+                .populate('name code')
                 .lean();
 
             if (childUnits.length === 0) {
@@ -171,10 +186,10 @@ class ChildUnitServices {
 
     public static updateChildUnit = catchAsyncErrors(
         async (req: Request, res: Response, next: NextFunction) => {
-            
+
             const childUnitId = req.params.id;
             const updateData: Partial<IChildUnit> = req.body;
-            
+
             const updatedChildUnit = await childUnit.findByIdAndUpdate(
                 childUnitId,
                 { ...updateData, updatedBy: req.user?._id, updatedAt: new Date() },
@@ -188,7 +203,7 @@ class ChildUnitServices {
             return handleResponse(req, res, 200, 'Child Unit updated successfully', updatedChildUnit);
         }
     );
-    
+
     public static deleteChildUnit = catchAsyncErrors(
         async (req: Request, res: Response, next: NextFunction) => {
             const childUnitId = req.params.id;

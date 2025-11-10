@@ -3,11 +3,11 @@ import ItemServices from "../../Services/item.Service";
 
 const itemsRouter = express.Router();
 
-itemsRouter.post("/create", ItemServices.createItem);
+itemsRouter.post("/add", ItemServices.createItem);
 
-itemsRouter.put("/:itemId", ItemServices.updateItem);
+itemsRouter.put("/update/:itemId", ItemServices.updateItem);
 
-itemsRouter.delete("/:itemId", ItemServices.deleteItem);
+itemsRouter.delete("/delete/:itemId", ItemServices.deleteItem);
 
 itemsRouter.get("/", ItemServices.getAllItems);
 

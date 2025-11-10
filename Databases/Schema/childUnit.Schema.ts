@@ -3,10 +3,6 @@ import { IChildUnit } from "../Entities/childUnit.interface";
 
 export const childUnitSchema = new Schema<IChildUnit & Document>(
   {
-    parentUnitId: {
-      type: Schema.Types.ObjectId,
-      ref: "ParentUnit",
-    },
     name: {
       type: String,
       required: true,
@@ -25,7 +21,7 @@ export const childUnitSchema = new Schema<IChildUnit & Document>(
     },
     weight: {
       type: Number,
-      min: 1
+      min: 1                                  
     },
     isActive: {
       type: Boolean,
@@ -33,13 +29,11 @@ export const childUnitSchema = new Schema<IChildUnit & Document>(
     },
     createdBy: {
       type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true
+      ref: "User"
     },
     updatedBy: {
       type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true
+      ref: "User"
     },
     createdAt: {
       type: Date,
