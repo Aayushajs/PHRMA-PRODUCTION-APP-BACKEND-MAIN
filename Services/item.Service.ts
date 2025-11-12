@@ -9,6 +9,7 @@ import ChildUnitModel from "../Databases/Models/childUnit.model";
 import ParentUnitModel from "../Databases/Models/parentUnit.model";
 import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
 import { v2 as cloudinary } from "cloudinary";
+import { gstModel } from '../Databases/Models/gst.Model'
 
 
 
@@ -27,9 +28,36 @@ export default class ItemServices {
             res: Response,
             next: NextFunction
         ) => {
-            const { itemName, itemPrice, itemDescription, itemCategory, itemMfgDate, itemExpiryDate, itemParentUnit, itemChildUnit } = req.body;
+            const {
+                itemName,
+                itemInitialPrice,
+                itemDescription,
+                itemCategory,
+                itemMfgDate,
+                itemExpiryDate,
+                itemParentUnit,
+                itemChildUnit,
+                itemGST,
+                code,
+                HSNCode,
+                weight
+            } = req.body;
 
-            const fields = { itemName, itemPrice, itemCategory, itemMfgDate, itemExpiryDate, itemChildUnit };
+            console.log("Requested to body : ", req.body);
+
+            const fields = {
+                itemName,
+                itemInitialPrice,
+                itemCategory,
+                itemMfgDate,
+                itemExpiryDate,
+                itemChildUnit,
+                code,
+                HSNCode,
+                weight,
+                itemGST
+            };
+
             const missing = (Object.keys(fields) as Array<keyof typeof fields>)
                 .filter(key => !fields[key]);
 
@@ -83,9 +111,16 @@ export default class ItemServices {
                 }
             }
 
+            const gstId = await gstModel.findById(itemGST).select('gstRate').lean();
+            const gstRate = gstId?.gstRate ?? 0;
+
+            const calculatedFinalPrice = +(itemInitialPrice * (1 + (Number(gstRate) || 0) / 100)).toFixed(2);
+            console.log("calculatedFinalPrice : ", calculatedFinalPrice)
+
             const newItemData: any = {
                 itemName,
-                itemPrice,
+                itemInitialPrice: Number(itemInitialPrice),
+                itemFinalPrice: Number(calculatedFinalPrice),
                 itemDescription,
                 itemImages: imageUrls,
                 itemCategory,
@@ -93,9 +128,15 @@ export default class ItemServices {
                 itemParentUnit: finalParentUnit,
                 itemChildUnit,
                 itemExpiryDate,
+                code,
+                HSNCode,
+                weight,
+                itemGST,
                 createdBy: req.user?._id,
                 createAt: Date.now()
             }
+
+            console.log("New data : ", newItemData);
 
             const newItem: any = await ItemModel.create(newItemData);
             await redis.del("deals:of-the-day");
@@ -139,12 +180,28 @@ export default class ItemServices {
                 }
             }
 
+            let itemFinalPrice = existingItem.itemFinalPrice;
+            if (updateData.itemInitialPrice || updateData.itemGst) {
+                const basePrice = Number(updateData.itemInitialPrice ?? existingItem.itemInitialPrice);
+                const gstId = updateData.itemGST ?? existingItem.itemGST;
+
+                let gstRate = 0;
+                if (gstId) {
+                    const gstData = await gstModel.findById(gstId).select("gstRate").lean();
+                    gstRate = gstData?.gstRate ?? 0;
+                }
+
+                itemFinalPrice = +((basePrice + (basePrice * gstRate) / 100)).toFixed(2);
+            }
+
             const updatedItem: any = await ItemModel.findByIdAndUpdate(
                 itemId,
                 {
                     ...updateData,
                     itemImages: imageUrls,
+                    itemFinalPrice,
                     updatedBy: req.user?._id,
+                    updatedAt: new Date()
                 },
                 { new: true }
             );
@@ -175,7 +232,6 @@ export default class ItemServices {
 
             if (existingItem.itemImages && existingItem.itemImages.length > 0) {
                 try {
-                    // Extract public IDs from Cloudinary URLs
                     const publicIds = existingItem.itemImages.map((url: string) => {
                         const parts = url.split("/");
                         const fileName = parts[parts.length - 1];
@@ -183,7 +239,6 @@ export default class ItemServices {
                         return `Epharma/items/${publicId}`;
                     });
 
-                    // Delete all images in parallel
                     await Promise.all(
                         publicIds.map(async (pid) => {
                             try {
@@ -303,52 +358,77 @@ export default class ItemServices {
             const cachedDeals = await redis.get(cacheKey);
 
             redis.del(cacheKey);
-            // if (cachedDeals) {
-            //     //Check if newer deals exist in DB
-            //     const latestDeal = await ItemModel.findOne({ itemDiscount: { $gte: Min_Discount } })
-            //         .sort({ updatedAt: -1 })
-            //         .select("updatedAt")
-            //         .lean();
+            if (cachedDeals) {
+                //Check if newer deals exist in DB
+                const latestDeal = await ItemModel.findOne({ itemDiscount: { $gte: Min_Discount } })
+                    .sort({ updatedAt: -1 })
+                    .select("updatedAt")
+                    .lean();
 
-            //     console.log("Latest deal in DB updated at:", latestDeal?.updatedAt);
-            //     const cacheMeta = JSON.parse(cachedDeals)?.[0]?.updatedAt;
+                // console.log("Latest deal in DB updated at:", latestDeal?.updatedAt);
+                // const cacheMeta = JSON.parse(cachedDeals)?.[0]?.updatedAt;
 
             //     console.log("Cached deals updated at:", cacheMeta); 
 
             //     if (latestDeal && cacheMeta && new Date(latestDeal.updatedAt ?? 0) > new Date(cacheMeta)) {
-            //         console.log("⚡ Newer deals found — refreshing cache...");
+            //         console.log("Newer deals found — refreshing cache...");
             //         await redis.del(cacheKey); // Clear old cache
             //     } else {
             //         console.log("Serving deals from cache");
             //         return handleResponse(req, res, 200, "Deals retrieved successfully (cached)", JSON.parse(cachedDeals));
             //     }
-            // }
-
-            if (cachedDeals) {
-                return handleResponse(req, res, 200, "Deals retrieved successfully", JSON.parse(cachedDeals));
             }
+
+            // if (cachedDeals) {
+            //     return handleResponse(req, res, 200, "Deals retrieved successfully", JSON.parse(cachedDeals));
+            // }
 
             const deals = await ItemModel
                 .find({ itemDiscount: { $gte: 40 } })
                 .sort({ itemDiscount: -1, updatedAt: -1 })
                 .limit(Max_Deals)
-                .select("_id itemName itemPrice itemDiscount itemImages itemCategory itemBrand updatedAt")
+                .select("_id itemName itemInitialPrice itemDiscount itemGST gstRate itemImages itemCategory itemCompany updatedAt")
+                .populate("itemGST")
                 .lean();
 
-            console.log(`Found ${deals.length} deals of the day`);
-            console.log("Deals:", deals);
+            // console.log(`Found ${deals.length} deals of the day`);
+            // console.log("Deals:", deals);
 
             if (deals.length === 0) {
                 return next(new ApiError(404, "No deals found today"));
             }
 
-            const formattedDeals = deals.map((deal) => ({
-                ...deal,
-                originalPrice: deal.itemPrice,
-                discountedPrice: +(deal.itemPrice * (1 - (Number(deal.itemDiscount ?? 0) / 100))).toFixed(2),
-            }));
+            const formattedDeals = deals.map((deal) => {
+                const gstRate = (deal.itemGST as any)?.gstRate ?? 0;
+                const discountPrice = +(deal.itemInitialPrice * (1 - ((deal.itemDiscount ?? 0) / 100))).toFixed(2);
+                const gstAmount = +(discountPrice * (gstRate / 100));
+                const finalPrice = +((discountPrice + gstAmount)).toFixed(2);
 
-            console.log("Formatted Deals:", formattedDeals);
+                // console.log(`Deal: ${deal.itemName}`);
+                // console.log(`  Initial Price: ${deal.itemInitialPrice}`);
+                // console.log(`  Discount: ${deal.itemDiscount}% => Discounted Price: ${discountPrice}`);
+                // console.log(`  GST Rate: ${gstRate}% => GST Amount: ${gstAmount}`);
+                // console.log(`  Final Price: ${finalPrice}`);
+
+
+                return {
+                    _id: deal._id,
+                    itemName: deal.itemName,
+                    itemInitialPrice: deal.itemInitialPrice,
+                    itemDiscount: deal.itemDiscount,
+                    itemDescription: deal.itemDescription,
+                    gstRate,
+                    discountPrice,
+                    gstAmount,
+                    itemFinalPrice: finalPrice,
+                    itemImages: deal.itemImages,
+                    itemCategory: deal.itemCategory,
+                    itemCompany: deal.itemCompany,
+                    updatedAt: deal.updatedAt
+                };
+            });
+
+            // console.log("Formatted Deals:", formattedDeals);
 
             await redis.set(cacheKey, JSON.stringify(formattedDeals), { EX: 21600 });
 

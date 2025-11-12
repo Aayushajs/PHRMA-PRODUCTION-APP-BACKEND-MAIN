@@ -1,24 +1,52 @@
-import mongoose from "mongoose";
+import { Types } from "mongoose";
 
 export interface Iitem {
-    _id?: mongoose.Types.ObjectId;
-    itemName: string;
-    itemDescription :string;
-    itemPrice: number;
-    itemCategory: mongoose.Types.ObjectId;
-    itemMfgDate: Date;
-    itemExpiryDate: Date;
-    itemImages?: string[];
-    itemBrand?: string;
-    itemParentUnit?: mongoose.Types.ObjectId;
-    itemChildUnit: mongoose.Types.ObjectId;
-    itemBatchNumber?: string;
-    itemDiscount?: number;
-    itemRatings?: number;
-    createdAt?: Date;
-    updatedAt?: Date;
-    createdBy?: mongoose.Types.ObjectId;
-    updatedBy?: mongoose.Types.ObjectId;
-    deletedBy?: mongoose.Types.ObjectId;
-    deletedAt?: Date;
+  itemName: string;
+  itemDescription?: string;
+  itemInitialPrice: number;
+  itemFinalPrice: number;
+
+  itemParentUnit?: Types.ObjectId;
+  itemChildUnit: Types.ObjectId;
+  itemCategory: Types.ObjectId;
+
+  itemMfgDate: Date;
+  itemExpiryDate: Date;
+
+  itemImages?: string[];
+  itemCompany?: string;
+  itemBatchNumber?: string;
+
+  itemDiscount?: number;
+  itemRatings?: number;
+  itemGST?: Types.ObjectId;
+
+  createdBy?: Types.ObjectId;
+  updatedBy?: Types.ObjectId;
+  deletedBy?: Types.ObjectId;
+
+  createdAt?: Date;
+  updatedAt?: Date;
+  deletedAt?: Date;
+
+  code?: string;
+  HSNCode?: string;
+  formula?: string;
+
+  views?: number;
+  images?: string[];
+
+  changeLog?: {
+    date: Date;
+    by: {
+      name: string;
+      userId: Types.ObjectId;
+    };
+  }[];
+
+  weight?: number;
+
+  stockAisleIds?: Types.ObjectId[];
+
+  isTrending?: boolean;
 }
