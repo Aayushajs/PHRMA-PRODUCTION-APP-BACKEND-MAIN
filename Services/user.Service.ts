@@ -251,12 +251,25 @@ public static forgotPassword = catchAsyncErrors(
 
     await redis.set(`otp:${Existeduser._id}`, otp, { EX: 180 });
 
-    if (email) {
-      console.log(`Sending OTP ${otp} to email ${email}`);
-      await sendEmail(email, otp);
-      console.log(sendEmail(email, otp));
+    try {
+      console.log(`📧 Sending OTP to email: ${email}`);
+      const emailSent = await sendEmail(email, otp);
+      
+      if (!emailSent) {
+        console.error('Email sending returned false');
+        return next(new ApiError(500, "Failed to send OTP email. Please try again."));
+      }
+      
+      console.log(`✅ OTP sent successfully to ${email}`);
+      return handleResponse(req, res, 200, "OTP sent to your email. Please check your inbox.");
+    } catch (emailError: any) {
+      console.error('❌ Email sending error:', emailError.message);
+      
+      // Delete the OTP from Redis since email failed
+      await redis.del(`otp:${Existeduser._id}`);
+      
+      return next(new ApiError(500, "Failed to send OTP email. Please check your email address and try again."));
     }
-    return handleResponse(req, res, 200, "OTP sent to your email");
   }
 );
 
