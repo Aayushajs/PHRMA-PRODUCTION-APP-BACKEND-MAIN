@@ -14,9 +14,8 @@ if (SENDGRID_API_KEY && SENDGRID_FROM_EMAIL) {
     try {
         sgMail.setApiKey(SENDGRID_API_KEY);
         sendGridReady = true;
-        console.log('✅ SendGrid initialized');
     } catch (error) {
-        console.warn('⚠️ SendGrid failed to initialize');
+        console.error('SendGrid initialization failed');
     }
 }
 
@@ -34,9 +33,8 @@ if (MAILJET_API_KEY && MAILJET_SECRET_KEY && MAILJET_FROM_EMAIL) {
             apiSecret: MAILJET_SECRET_KEY
         });
         mailjetReady = true;
-        console.log('✅ Mailjet initialized');
     } catch (error) {
-        console.warn('⚠️ Mailjet failed to initialize');
+        console.error('Mailjet initialization failed');
     }
 }
 
@@ -56,74 +54,33 @@ if (process.env.GMAIL_USER && process.env.GMAIL_PASS) {
         pool: true,
         maxConnections: 3,
     });
-    console.log('✅ Gmail SMTP configured');
 }
 
 // Email Templates
 const getEmailTemplate = (type: 'otp' | 'welcome' | 'notification', data: any): { subject: string; html: string; text: string } => {
     if (type === 'otp') {
         return {
-            subject: 'Your Password Reset OTP',
-            text: `Your OTP: ${data.otp}\n\nExpires in 3 minutes.\n\nVelcart Team`,
-            html: `
-<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<style>
-body{font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:0}
-.container{max-width:600px;margin:40px auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.1)}
-.header{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;padding:30px;text-align:center}
-.content{padding:40px 30px}
-.otp-box{background:#f8f9fa;border:2px dashed #667eea;border-radius:8px;padding:20px;text-align:center;margin:30px 0}
-.otp-code{font-size:36px;font-weight:bold;color:#667eea;letter-spacing:8px;margin:10px 0}
-.footer{background:#f8f9fa;padding:20px;text-align:center;color:#666;font-size:12px}
-.warning{color:#dc3545;font-size:14px;margin-top:20px}
-</style>
-</head>
-<body>
-<div class="container">
-<div class="header"><h1> Password Reset</h1></div>
-<div class="content">
-<h2>Hello!</h2>
-<p>Use the OTP code below to reset your password:</p>
-<div class="otp-box">
-<p style="margin:0;color:#666;font-size:14px">Your One-Time Password</p>
-<div class="otp-code">${data.otp}</div>
-<p style="margin:0;color:#666;font-size:12px">Valid for 3 minutes</p>
-</div>
-<p><strong> Expires in 3 minutes</strong></p>
-<p class="warning"> Didn't request this? Ignore this email.</p>
-<p>Best regards,<br><strong>Velcart Team</strong></p>
-</div>
-<div class="footer">
-<p>© 2025 Velcart. All rights reserved.</p>
-<p>This is an automated email. Please do not reply.</p>
-</div>
-</div>
-</body>
-</html>`
+            subject: 'Password Reset Code - Velcart',
+            text: `Your verification code: ${data.otp}\n\nThis code will expire in 3 minutes.\n\nIf you didn't request this code, please ignore this email.\n\nBest regards,\nVelcart Team`,
+            html: `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><meta http-equiv="X-UA-Compatible" content="IE=edge"><title>Password Reset</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;line-height:1.6;background-color:#f5f7fa;color:#333}.email-wrapper{width:100%;background-color:#f5f7fa;padding:40px 20px}.email-container{max-width:600px;margin:0 auto;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08)}.header{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);padding:40px 30px;text-align:center}.header h1{color:#ffffff;font-size:28px;font-weight:600;margin:0}.content{padding:40px 35px}.greeting{font-size:18px;color:#333;margin-bottom:20px;font-weight:500}.message{font-size:15px;color:#666;line-height:1.8;margin-bottom:30px}.otp-container{background:linear-gradient(135deg,#f8f9ff 0%,#f0f2ff 100%);border:2px solid #667eea;border-radius:12px;padding:30px;text-align:center;margin:30px 0}.otp-label{font-size:13px;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:15px;font-weight:600}.otp-code{font-size:40px;font-weight:700;color:#667eea;letter-spacing:12px;font-family:'Courier New',monospace;margin:10px 0}.otp-validity{font-size:13px;color:#999;margin-top:15px}.security-note{background-color:#fff8e1;border-left:4px solid #ffc107;padding:15px 20px;margin:25px 0;border-radius:4px}.security-note p{font-size:14px;color:#666;margin:0}.footer{background-color:#f8f9fa;padding:30px;text-align:center;border-top:1px solid #e9ecef}.footer-text{font-size:13px;color:#999;margin:5px 0}.footer-brand{font-size:14px;color:#667eea;font-weight:600;margin-top:15px}@media only screen and (max-width:600px){.email-wrapper{padding:20px 10px}.content{padding:30px 20px}.otp-code{font-size:32px;letter-spacing:8px}.header h1{font-size:24px}}</style></head><body><div class="email-wrapper"><div class="email-container"><div class="header"><h1>🔐 Password Reset Request</h1></div><div class="content"><div class="greeting">Hello,</div><p class="message">We received a request to reset your password. Use the verification code below to proceed with resetting your password.</p><div class="otp-container"><div class="otp-label">Your Verification Code</div><div class="otp-code">${data.otp}</div><div class="otp-validity">⏱ Valid for 3 minutes only</div></div><div class="security-note"><p><strong>⚠️ Security Notice:</strong> If you didn't request this password reset, please ignore this email. Your account remains secure.</p></div><p class="message">For your security, this code will expire in 3 minutes. If the code expires, you can request a new one.</p><p style="margin-top:30px;font-size:14px;color:#666">Best regards,<br><strong style="color:#667eea">Velcart Team</strong></p></div><div class="footer"><p class="footer-text">© 2025 Velcart. All rights reserved.</p><p class="footer-text">This is an automated message, please do not reply to this email.</p><div class="footer-brand">Velcart - Your Trusted Platform</div></div></div></div></body></html>`
         };
     }
     
     if (type === 'welcome') {
         return {
-            subject: 'Welcome to Velcart!',
-            text: `Welcome ${data.name}!\n\nThank you for joining Velcart.\n\nVelcart Team`,
-            html: `<h1>Welcome ${data.name}!</h1><p>Thank you for joining Velcart.</p>`
+            subject: 'Welcome to Velcart - Get Started Today!',
+            text: `Welcome ${data.name}!\n\nThank you for joining Velcart. We're excited to have you on board.\n\nBest regards,\nVelcart Team`,
+            html: `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:#f5f7fa}.wrapper{padding:40px 20px}.container{max-width:600px;margin:0 auto;background:#fff;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.08)}.header{background:linear-gradient(135deg,#667eea,#764ba2);padding:40px;text-align:center;color:#fff}.header h1{font-size:28px;margin-bottom:10px}.content{padding:40px}.welcome-text{font-size:18px;color:#333;margin-bottom:20px}.message{color:#666;line-height:1.8;margin-bottom:20px}.footer{background:#f8f9fa;padding:30px;text-align:center;border-top:1px solid #e9ecef;color:#999;font-size:13px}</style></head><body><div class="wrapper"><div class="container"><div class="header"><h1>🎉 Welcome to Velcart!</h1></div><div class="content"><p class="welcome-text">Hello ${data.name},</p><p class="message">Thank you for joining Velcart! We're thrilled to have you as part of our community.</p><p class="message">You can now explore all our features and start your journey with us.</p><p style="margin-top:30px;color:#666">Best regards,<br><strong style="color:#667eea">Velcart Team</strong></p></div><div class="footer"><p>© 2025 Velcart. All rights reserved.</p></div></div></div></body></html>`
         };
     }
     
-    // Default notification template
     return {
-        subject: data.subject || 'Velcart Notification',
-        text: data.message || 'Notification from Velcart',
-        html: `<p>${data.message || 'Notification from Velcart'}</p>`
+        subject: data.subject || 'Notification from Velcart',
+        text: data.message || 'You have a new notification from Velcart.',
+        html: `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:#f5f7fa}.wrapper{padding:40px 20px}.container{max-width:600px;margin:0 auto;background:#fff;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.08)}.header{background:linear-gradient(135deg,#667eea,#764ba2);padding:30px;text-align:center;color:#fff}.content{padding:40px;color:#666;line-height:1.8}.footer{background:#f8f9fa;padding:20px;text-align:center;color:#999;font-size:13px}</style></head><body><div class="wrapper"><div class="container"><div class="header"><h1>📢 Notification</h1></div><div class="content"><p>${data.message || 'You have a new notification from Velcart.'}</p></div><div class="footer"><p>© 2025 Velcart. All rights reserved.</p></div></div></div></body></html>`
     };
 };
 
-/**
- * Send email via SendGrid with auto-fallback
- */
 const sendViaSendGrid = async (to: string, template: any): Promise<boolean> => {
     if (!sendGridReady) return false;
     
@@ -132,24 +89,35 @@ const sendViaSendGrid = async (to: string, template: any): Promise<boolean> => {
             to,
             from: { 
                 email: SENDGRID_FROM_EMAIL as string, 
-                name: 'Epharma Support' 
+                name: 'Velcart' 
             },
             subject: template.subject,
             text: template.text,
             html: template.html,
+            replyTo: SENDGRID_FROM_EMAIL as string,
+            // Anti-spam headers
+            headers: {
+                'X-Priority': '1',
+                'X-MSMail-Priority': 'High',
+                'Importance': 'high'
+            },
+            // Track settings
+            trackingSettings: {
+                clickTracking: { enable: false },
+                openTracking: { enable: false }
+            },
+            mailSettings: {
+                sandboxMode: { enable: false }
+            }
         });
-        console.log(`✅ Email sent via SendGrid to ${to}`);
         return true;
     } catch (error: any) {
         const errorMsg = error.response?.body?.errors?.[0]?.message || error.message;
-        console.error('❌ SendGrid failed:', errorMsg);
+        console.error('SendGrid failed:', errorMsg);
         return false;
     }
 };
 
-/**
- * Send email via Mailjet with auto-fallback
- */
 const sendViaMailjet = async (to: string, template: any): Promise<boolean> => {
     if (!mailjetReady) return false;
     
@@ -160,76 +128,69 @@ const sendViaMailjet = async (to: string, template: any): Promise<boolean> => {
                 Messages: [{
                     From: {
                         Email: MAILJET_FROM_EMAIL,
-                        Name: 'Epharma Support'
+                        Name: 'Velcart'
                     },
                     To: [{
                         Email: to
                     }],
                     Subject: template.subject,
                     TextPart: template.text,
-                    HTMLPart: template.html
+                    HTMLPart: template.html,
+                    // Anti-spam configuration
+                    CustomID: `velcart-${Date.now()}`,
+                    Headers: {
+                        'X-Priority': '1',
+                        'X-MSMail-Priority': 'High',
+                        'Importance': 'high'
+                    }
                 }]
             });
 
         if (request.response.status === 200) {
-            console.log(`✅ Email sent via Mailjet to ${to}`);
             return true;
         }
         return false;
     } catch (error: any) {
         const errorMsg = error.response?.body?.ErrorMessage || error.message;
-        console.error('❌ Mailjet failed:', errorMsg);
+        console.error(' Mailjet failed:', errorMsg);
         return false;
     }
 };
 
-/**
- * Send email via Gmail SMTP
- */
 const sendViaGmail = async (to: string, template: any): Promise<boolean> => {
     if (!gmailTransporter) return false;
     
     try {
         await gmailTransporter.sendMail({
             from: { 
-                name: 'Epharma Support', 
+                name: 'Velcart', 
                 address: process.env.GMAIL_USER as string 
             },
             to,
             subject: template.subject,
             text: template.text,
             html: template.html,
+            // Anti-spam headers
+            headers: {
+                'X-Priority': '1',
+                'X-MSMail-Priority': 'High',
+                'Importance': 'high',
+                'X-Entity-Ref-ID': `velcart-${Date.now()}`
+            },
+            priority: 'high'
         });
-        console.log(`✅ Email sent via Gmail to ${to}`);
         return true;
     } catch (error: any) {
-        console.error('❌ Gmail failed:', error.message);
+        console.error(' Gmail failed:', error.message);
         return false;
     }
 };
 
-/**
- * Smart Email Service - Round-Robin with Auto-Fallback
- * 
- * Features:
- * - Alternates between SendGrid and Mailjet (load balancing)
- * - Auto-fallback if primary provider fails or reaches limit
- * - Gmail as last resort backup
- * 
- * Flow: Mailjet → SendGrid → Mailjet → SendGrid (alternating)
- * If any fails: Try other provider → Gmail → Error
- * 
- * @param to - Recipient email address
- * @param type - Email type: 'otp' | 'welcome' | 'notification'
- * @param data - Email data
- * @returns Promise<{ success: boolean; provider: string; alternated: boolean }>
- */
 export const sendEmail = async (
     to: string, 
     type: 'otp' | 'welcome' | 'notification' = 'otp', 
     data: any
 ): Promise<{ success: boolean; provider: string; alternated: boolean }> => {
-    // Validate email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(to)) {
         throw new Error('Invalid email format');
@@ -238,16 +199,11 @@ export const sendEmail = async (
     const template = getEmailTemplate(type, data);
     emailCounter++;
 
-    // Determine primary provider using round-robin (alternating)
-    const useMailjetFirst = emailCounter % 2 === 1; // Odd = Mailjet, Even = SendGrid
+    const useMailjetFirst = emailCounter % 2 === 1;
     const primaryProvider = useMailjetFirst ? 'Mailjet' : 'SendGrid';
     const secondaryProvider = useMailjetFirst ? 'SendGrid' : 'Mailjet';
-    
-    console.log(`🔄 Round ${emailCounter}: Trying ${primaryProvider} first`);
 
-    // Try PRIMARY provider first
     let success = false;
-    let usedProvider = '';
     let alternated = false;
 
     if (primaryProvider === 'Mailjet') {
@@ -264,8 +220,6 @@ export const sendEmail = async (
         }
     }
 
-    // PRIMARY FAILED - Try SECONDARY provider
-    console.log(`⚠️ ${primaryProvider} failed, switching to ${secondaryProvider}...`);
     alternated = true;
 
     if (secondaryProvider === 'Mailjet') {
@@ -282,16 +236,13 @@ export const sendEmail = async (
         }
     }
 
-    // BOTH SendGrid & Mailjet FAILED - Try Gmail as last resort
-    console.log('⚠️ Both SendGrid and Mailjet failed, trying Gmail backup...');
     success = await sendViaGmail(to, template);
     if (success) {
         lastUsedProvider = 'Gmail';
         return { success: true, provider: 'Gmail', alternated: true };
     }
 
-    // ALL PROVIDERS FAILED
-    throw new Error('All email providers failed. Please check configurations.');
+    throw new Error('All email providers failed');
 };
 
 export default sendEmail;

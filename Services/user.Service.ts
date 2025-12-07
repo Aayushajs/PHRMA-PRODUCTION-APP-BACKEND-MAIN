@@ -27,8 +27,6 @@ export default class UserService {
           address
         } = req.body;
 
-    console.log("Request Body : ", req.body);
-
     const requiredFields = { name, email, password, phone };
     const missingFields = Object.entries(requiredFields)
       .filter(([_, value]) => !value)
@@ -156,7 +154,6 @@ public static login = catchAsyncErrors(
       password,
       userExist.password
     );
-    console.log("Password matched : ", isPasswordMatched);
 
     if (!isPasswordMatched) {
       return next(new ApiError(400, "Invalid email or password"));
@@ -178,7 +175,6 @@ public static login = catchAsyncErrors(
     }
 
     await userExist.save();
-    console.log("Login Successful - User updated");
 
     const userObj = userExist.toObject();
 
@@ -233,21 +229,17 @@ public static logout = catchAsyncErrors(
 public static forgotPassword = catchAsyncErrors(
   async (req: Request, res: Response, next: NextFunction) => {
     const { email } = req.body;
-    console.log("Request Body : ", req.body);
 
     if (!email) {
-      console.log("Email not found : ", email);
       return next(new ApiError(400, "Email is required"));
     }
 
     const Existeduser = await UserModel.findOne({ email });
     if (!Existeduser) {
-      console.log("User not found with this email : ", email);
       return next(new ApiError(400, "User not found"));
     }
 
     const otp = generateOtp();
-    console.log("Generated OTP : ", otp);
 
     await redis.set(`otp:${Existeduser._id}`, otp, { EX: 180 });
 
@@ -271,23 +263,18 @@ public static verifyOtp = catchAsyncErrors(
   async (req: Request, res: Response, next: NextFunction) => {
     const userId = req.user?._id;
     const { otp } = req.body;
-    console.log("Request Body : ", req.body);
 
     if (!otp) {
-      console.log("OTP not found");
       return next(new ApiError(400, "OTP is required"));
     }
 
     const SystemGeneratedOtp = await redis.get(`otp:${userId}`);
-    console.log("SystemGeneratedOtp : ", SystemGeneratedOtp);
 
     if (!SystemGeneratedOtp) {
-      console.log("OTP not found");
       return next(new ApiError(400, "OTP expired"));
     }
 
     if (SystemGeneratedOtp !== otp) {
-      console.log("Invalid OTP");
       return next(new ApiError(400, "Invalid OTP"));
     }
 
@@ -299,8 +286,6 @@ public static ResetPassword = catchAsyncErrors(
   async (req: Request, res: Response, next: NextFunction) => {
     const { password } = req.body;
     const userId = req.user?._id;
-
-    console.log("Request Body : ", req.body);
 
     if (!password) {
       return next(new ApiError(400, "New password is required"));
@@ -320,7 +305,6 @@ public static ResetPassword = catchAsyncErrors(
         useFindAndModify: false,
       }
     );
-    console.log("User found : ", user);
 
     if (!user) {
       return next(new ApiError(400, "User not found"));
@@ -333,20 +317,15 @@ public static ResetPassword = catchAsyncErrors(
 public static googleAuthLogin = catchAsyncErrors(
   async (req: Request, res: Response, next: NextFunction) => {
     const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-    console.log("Clent : ", client);
 
     const { userToken } = req.body;
-    console.log("User Token : ", userToken);
 
     const ticket = await client.verifyIdToken({
       idToken: userToken,
       audience: process.env.GOOGLE_CLIENT_ID,
     });
 
-    console.log("Ticket : ", ticket);
-
     const payload: TokenPayload | undefined = ticket.getPayload();
-    console.log("Payload : ", payload);
     if (!payload) {
       return next(new ApiError(400, "Invalid token"));
     }
@@ -364,7 +343,6 @@ public static googleAuthLogin = catchAsyncErrors(
         name,
         email,
       });
-      console.log("User created : ", userCreated);
 
       const userToken = generateUserToken(userCreated);
 
@@ -401,7 +379,6 @@ public static googleAuthLogin = catchAsyncErrors(
 public static getUserProfile = catchAsyncErrors(
   async (req: Request, res: Response, next: NextFunction) => {
     const userId = req.user?._id;
-    console.log("User Id : ", userId);
 
     if (!userId) {
       return next(new ApiError(400, "User not found"));
