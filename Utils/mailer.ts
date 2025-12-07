@@ -1,5 +1,7 @@
 import nodemailer, { Transporter } from 'nodemailer';
 import dotenv from 'dotenv';
+import { sendEmailViaSendGrid, isSendGridAvailable } from './sendgridMailer';
+
 dotenv.config({ path: './config/.env' });
 
 if(!process.env.GMAIL_USER || !process.env.GMAIL_PASS){
@@ -139,12 +141,29 @@ const getOtpEmailHTML = (otp: number): string => {
     `;
 };
 
-// Email sending function with enhanced retry logic and dynamic transporter switching
-export const sendEmail = async (email: string, otp: number, retries: number = 6): Promise<boolean> => {
+// Email sending function with SendGrid fallback and enhanced retry logic
+export const sendEmail = async (email: string, otp: number, retries: number = 3): Promise<boolean> => {
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
         throw new Error('Invalid email format');
+    }
+
+    // Try SendGrid first if available (best for Render deployment)
+    if (isSendGridAvailable()) {
+        try {
+            console.log('📧 Using SendGrid (Primary method)...');
+            const result = await sendEmailViaSendGrid(email, otp);
+            if (result) {
+                return true;
+            }
+        } catch (sendGridError: any) {
+            console.error('❌ SendGrid failed:', sendGridError.message);
+            console.log('🔄 Falling back to Gmail SMTP...');
+            // Continue to Gmail SMTP fallback
+        }
+    } else {
+        console.log('⚠️ SendGrid not configured, using Gmail SMTP...');
     }
 
     const mailOptions = {
