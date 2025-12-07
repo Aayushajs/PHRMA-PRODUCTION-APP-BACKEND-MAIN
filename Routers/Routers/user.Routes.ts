@@ -1,7 +1,7 @@
 import {Router} from "express";
 import UserService from "../../Services/user.Service";
 import { customersMiddleware } from '../../Middlewares/CheckLoginMiddleware'
-import  uploadImage  from "../../config/multer";
+import  upload  from "../../config/multer";
 
 const userRouter = Router();
 const r = userRouter
@@ -13,13 +13,13 @@ r.get('/verify-token',customersMiddleware, (req, res) => {
         user: req.user
     });
 });
-r.post('/signup', uploadImage.single('profileImage'), UserService.signup);
+r.post('/signup', upload.single('profileImage'), UserService.signup);
 r.post('/login', UserService.login);
 r.post('/forgot-password', UserService.forgotPassword);
 r.post('/verify-otp', customersMiddleware, UserService.verifyOtp);
 r.post('/reset-password', customersMiddleware, UserService.ResetPassword);
 r.post('/google-login', UserService.googleAuthLogin);
 r.get('/profile', customersMiddleware, UserService.getUserProfile);
-r.put('/update/profile', customersMiddleware, uploadImage.single('profileImage'), UserService.updateUserProfile);
+r.put('/update/profile', customersMiddleware, upload.single('profileImage'), UserService.updateUserProfile);
 
 export default userRouter;

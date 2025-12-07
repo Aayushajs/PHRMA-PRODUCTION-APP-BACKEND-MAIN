@@ -533,10 +533,8 @@ export default class CategoryService {
       }
 
       const files = req.files as any;
-      let uploadedImageUrls: string[] = [...(existingCategory.imageUrl || [])];
-      let uploadedBannerUrls: string[] = [
-        ...(existingCategory.bannerUrl || []),
-      ];
+      let uploadedImageUrls: string[] = [];
+      let uploadedBannerUrls: string[] = [];
 
       if (files && files.imageUrl) {
         const imageFiles = Array.isArray(files.imageUrl)
@@ -597,8 +595,12 @@ export default class CategoryService {
       if (isFeatured !== undefined) updateData.isFeatured = Boolean(isFeatured);
       if (isActive !== undefined) updateData.isActive = Boolean(isActive);
 
-      if (files && files.imageUrl) updateData.imageUrl = uploadedImageUrls;
-      if (files && files.bannerUrl) updateData.bannerUrl = uploadedBannerUrls;
+      if (files && files.imageUrl && uploadedImageUrls.length > 0) {
+        updateData.imageUrl = uploadedImageUrls;
+      }
+      if (files && files.bannerUrl && uploadedBannerUrls.length > 0) {
+        updateData.bannerUrl = uploadedBannerUrls;
+      }
 
       const updatedCategory = await CategoryModel.findByIdAndUpdate(
         id,
