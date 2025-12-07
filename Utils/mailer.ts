@@ -6,32 +6,87 @@ if(!process.env.GMAIL_USER || !process.env.GMAIL_PASS){
     throw new Error("GMAIL_USER and GMAIL_PASS must be defined in .env file");
 }
 
-// Production-ready SMTP configuration
-const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false, // true for 465, false for other ports
-    auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_PASS,
-    },
-    tls: {
-        rejectUnauthorized: false // Accept self-signed certificates in production
-    },
-    connectionTimeout: 10000, // 10 seconds
-    greetingTimeout: 5000,
-    socketTimeout: 10000
-});
+// Create transporter with multiple fallback configurations
+const createTransporter = () => {
+    // Try SSL first (Port 465)
+    const sslTransporter = nodemailer.createTransport({
+        service: 'gmail',
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
+        auth: {
+            user: process.env.GMAIL_USER,
+            pass: process.env.GMAIL_PASS,
+        },
+        tls: {
+            rejectUnauthorized: false,
+            minVersion: 'TLSv1.2'
+        },
+        connectionTimeout: 60000,
+        greetingTimeout: 60000,
+        socketTimeout: 60000,
+        pool: true,
+        maxConnections: 5,
+        maxMessages: 100,
+        rateDelta: 1000,
+        rateLimit: 5,
+        logger: false,
+        debug: false
+    });
 
-// Verify transporter connection on startup
-transporter.verify((error, success) => {
-    if (error) {
-        console.error('❌ SMTP Connection Error:', error.message);
-        console.error('Please check GMAIL_USER and GMAIL_PASS in .env file');
-    } else {
-        console.log('✅ SMTP Server is ready to send emails');
+    return sslTransporter;
+};
+
+// Fallback TLS transporter (Port 587)
+const createFallbackTransporter = () => {
+    return nodemailer.createTransport({
+        host: 'smtp.gmail.com',
+        port: 587,
+        secure: false,
+        auth: {
+            user: process.env.GMAIL_USER,
+            pass: process.env.GMAIL_PASS,
+        },
+        tls: {
+            rejectUnauthorized: false,
+            ciphers: 'SSLv3'
+        },
+        connectionTimeout: 60000,
+        greetingTimeout: 60000,
+        socketTimeout: 60000
+    });
+};
+
+let transporter = createTransporter();
+let usingFallback = false;
+
+// Verify connection and switch to fallback if needed
+const verifyConnection = async () => {
+    try {
+        await transporter.verify();
+        console.log('✅ SMTP Server ready (Port 465 - SSL)');
+        return true;
+    } catch (error: any) {
+        console.error('❌ Port 465 failed:', error.message);
+        console.log('🔄 Trying fallback Port 587 (TLS)...');
+        
+        try {
+            transporter = createFallbackTransporter();
+            await transporter.verify();
+            usingFallback = true;
+            console.log('✅ SMTP Server ready (Port 587 - TLS Fallback)');
+            return true;
+        } catch (fallbackError: any) {
+            console.error('❌ Port 587 also failed:', fallbackError.message);
+            console.error('Please check GMAIL_USER and GMAIL_PASS in environment variables');
+            console.error('Make sure you are using Gmail App Password, not regular password');
+            return false;
+        }
     }
-});
+};
+
+// Verify on startup
+verifyConnection();
 
 // HTML Email Template
 const getOtpEmailHTML = (otp: number): string => {
@@ -84,8 +139,14 @@ const getOtpEmailHTML = (otp: number): string => {
     `;
 };
 
-// Email sending function with retry logic
-export const sendEmail = async (email: string, otp: number, retries: number = 3): Promise<boolean> => {
+// Email sending function with enhanced retry logic and dynamic transporter switching
+export const sendEmail = async (email: string, otp: number, retries: number = 6): Promise<boolean> => {
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        throw new Error('Invalid email format');
+    }
+
     const mailOptions = {
         from: {
             name: 'Epharma Support',
@@ -94,39 +155,87 @@ export const sendEmail = async (email: string, otp: number, retries: number = 3)
         to: email,
         subject: '🔐 Your Password Reset OTP Code',
         text: `Your OTP code is: ${otp}\n\nThis code will expire in 3 minutes.\n\nIf you didn't request this, please ignore this email.\n\nBest regards,\nEpharma Team`,
-        html: getOtpEmailHTML(otp)
+        html: getOtpEmailHTML(otp),
+        priority: 'high' as const
     };
+
+    let switchedToFallback = false;
 
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {
+            const transporterType = usingFallback ? 'Port 587-TLS' : 'Port 465-SSL';
+            console.log(`📤 Attempt ${attempt}/${retries} using ${transporterType} to ${email}...`);
+            
             const info = await transporter.sendMail(mailOptions);
             console.log(`✅ Email sent successfully to ${email}`);
             console.log(`📧 Message ID: ${info.messageId}`);
-            console.log(`📬 Response: ${info.response}`);
             return true;
         } catch (error: any) {
-            console.error(`❌ Email sending failed (Attempt ${attempt}/${retries}):`, error.message);
+            console.error(`❌ Failed (Attempt ${attempt}/${retries}):`, error.message);
+            console.error(`Error Code: ${error.code || 'UNKNOWN'}`);
             
+            // Handle authentication errors - don't retry
             if (error.code === 'EAUTH') {
-                console.error('🔒 Authentication failed. Please check:');
-                console.error('   1. GMAIL_USER is correct');
-                console.error('   2. GMAIL_PASS is a valid App Password (not regular password)');
-                console.error('   3. 2-Step Verification is enabled on Gmail');
-                console.error('   4. Generate new App Password: https://myaccount.google.com/apppasswords');
-            } else if (error.code === 'ECONNECTION' || error.code === 'ETIMEDOUT') {
-                console.error('🌐 Network connection issue. Retrying...');
-            } else if (error.code === 'EMESSAGE') {
-                console.error('📧 Invalid email format or message content');
+                console.error('🔒 Authentication failed!');
+                console.error('   ⚠️ GMAIL_USER:', process.env.GMAIL_USER ? '✓ Set' : '✗ Missing');
+                console.error('   ⚠️ GMAIL_PASS:', process.env.GMAIL_PASS ? '✓ Set' : '✗ Missing');
+                console.error('   📝 Use Gmail App Password: https://myaccount.google.com/apppasswords');
+                throw new Error('SMTP Authentication failed. Check Gmail App Password.');
             }
             
-            // If this was the last attempt, throw error
-            if (attempt === retries) {
-                console.error(`💥 Failed to send email after ${retries} attempts`);
-                throw new Error(`Email sending failed: ${error.message}`);
+            // Handle connection/timeout errors
+            if (error.code === 'ECONNECTION' || error.code === 'ETIMEDOUT' || error.code === 'ESOCKET' || error.message.includes('timeout')) {
+                console.error(`🌐 Connection/Timeout issue detected`);
+                
+                // Try switching to fallback transporter after 2 failed attempts
+                if (attempt === 2 && !switchedToFallback && !usingFallback) {
+                    console.log('🔄 Switching to fallback Port 587 (TLS)...');
+                    try {
+                        transporter = createFallbackTransporter();
+                        await transporter.verify();
+                        usingFallback = true;
+                        switchedToFallback = true;
+                        console.log('✅ Switched to Port 587 successfully');
+                        // Don't increment attempt counter for this switch
+                        continue;
+                    } catch (fallbackError: any) {
+                        console.error('❌ Fallback also failed:', fallbackError.message);
+                    }
+                }
+                
+                // Last attempt - give up
+                if (attempt === retries) {
+                    console.error(`💥 All ${retries} attempts failed`);
+                    console.error('Possible reasons:');
+                    console.error('  1. SMTP ports (465/587) blocked by hosting provider');
+                    console.error('  2. Invalid Gmail App Password');
+                    console.error('  3. Network connectivity issues');
+                    console.error('  4. Gmail account security restrictions');
+                    throw new Error(`Email failed after ${retries} attempts: ${error.message}`);
+                }
+                
+                // Exponential backoff with jitter
+                const baseDelay = Math.min(3000 * Math.pow(1.5, attempt - 1), 30000);
+                const jitter = Math.random() * 2000;
+                const waitTime = baseDelay + jitter;
+                console.log(`⏳ Waiting ${Math.round(waitTime/1000)}s before retry...`);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+            } 
+            // Handle message format errors
+            else if (error.code === 'EMESSAGE') {
+                console.error('📧 Invalid message format');
+                throw new Error('Invalid email message format');
+            } 
+            // Handle other errors
+            else {
+                console.error(`⚠️ Unexpected error: ${error.message}`);
+                
+                if (attempt === retries) {
+                    throw new Error(`Email sending failed: ${error.message}`);
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 4000 * attempt));
             }
-            
-            // Wait before retrying (exponential backoff)
-            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
         }
     }
     
