@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+import nodemailer, { Transporter } from 'nodemailer';
 import dotenv from 'dotenv';
 dotenv.config({ path: './config/.env' });
 
@@ -7,7 +7,7 @@ if(!process.env.GMAIL_USER || !process.env.GMAIL_PASS){
 }
 
 // Create transporter with multiple fallback configurations
-const createTransporter = () => {
+const createTransporter = (): Transporter => {
     // Try SSL first (Port 465)
     const sslTransporter = nodemailer.createTransport({
         service: 'gmail',
@@ -38,7 +38,7 @@ const createTransporter = () => {
 };
 
 // Fallback TLS transporter (Port 587)
-const createFallbackTransporter = () => {
+const createFallbackTransporter = (): Transporter => {
     return nodemailer.createTransport({
         host: 'smtp.gmail.com',
         port: 587,
@@ -57,7 +57,7 @@ const createFallbackTransporter = () => {
     });
 };
 
-let transporter = createTransporter();
+let transporter: Transporter = createTransporter();
 let usingFallback = false;
 
 // Verify connection and switch to fallback if needed
