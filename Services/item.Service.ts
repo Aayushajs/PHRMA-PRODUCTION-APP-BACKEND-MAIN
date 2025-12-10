@@ -19,7 +19,7 @@ import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
 import { v2 as cloudinary } from "cloudinary";
 import { gstModel } from '../Databases/Models/gst.Model'
 import mongoose from "mongoose";
-import { MRPVerificationService } from './MrpVerification.Service';
+import { MRPVerificationService } from './mrpVerification.Service';
 
 
 
