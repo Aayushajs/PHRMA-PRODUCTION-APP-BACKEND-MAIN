@@ -1,3 +1,10 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Advertisement Log Interface - Type definitions for ad logs.          │
+│  Structural definition for auditing ad creation/updates.              │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import mongoose, { Document } from "mongoose";
 
 export interface IAdvertisementLog extends Document {

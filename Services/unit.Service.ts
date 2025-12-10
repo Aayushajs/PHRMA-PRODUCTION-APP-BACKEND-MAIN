@@ -1,3 +1,10 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Unit Service - Business logic for Parent and Child Units.            │
+│  Handles creation, retrieval, updates, and deletion of units.         │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import parentUnitModel from '../Databases/Models/parentUnit.model';
 import { IParentUnit } from '../Databases/Entities/parentUnit.interface';
 import childUnit from '../Databases/Models/childUnit.model';
@@ -17,8 +24,8 @@ class ParentUnitServices {
             const parentUnitData: IParentUnit = req.body;
 
             const checktExistingUnit = await parentUnitModel.findOne({
-                $or:[
-                    { code: parentUnitData.code }, 
+                $or: [
+                    { code: parentUnitData.code },
                     { name: parentUnitData.name }
                 ]
             });

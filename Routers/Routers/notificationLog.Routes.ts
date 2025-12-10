@@ -1,6 +1,13 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Notification Log Routes - API endpoints for notification logs.       │
+│  Routes for viewing, filtering, and marking notifications as read.    │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import { Router } from 'express';
 import NotificationLogService from '../../Services/notificationLog.Service';
-import NotificationService  from '../../Middlewares/LogMedillewares/notificationLogger';
+import NotificationService from '../../Middlewares/LogMedillewares/notificationLogger';
 import { authenticatedUserMiddleware } from '../../Middlewares/CheckLoginMiddleware';
 
 const router = Router();

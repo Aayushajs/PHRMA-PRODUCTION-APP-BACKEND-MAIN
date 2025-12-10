@@ -1,3 +1,11 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Defines GST (Goods and Services Tax) configurations.                 │
+│  Stores GST rates (CGST, SGST, IGST), applicability dates, and        │
+│  descriptions for tax calculations on items.                          │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import { Igst } from '../Entities/gst.interface';
 import { Schema, Document } from "mongoose";
 
@@ -8,7 +16,7 @@ export const gstSchema = new Schema<Igst & Document>(
             required: true,
             trim: true,
         },
-        gstRate:{
+        gstRate: {
             type: Number,
             required: true,
         },

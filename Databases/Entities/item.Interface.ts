@@ -1,3 +1,10 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Item Interface - TypeScript definitions for product items.           │
+│  Defines structure for medicine details, stock, prices, and expiry.   │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import { Types } from "mongoose";
 
 export interface Iitem {
@@ -49,4 +56,26 @@ export interface Iitem {
   stockAisleIds?: Types.ObjectId[];
 
   isTrending?: boolean;
+
+  mrpVerification?: {
+    status?: 'approved' | 'warning' | 'rejected' | 'pending';
+    systemFinalMRP?: number;
+    userEnteredPrice?: number;
+    maxAllowedPrice?: number;
+    finalScore?: number;
+    reason?: string;
+    difference?: string;
+    stageUsed?: string;
+    needsAdminReview?: boolean;
+    verifiedAt?: Date;
+    realtimeReferences?: Array<{
+      source: string;
+      matchedProduct: string;
+      mrp: number;
+      pack: string;
+      normalizedMRP: number;
+      weightUsed: number;
+      matchScore: number;
+    }>;
+  };
 }

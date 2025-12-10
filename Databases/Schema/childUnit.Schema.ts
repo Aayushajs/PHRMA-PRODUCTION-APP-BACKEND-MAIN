@@ -1,3 +1,11 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Defines the structure for Child Units (e.g., strips, bottles).       │
+│  Includes code, weight, and description. Linked to Parent Units       │
+│  for inventory unit conversions.                                      │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import { Schema, Document } from "mongoose";
 import { IChildUnit } from "../Entities/childUnit.interface";
 
@@ -21,7 +29,7 @@ export const childUnitSchema = new Schema<IChildUnit & Document>(
     },
     weight: {
       type: Number,
-      min: 1                                  
+      min: 1
     },
     isActive: {
       type: Boolean,

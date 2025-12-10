@@ -1,3 +1,9 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Redis Config - Connection setup for Redis caching.                   │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import { createClient } from "redis";
 import dotenv from "dotenv";
 

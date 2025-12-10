@@ -1,3 +1,10 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Advertisement Interface - TypeScript definitions for ads.            │
+│  Defines structure for ad content, targeting, and tracking data.      │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import mongoose from "mongoose";
 
 export interface IAdvertisement {
@@ -14,7 +21,7 @@ export interface IAdvertisement {
     isActive: boolean;
     adClickTracking: {
         userId: mongoose.Schema.Types.ObjectId;
-        timestamp: Date;    
+        timestamp: Date;
     }[];
     createdBy?: string;
     updatedBy?: string;

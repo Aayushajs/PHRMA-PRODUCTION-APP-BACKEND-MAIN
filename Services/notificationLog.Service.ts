@@ -1,3 +1,10 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Notification Log Service - Logic for managing notification history.  │
+│  Handles retrieval, filtering, stats, and read status for logs.       │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import { Request, Response, NextFunction } from "express";
 import NotificationLogModel from "../Databases/Models/notificationLog.model";
 import { ApiError } from "../Utils/ApiError";
@@ -34,7 +41,7 @@ export default class NotificationLogService {
       const limitNum = Math.min(100, parseInt(limit as string) || 20);
       const skip = (pageNum - 1) * limitNum;
 
-      
+
       const cacheKey = `${CACHE_PREFIX}:active:${crypto
         .createHash("md5")
         .update(

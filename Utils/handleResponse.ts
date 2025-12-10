@@ -1,4 +1,10 @@
-import {Response, Request} from 'express';
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Response Handler - Standardized API response formatter.              │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
+import { Response, Request } from 'express';
 
 interface IResponse {
     success: boolean;

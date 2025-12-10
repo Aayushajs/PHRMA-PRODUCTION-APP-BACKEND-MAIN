@@ -1,3 +1,9 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Multer Config - Middleware for handling file uploads.                │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import multer from "multer";
 import path from "path";
 

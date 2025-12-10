@@ -1,4 +1,11 @@
-import {Router} from "express";
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Main Router - Entry point for all API routes.                        │
+│  Aggregates routes for Users, Medicines, Categories, Items, and Ads.  │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
+import { Router } from "express";
 import userRouter from './Routers/user.Routes';
 import featuredRouter from './Routers/featured.Routes';
 import categoryRouter from './Routers/category.Routes';
@@ -8,7 +15,7 @@ import units from './Routers/unit.Routes';
 import gstRouter from './Routers/gst.Routes';
 const mainRouter = Router();
 
-mainRouter.use('/users',userRouter);
+mainRouter.use('/users', userRouter);
 mainRouter.use('/featured-medicines', featuredRouter);
 mainRouter.use('/categories', categoryRouter);
 mainRouter.use('/items', itemsRouter);

@@ -1,4 +1,11 @@
-import {Router} from 'express';
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Unit Routes - API endpoints for Unit management.                     │
+│  Routes for managing Parent and Child Units (CRUD operations).        │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
+import { Router } from 'express';
 import unitServices from '../../Services/unit.Service';
 import { adminMiddleware } from '../../Middlewares/CheckLoginMiddleware';
 

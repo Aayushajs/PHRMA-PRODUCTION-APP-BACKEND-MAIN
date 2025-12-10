@@ -1,3 +1,10 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  User Interface - TypeScript definitions for user profiles.           │
+│  Defines structure for user data including personal info and address. │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import mongoose from "mongoose";
 import RoleIndex from "../../Utils/Roles.enum";
 
@@ -13,6 +20,7 @@ export interface Iuser {
   category?: mongoose.Types.ObjectId[];
   itemsPurchased?: mongoose.Types.ObjectId[];
   viewedItems?: mongoose.Types.ObjectId[];
+  viewedCategories?: mongoose.Types.ObjectId[];
   dob: Date;
   address?: {
     street?: string;

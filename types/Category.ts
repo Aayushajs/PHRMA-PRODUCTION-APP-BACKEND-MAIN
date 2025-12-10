@@ -1,3 +1,9 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Category Types - Type definitions and interfaces for Category module.│
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import { Schema } from "mongoose";
 
 // Base Category Interface

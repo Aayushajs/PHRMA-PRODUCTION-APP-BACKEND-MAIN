@@ -1,7 +1,9 @@
-/*───────────────────────────────────────────────────────────────────────────────
-  Hooks for Category model — handles automatic logging
-  on create, update, and delete events.
-───────────────────────────────────────────────────────────────────────────────*/
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Category Logger - Middleware hooks for Category schema operations.   │
+│  Logs create, update, and delete events to CategoryLog.               │
+└───────────────────────────────────────────────────────────────────────┘
+*/
 
 import { Schema } from "mongoose";
 import CategoryLogModel from "../../Databases/Models/categoryLog.model";

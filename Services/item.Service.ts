@@ -1,3 +1,10 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Item Service - Business logic for Item/Product management.           │
+│  Handles creation, updates, retrieval, deals, and image uploads.      │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import { Response, Request, NextFunction } from "express";
 import { catchAsyncErrors } from "../Utils/catchAsyncErrors";
 import { ApiError } from "../Utils/ApiError";
@@ -5,11 +12,14 @@ import { handleResponse } from "../Utils/handleResponse";
 import { redis } from "../config/redis";
 import ItemModel from "../Databases/Models/item.Model"
 import { Iuser } from "../Databases/Entities/user.Interface";
+import userModel from "../Databases/Models/user.Models";
 import ChildUnitModel from "../Databases/Models/childUnit.model";
 import ParentUnitModel from "../Databases/Models/parentUnit.model";
 import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
 import { v2 as cloudinary } from "cloudinary";
 import { gstModel } from '../Databases/Models/gst.Model'
+import mongoose from "mongoose";
+import { MRPVerificationService } from './MrpVerification.Service';
 
 
 
@@ -22,6 +32,7 @@ declare global {
 }
 
 export default class ItemServices {
+    //only serching and ganuvan price and mrp 
     public static createItem = catchAsyncErrors(
         async (
             req: Request,
@@ -67,6 +78,199 @@ export default class ItemServices {
                         ? `${missing[0]} is required`
                         : `${missing.join(", ")} are required`;
                 return next(new ApiError(400, message));
+            }
+
+            const mfgDate = new Date(itemMfgDate);
+            const expiryDate = new Date(itemExpiryDate);
+            const now = new Date();
+
+            if (isNaN(mfgDate.getTime()) || isNaN(expiryDate.getTime())) {
+                return next(new ApiError(400, "Invalid Date Format for Mfg or Expiry Date"));
+            }
+
+            if (mfgDate > now) {
+                return next(new ApiError(400, "Manufacturing Date cannot be in the future"));
+            }
+
+            //  Logical Validity Check (Expiry > Mfg)
+            if (expiryDate <= mfgDate) {
+                return next(new ApiError(400, "Expiry Date must be strictly after Manufacturing Date"));
+            }
+
+            const existingItem = await ItemModel.findOne({ itemName: itemName });
+            if (existingItem) {
+                return next(new ApiError(409, `Item already exists ${itemName} name`));
+            }
+
+            const childUnit = await ChildUnitModel.findById(itemChildUnit);
+            if (!childUnit) {
+                return next(new ApiError(404, "Child Unit not found"));
+            }
+
+            let finalParentUnit = undefined;
+            if (itemParentUnit) {
+                const parentUnitId = await ParentUnitModel.findById(itemParentUnit);
+                if (!parentUnitId) return next(new ApiError(404, "Parent Unit not found"));
+                finalParentUnit = parentUnitId._id;
+            }
+
+            let imageUrls: string[] = [];
+
+            // If files are uploaded via form-data
+            if (req.files && Array.isArray(req.files)) {
+                try {
+                    const uploadResults = await Promise.all(
+                        (req.files as Express.Multer.File[]).map(file =>
+                            uploadToCloudinary(file.buffer, "Epharma/items") // Folder name
+                        )
+                    );
+                    imageUrls = uploadResults.map(r => r.secure_url);
+                } catch (error) {
+                    console.error("Cloudinary upload error:", error);
+                    return next(new ApiError(500, "Failed to upload item images"));
+                }
+            }
+            // If frontend sends existing URLs (string or array)
+            else if (req.body.itemImages) {
+                if (Array.isArray(req.body.itemImages)) {
+                    imageUrls = req.body.itemImages;
+                } else if (typeof req.body.itemImages === "string") {
+                    imageUrls = [req.body.itemImages];
+                }
+            }
+
+            const gstId = await gstModel.findById(itemGST).select('gstRate').lean();
+            const gstRate = gstId?.gstRate ?? 0;
+
+            const calculatedFinalPrice = +(itemInitialPrice * (1 + (Number(gstRate) || 0) / 100)).toFixed(2);
+            console.log("calculatedFinalPrice : ", calculatedFinalPrice)
+
+            // === MRP VERIFICATION (REAL-TIME) ===
+            let mrpVerificationData: any = { status: 'pending', needsAdminReview: true };
+            try {
+                const verificationResult = await MRPVerificationService.verifyMRP({
+                    itemName,
+                    itemCompany: req.body.itemCompany,
+                    formula: req.body.formula,
+                    userEnteredPrice: calculatedFinalPrice,
+                    packSize: req.body.packSize,
+                    category: itemCategory
+                });
+
+                mrpVerificationData = {
+                    status: verificationResult.status,
+                    systemFinalMRP: verificationResult.systemFinalMRP,
+                    userEnteredPrice: verificationResult.userEnteredPrice,
+                    maxAllowedPrice: verificationResult.maxAllowedPrice,
+                    finalScore: verificationResult.finalScore,
+                    reason: verificationResult.reason,
+                    difference: verificationResult.difference,
+                    stageUsed: verificationResult.stageUsed,
+                    needsAdminReview: verificationResult.needsAdminReview,
+                    verifiedAt: new Date(),
+                    realtimeReferences: verificationResult.realtimeReferences
+                };
+                console.log('✅ MRP Verified:', verificationResult.status);
+            } catch (error) {
+                console.error('❌ MRP Verification Failed:', error);
+            }
+
+            const newItemData: any = {
+                itemName,
+                itemInitialPrice: Number(itemInitialPrice),
+                itemFinalPrice: Number(calculatedFinalPrice),
+                itemDescription,
+                itemImages: imageUrls,
+                itemCategory,
+                itemMfgDate,
+                itemParentUnit: finalParentUnit,
+                itemChildUnit,
+                itemExpiryDate,
+                code,
+                HSNCode,
+                weight,
+                itemGST,
+                createdBy: req.user?._id,
+                createAt: Date.now(),
+                mrpVerification: mrpVerificationData,
+                otherInformation: req.body.otherInformation || {}
+            }
+
+            console.log("New data : ", newItemData);
+
+            const newItem: any = await ItemModel.create(newItemData);
+            await redis.del("deals:of-the-day");
+
+            return handleResponse(req, res, 201, "Item created successfully", {
+                item: newItem,
+                priceVerification: mrpVerificationData
+            });
+        }
+    )
+
+    //alow create all price , mrp in item have no any rules 
+    public static createPremiumItem = catchAsyncErrors(
+        async (
+            req: Request,
+            res: Response,
+            next: NextFunction
+        ) => {
+            const {
+                itemName,
+                itemInitialPrice,
+                itemDescription,
+                itemCategory,
+                itemMfgDate,
+                itemExpiryDate,
+                itemParentUnit,
+                itemChildUnit,
+                itemGST,
+                code,
+                HSNCode,
+                weight
+            } = req.body;
+
+            console.log("Requested to body : ", req.body);
+
+            const fields = {
+                itemName,
+                itemInitialPrice,
+                itemCategory,
+                itemMfgDate,
+                itemExpiryDate,
+                itemChildUnit,
+                code,
+                HSNCode,
+                weight,
+                itemGST
+            };
+
+            const missing = (Object.keys(fields) as Array<keyof typeof fields>)
+                .filter(key => !fields[key]);
+
+            if (missing.length > 0) {
+                const message =
+                    missing.length === 1
+                        ? `${missing[0]} is required`
+                        : `${missing.join(", ")} are required`;
+                return next(new ApiError(400, message));
+            }
+
+            const mfgDate = new Date(itemMfgDate);
+            const expiryDate = new Date(itemExpiryDate);
+            const now = new Date();
+
+            if (isNaN(mfgDate.getTime()) || isNaN(expiryDate.getTime())) {
+                return next(new ApiError(400, "Invalid Date Format for Mfg or Expiry Date"));
+            }
+
+            if (mfgDate > now) {
+                return next(new ApiError(400, "Manufacturing Date cannot be in the future"));
+            }
+
+            //  Logical Validity Check (Expiry > Mfg)
+            if (expiryDate <= mfgDate) {
+                return next(new ApiError(400, "Expiry Date must be strictly after Manufacturing Date"));
             }
 
             const existingItem = await ItemModel.findOne({ itemName: itemName });
@@ -368,15 +572,15 @@ export default class ItemServices {
                 // console.log("Latest deal in DB updated at:", latestDeal?.updatedAt);
                 // const cacheMeta = JSON.parse(cachedDeals)?.[0]?.updatedAt;
 
-            //     console.log("Cached deals updated at:", cacheMeta); 
+                //     console.log("Cached deals updated at:", cacheMeta); 
 
-            //     if (latestDeal && cacheMeta && new Date(latestDeal.updatedAt ?? 0) > new Date(cacheMeta)) {
-            //         console.log("Newer deals found — refreshing cache...");
-            //         await redis.del(cacheKey); // Clear old cache
-            //     } else {
-            //         console.log("Serving deals from cache");
-            //         return handleResponse(req, res, 200, "Deals retrieved successfully (cached)", JSON.parse(cachedDeals));
-            //     }
+                //     if (latestDeal && cacheMeta && new Date(latestDeal.updatedAt ?? 0) > new Date(cacheMeta)) {
+                //         console.log("Newer deals found — refreshing cache...");
+                //         await redis.del(cacheKey); // Clear old cache
+                //     } else {
+                //         console.log("Serving deals from cache");
+                //         return handleResponse(req, res, 200, "Deals retrieved successfully (cached)", JSON.parse(cachedDeals));
+                //     }
             }
 
             // if (cachedDeals) {
@@ -435,5 +639,398 @@ export default class ItemServices {
             return handleResponse(req, res, 200, "Deals fetched successfully", formattedDeals);
         }
     )
-}
 
+    public static addToRecentlyViewedItems = catchAsyncErrors(
+        async (req: Request, res: Response, next: NextFunction) => {
+            const { itemId } = req.params;
+            const userId = req.user?._id;
+
+            if (!itemId) {
+                return next(new ApiError(400, "Item ID is required"));
+            }
+
+            if (!userId) {
+                return next(new ApiError(401, "User not authenticated"));
+            }
+
+            // LIFO Logic
+            await userModel.findByIdAndUpdate(userId, {
+                $pull: { viewedItems: itemId }
+            });
+
+            await userModel.findByIdAndUpdate(userId, {
+                $push: {
+                    viewedItems: {
+                        $each: [itemId],
+                        $position: 0,
+                        $slice: 15
+                    }
+                }
+            });
+
+            // Invalidate Redis Cache
+            await redis.del(`recently_viewed_items:${userId}`);
+
+            return handleResponse(req, res, 200, "Recently viewed item updated");
+        }
+    )
+
+    public static getRecentlyViewedItems = catchAsyncErrors(
+        async (req: Request, res: Response, next: NextFunction) => {
+            const userId = req.user?._id;
+
+            if (!userId) {
+                return next(new ApiError(401, "User not authenticated"));
+            }
+
+            const cacheKey = `recently_viewed_items:${userId}`;
+            const cachedData = await redis.get(cacheKey);
+
+            if (cachedData) {
+                return handleResponse(req, res, 200, "Recently viewed items fetched from cache", JSON.parse(cachedData));
+            }
+
+            const user = await userModel.findById(userId).populate("viewedItems");
+
+            if (!user) {
+                return next(new ApiError(404, "User not found"));
+            }
+
+            const viewedItems = user.viewedItems || [];
+
+            // Cache for 10 minutes
+            await redis.set(cacheKey, JSON.stringify(viewedItems), { EX: 600 });
+
+            return handleResponse(req, res, 200, "Recently viewed items fetched successfully", viewedItems);
+        }
+    )
+
+    public static getDynamicFeed = catchAsyncErrors(
+        async (req: Request, res: Response, next: NextFunction) => {
+            const userId = (req as any).user?._id;
+
+            if (!userId) {
+                return next(new ApiError(401, "User not authenticated"));
+            }
+
+            const limit = 20;
+            const queueKey = `user_feed_queue:${userId}`;
+
+            // 1. Check Queue Length
+            const queueLength = await redis.lLen(queueKey);
+
+            if (queueLength < limit) {
+                // Regenerate Queue
+                const user = await userModel.findById(userId);
+                const viewedCategoryIds = user?.viewedCategories || [];
+
+                // Parallel Fetch Strategy
+                const [personalizedItems, trendingItems, newItems] = await Promise.all([
+                    // A. Personalized (History Match)
+                    viewedCategoryIds.length > 0
+                        ? ItemModel.find({ itemCategory: { $in: viewedCategoryIds } })
+                            .sort({ views: -1 })
+                            .limit(50)
+                            .select("_id")
+                            .lean()
+                        : Promise.resolve([]),
+
+                    // B. Trending (High Views)
+                    ItemModel.find()
+                        .sort({ views: -1 })
+                        .limit(50)
+                        .select("_id")
+                        .lean(),
+
+                    // C. New Arrivals
+                    ItemModel.find()
+                        .sort({ createdAt: -1 })
+                        .limit(50)
+                        .select("_id")
+                        .lean()
+                ]);
+
+                // Merge Unique IDs
+                const allIds = new Set([
+                    ...personalizedItems.map((i: any) => i._id.toString()),
+                    ...trendingItems.map((i: any) => i._id.toString()),
+                    ...newItems.map((i: any) => i._id.toString())
+                ]);
+
+                // Fisher-Yates Shuffle
+                const shuffledIds = Array.from(allIds);
+                for (let i = shuffledIds.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [shuffledIds[i], shuffledIds[j]] = [shuffledIds[j], shuffledIds[i]];
+                }
+
+                if (shuffledIds.length > 0) {
+                    await redis.rPush(queueKey, shuffledIds);
+                    await redis.expire(queueKey, 3600); // 1 Hour TTL
+                }
+            }
+
+            // 2. Pop Items from Queue (Get next batch)
+            const ids = await redis.lRange(queueKey, 0, limit - 1);
+            if (ids.length > 0) {
+                await redis.lTrim(queueKey, limit, -1);
+            }
+
+            if (ids.length === 0) {
+                // Fallback if empty even after regeneration attempt (e.g. no items in DB)
+                return handleResponse(req, res, 200, "Feed updated", []);
+            }
+
+            // 3. Fetch Item Details
+            const items = await ItemModel.find({ _id: { $in: ids } })
+                .select("itemName code itemImages itemDescription itemDiscount itemRatings itemFinalPrice itemInitialPrice views")
+                .lean();
+
+            // 4. Preserve Shuffled Order & Format
+            const itemMap = new Map(items.map((i: any) => [i._id.toString(), i]));
+            const formattedFeed = ids
+                .map(id => itemMap.get(id))
+                .filter(item => !!item)
+                .map((item: any) => ({
+                    _id: item._id,
+                    itemName: item.itemName,
+                    code: item.code,
+                    image: item.itemImages?.[0] || null, // First index only
+                    itemDescription: item.itemDescription,
+                    itemDiscount: item.itemDiscount,
+                    itemRatings: item.itemRatings,
+                    itemFinalPrice: item.itemFinalPrice,
+                    itemInitialPrice: item.itemInitialPrice
+                }));
+
+            return handleResponse(req, res, 200, "Dynamic feed fetched successfully", formattedFeed);
+        }
+    )
+
+    public static getAITrendingProducts = catchAsyncErrors(
+        async (req: Request, res: Response, next: NextFunction) => {
+            let userId = (req as any).user?._id;
+
+            // --- 1. Fetch User Profile (if logged in) ---
+            let userProfile: any = null;
+            if (userId) {
+                userProfile = await userModel.findById(userId)
+                    .select("viewedCategories viewedItems itemsPurchased age address.location wishlist")
+                    .lean();
+            }
+
+            const userCacheKey = userId ? `user_trend_cache_v2:${userId}` : null;
+            if (userCacheKey) {
+                const cachedUserTrend = await redis.get(userCacheKey);
+                if (cachedUserTrend) {
+                    return handleResponse(req, res, 200, "AI Trending products (Cached)", JSON.parse(cachedUserTrend));
+                }
+            }
+
+            // --- 2. Global Candidates (Base Layer - Cached 1h) ---
+            const globalCacheKey = "global_ai_candidates_v2";
+            let globalCandidates: any[] = [];
+            const cachedGlobals = await redis.get(globalCacheKey);
+
+            if (cachedGlobals) {
+                globalCandidates = JSON.parse(cachedGlobals);
+            } else {
+                // Optimized Aggregation Pipeline
+                globalCandidates = await ItemModel.aggregate([
+                    {
+                        $match: {
+                            $or: [
+                                { views: { $gt: 50 } },
+                                { itemDiscount: { $gt: 15 } },
+                                { itemRatings: { $gt: 4 } }
+                            ]
+                        }
+                    },
+                    {
+                        $project: {
+                            _id: 1,
+                            itemName: 1,
+                            itemDescription: 1,
+                            itemRatings: 1,
+                            // Performance: Slice image array in DB
+                            itemImages: { $slice: ["$itemImages", 1] },
+                            // Scoring Signals (Needed for logic, removed in final response)
+                            itemCategory: 1,
+                            views: 1,
+                            itemDiscount: 1
+                        }
+                    }
+                ]);
+                await redis.set(globalCacheKey, JSON.stringify(globalCandidates), { EX: 3600 });
+            }
+
+            // --- 3. AI Scoring Engine (In-Memory Microservice Logic) ---
+            const scoredItems = globalCandidates.map(item => {
+                let score = 0;
+
+                // A. User Affinity (Weight: 45%)
+                if (userProfile) {
+                    if (userProfile.viewedCategories?.some((c: any) => c.toString() === item.itemCategory?.toString())) {
+                        score += 30;
+                    }
+                }
+
+                // B. Global Trend Signals (Weight: 25%)
+                if ((item.views || 0) > 100) score += 15;
+                if ((item.itemDiscount || 0) > 20) score += 10;
+
+                // C. Product Quality (Weight: 15%)
+                if ((item.itemRatings || 0) >= 4.5) score += 15;
+
+                // D. Seasonality (Weight: 15%)
+                // (Simplified Regex Logic)
+                const currentMonth = new Date().getMonth();
+                const isWinter = [10, 11, 0, 1].includes(currentMonth);
+                const nameLower = (item.itemName || "").toLowerCase();
+
+                if (isWinter && (nameLower.includes("code") || nameLower.includes("syrup"))) score += 20; // Example keywords
+
+                return { ...item, finalScore: score };
+            });
+
+            // --- 4. Final Sort & Strict Formatting ---
+            scoredItems.sort((a, b) => b.finalScore - a.finalScore);
+
+            if (scoredItems.length > 5) {
+                const rand = Math.random();
+                if (rand > 0.5) [scoredItems[0], scoredItems[1]] = [scoredItems[1], scoredItems[0]];
+            }
+
+            // Strictly requested fields: id, name, description, image, rating
+            const formattedResponse = scoredItems.slice(0, 20).map(i => ({
+                _id: i._id,
+                itemName: i.itemName,
+                itemDescription: i.itemDescription || "",
+                image: i.itemImages?.[0] || null,
+                itemRatings: i.itemRatings || 0
+            }));
+
+            // Cache for User (10 mins)
+            if (userCacheKey) {
+                await redis.set(userCacheKey, JSON.stringify(formattedResponse), { EX: 600 });
+            }
+
+            return handleResponse(req, res, 200, "AI Trending Products", formattedResponse);
+        }
+    )
+
+    public static getItemDetails = catchAsyncErrors(
+        async (req: Request, res: Response, next: NextFunction) => {
+            const { itemId } = req.params;
+
+            if (!itemId) {
+                return next(new ApiError(400, "Item ID is required"));
+            }
+
+            // 1. Check Cache
+            const cacheKey = `item_details:${itemId}`;
+            const cachedItem = await redis.get(cacheKey);
+
+            if (cachedItem) {
+                // Async View Increment (Fire & Forget)
+                ItemModel.findByIdAndUpdate(itemId, { $inc: { views: 1 } }).exec();
+                return handleResponse(req, res, 200, "Item details fetched (Cached)", JSON.parse(cachedItem));
+            }
+
+            // 2. High-Performance Aggregation Pipeline
+            const itemData = await ItemModel.aggregate([
+                {
+                    $match: { _id: new mongoose.Types.ObjectId(itemId) }
+                },
+                // Join Category
+                {
+                    $lookup: {
+                        from: "categories", // Collection name
+                        localField: "itemCategory",
+                        foreignField: "_id",
+                        as: "categoryDetails"
+                    }
+                },
+                { $unwind: { path: "$categoryDetails", preserveNullAndEmptyArrays: true } },
+                // Join Parent Unit
+                {
+                    $lookup: {
+                        from: "parentunits",
+                        localField: "itemParentUnit",
+                        foreignField: "_id",
+                        as: "parentUnitDetails"
+                    }
+                },
+                { $unwind: { path: "$parentUnitDetails", preserveNullAndEmptyArrays: true } },
+                // Join Child Unit
+                {
+                    $lookup: {
+                        from: "childunits",
+                        localField: "itemChildUnit",
+                        foreignField: "_id",
+                        as: "childUnitDetails"
+                    }
+                },
+                { $unwind: { path: "$childUnitDetails", preserveNullAndEmptyArrays: true } },
+                // Join GST
+                {
+                    $lookup: {
+                        from: "gsts",
+                        localField: "itemGST",
+                        foreignField: "_id",
+                        as: "gstDetails"
+                    }
+                },
+                { $unwind: { path: "$gstDetails", preserveNullAndEmptyArrays: true } },
+                // Final Projection (Strict & Clean)
+                {
+                    $project: {
+                        _id: 1,
+                        itemName: 1,
+                        itemDescription: 1,
+                        itemInitialPrice: 1,
+                        itemFinalPrice: 1,
+                        itemDiscount: 1,
+                        itemRatings: 1,
+                        itemImages: 1,
+                        itemMfgDate: 1,
+                        itemExpiryDate: 1,
+                        code: 1,
+                        HSNCode: 1,
+                        views: 1,
+                        weight: 1,
+                        formula: 1,
+                        category: {
+                            _id: "$categoryDetails._id",
+                            name: "$categoryDetails.name",
+                            description: "$categoryDetails.description"
+                        },
+                        units: {
+                            parent: "$parentUnitDetails.name",
+                            child: "$childUnitDetails.name",
+                            conversion: "$parentUnitDetails.conversionFactor"
+                        },
+                        gst: {
+                            rate: "$gstDetails.gstRate",
+                            id: "$gstDetails._id"
+                        }
+                    }
+                }
+            ]);
+
+            const item = itemData[0];
+
+            if (!item) {
+                return next(new ApiError(404, "Item not found"));
+            }
+
+            // 3. Increment Views (DB Side)
+            ItemModel.findByIdAndUpdate(itemId, { $inc: { views: 1 } }).exec();
+
+            // 4. Cache Result (30 Minutes)
+            await redis.set(cacheKey, JSON.stringify(item), { EX: 1800 });
+
+            return handleResponse(req, res, 200, "Item details fetched successfully", item);
+        }
+    )
+}

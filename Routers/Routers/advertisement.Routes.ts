@@ -1,13 +1,20 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Advertisement Routes - API endpoints for advertisement operations.   │
+│  Routes for managing ads, tracking clicks, and viewing analytics.     │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import express from "express";
 import AdvertisementService, { AdvertisementLogService } from "../../Services/advertisement.Service";
 import upload from "../../config/multer";
-import { adminMiddleware , userMiddleware} from "../../Middlewares/CheckLoginMiddleware";
+import { adminMiddleware, userMiddleware } from "../../Middlewares/CheckLoginMiddleware";
 
 const router = express.Router();
 const r = router;
 
 r.get("/debug", AdvertisementService.getDebugInfo);
-r.post("/create", adminMiddleware,upload.single("imageUrl"),AdvertisementService.createAd);
+r.post("/create", adminMiddleware, upload.single("imageUrl"), AdvertisementService.createAd);
 r.put("/update/:adId", adminMiddleware, upload.single("imageUrl"), AdvertisementService.updateAd);
 r.delete("/delete/:adId", adminMiddleware, AdvertisementService.deleteAd);
 r.patch("/deactivate/:adId", adminMiddleware, AdvertisementService.softDeleteAd);

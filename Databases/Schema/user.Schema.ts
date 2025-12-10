@@ -43,11 +43,6 @@ export const userSchema = new Schema<Iuser & Document>(
     lastLogin: {
       type: Date,
     },
-    category: {
-      type: [Schema.Types.ObjectId],
-      ref: "Category",
-      default: [],
-    },
     itemsPurchased: {
       type: [Schema.Types.ObjectId],
       ref: "items",
@@ -56,6 +51,11 @@ export const userSchema = new Schema<Iuser & Document>(
     viewedItems: {
       type: [Schema.Types.ObjectId],
       ref: "items",
+      default: [],
+    },
+    viewedCategories: {
+      type: [Schema.Types.ObjectId],
+      ref: "Category",
       default: [],
     },
     address: {

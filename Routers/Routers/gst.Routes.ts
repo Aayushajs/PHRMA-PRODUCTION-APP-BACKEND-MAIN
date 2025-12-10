@@ -1,3 +1,10 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  GST Routes - API endpoints for GST management.                       │
+│  Routes for adding, updating, deleting, and retrieving GST rates.     │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import express from "express";
 import GSTServices from "../../Services/gst.Service";
 
