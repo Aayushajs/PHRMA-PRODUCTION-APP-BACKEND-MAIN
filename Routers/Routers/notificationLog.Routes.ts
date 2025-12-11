@@ -1,116 +1,141 @@
 /*
 ┌───────────────────────────────────────────────────────────────────────┐
-│  Notification Log Routes - API endpoints for notification logs.       │
-│  Routes for viewing, filtering, and marking notifications as read.    │
+│  Notification API Routes - Production Ready                           │
+│  Handles notification logs, FCM token management, and notifications   │
 └───────────────────────────────────────────────────────────────────────┘
 */
 
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import NotificationLogService from '../../Services/notificationLog.Service';
 import NotificationService from '../../Middlewares/LogMedillewares/notificationLogger';
 import { authenticatedUserMiddleware } from '../../Middlewares/CheckLoginMiddleware';
+import { handleResponse } from '../../Utils/handleResponse';
+import { ApiError } from '../../Utils/ApiError';
 
 const router = Router();
-const r = router;
 
-// Get all active notification logs (filters out deleted/inactive entities)
-r.get('/active-logs', NotificationLogService.getActiveLogs);
+// ============================================================================
+// NOTIFICATION LOG ENDPOINTS
+// ============================================================================
+router.get('/active-logs', NotificationLogService.getActiveLogs);
+router.get('/myNotification', authenticatedUserMiddleware, NotificationLogService.getUserLogs);
+router.get('/log/:id', NotificationLogService.getLogById);
+router.get('/stats', authenticatedUserMiddleware, NotificationLogService.getUserStats);
+router.patch('/mark-read/:id', authenticatedUserMiddleware, NotificationLogService.markAsRead);
 
-// Get notification logs for a specific user
-r.get('/myNotification', authenticatedUserMiddleware, NotificationLogService.getUserLogs);
-
-// Get a specific notification log by ID
-r.get('/log/:id', NotificationLogService.getLogById);
-
-// Get user notification statistics
-r.get('/stats', authenticatedUserMiddleware, NotificationLogService.getUserStats);
-
-// Mark notification as read (requires authentication)
-r.patch('/mark-read/:id', authenticatedUserMiddleware, NotificationLogService.markAsRead);
-
-// Send test notification (requires authentication)
-r.post('/send-test', authenticatedUserMiddleware, async (req, res) => {
-  try {
-    const userId = (req as any).user?._id;
-    const fcmToken = (req as any).user?.fcmToken;
-    const { title, body, type = 'OTHER' } = req.body;
-
-    if (!fcmToken) {
-      return res.status(400).json({
-        success: false,
-        message: 'FCM token not found. Please update your device token.'
-      });
-    }
-
-    const result = await NotificationService.sendNotificationWithLog(
-      userId,
-      fcmToken,
-      title || 'Test Notification',
-      body || 'This is a test notification from Postman',
-      {
-        type: type,
-        payload: { source: 'postman_test', timestamp: new Date().toISOString() }
-      }
-    );
-
-    return res.status(200).json({
-      success: true,
-      message: 'Test notification sent',
-      data: result
-    });
-
-  } catch (error: any) {
-    console.error('Send test notification error:', error);
-    return res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to send test notification'
-    });
-  }
-});
-
-// Mark multiple notifications as read (requires authentication)
-r.patch('/mark-multiple-read', authenticatedUserMiddleware, async (req, res, next) => {
+router.patch('/mark-multiple-read', authenticatedUserMiddleware, async (req: Request, res: Response) => {
   try {
     const { logIds } = req.body;
     const userId = (req as any).user?._id;
 
     if (!logIds || !Array.isArray(logIds) || logIds.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'logIds array is required'
-      });
-    }
-
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: 'User authentication required'
-      });
+      throw new ApiError(400, 'logIds array is required');
     }
 
     const result = await NotificationService.markMultipleAsRead(logIds, userId);
 
     if (!result) {
-      return res.status(500).json({
-        success: false,
-        message: 'Failed to mark notifications as read'
-      });
+      throw new ApiError(500, 'Failed to mark notifications as read');
     }
 
-    return res.status(200).json({
-      success: true,
-      message: `${result.modifiedCount} notifications marked as read`,
-      data: {
-        modifiedCount: result.modifiedCount,
-        matchedCount: result.matchedCount
-      }
+    return handleResponse(req, res, 200, `${result.modifiedCount} notifications marked as read`, {
+      modifiedCount: result.modifiedCount,
+      matchedCount: result.matchedCount
     });
 
   } catch (error: any) {
-    console.error('Mark multiple as read error:', error);
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
-      message: 'Internal server error'
+      message: error.message || 'Internal server error'
+    });
+  }
+});
+
+// ============================================================================
+// FCM TOKEN MANAGEMENT
+// ============================================================================
+
+router.post('/register-token', authenticatedUserMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?._id;
+    const { token } = req.body;
+
+    // Validate token
+    if (!token || typeof token !== 'string' || token.trim() === '') {
+      throw new ApiError(400, 'Valid FCM token is required');
+    }
+
+    // Reject Expo tokens
+    if (token.startsWith('ExponentPushToken')) {
+      throw new ApiError(400, 'Expo Push Token not supported. Please use FCM token.');
+    }
+
+    // Update user's FCM token
+    const UserModel = (await import('../../Databases/Models/user.Models')).default;
+    const user = await UserModel.findByIdAndUpdate(
+      userId,
+      { fcmToken: token.trim() },
+      { new: true }
+    );
+
+    if (!user) {
+      throw new ApiError(404, 'User not found');
+    }
+
+    return handleResponse(req, res, 200, 'FCM token registered successfully', {
+      userId: user._id,
+      tokenRegistered: true
+    });
+
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Failed to register FCM token'
+    });
+  }
+});
+
+// ============================================================================
+// TESTING ENDPOINT (Development/Testing only)
+// ============================================================================
+
+router.post('/send-test', authenticatedUserMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?._id;
+    const fcmToken = (req as any).user?.fcmToken;
+    const { title, body, type = 'OTHER' } = req.body;
+
+    // Validate FCM token exists
+    if (!fcmToken) {
+      throw new ApiError(400, 'FCM token not found. Please login from mobile app.');
+    }
+
+    // Reject Expo tokens
+    if (fcmToken.startsWith('ExponentPushToken')) {
+      throw new ApiError(400, 'Expo Push Token detected. Please login again to get FCM token.');
+    }
+
+    // Send notification with log
+    const result = await NotificationService.sendNotificationWithLog(
+      userId,
+      fcmToken,
+      title || 'Test Notification',
+      body || 'This is a test notification',
+      {
+        type: type,
+        payload: {
+          source: 'api_test',
+          timestamp: new Date().toISOString()
+        }
+      }
+    );
+
+    return handleResponse(req, res, 200, 'Test notification sent successfully', result);
+
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Failed to send test notification'
     });
   }
 });
