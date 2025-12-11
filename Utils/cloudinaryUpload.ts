@@ -1,3 +1,9 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Cloudinary Upload Utility - Helper for uploading files to Cloudinary.│
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import { v2 as cloudinary } from "cloudinary";
 import type { UploadApiResponse } from "cloudinary";
 import dotenv from "dotenv";
@@ -24,10 +30,10 @@ export const uploadToCloudinary = async (fileBuffer: Buffer, folder: string) => 
 
     cloudinary.uploader
       .upload_stream(
-        { 
+        {
           folder: folder || "Epharma",
           resource_type: "image"
-        }, 
+        },
         (error, result) => {
           if (error) {
             console.error("Cloudinary upload error:", error);

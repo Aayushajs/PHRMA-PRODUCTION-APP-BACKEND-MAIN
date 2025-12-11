@@ -1,13 +1,19 @@
-import express, {Express} from 'express';
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Server Entry Point - Main Express application setup/initialization.  │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
+import express, { Express } from 'express';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
-import {connectDB} from './Databases/db';
+import { connectDB } from './Databases/db';
 import { errorHandler } from './Middlewares/errorHandler';
 import mainRouter from './Routers/main.Routes';
 import { firebaseAdmin } from './Utils/serviceAccount';
 
-dotenv.config({path: './config/.env'});
+dotenv.config({ path: './config/.env' });
 
 
 const app: Express = express();
@@ -17,11 +23,11 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors({
-    origin: ['exp://10.168.86.226:8081', '*'],
-    // origin: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
+  origin: ['exp://10.168.86.226:8081', '*'],
+  // origin: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
 }));
 
 
@@ -44,6 +50,6 @@ try {
 }
 
 const PORT = process.env.PORT || 5001;
-app.listen(PORT, async ()=>{
-    console.log(`Server is running on port http://localhost:${PORT}`);
-} )
+app.listen(PORT, async () => {
+  console.log(`Server is running on port http://localhost:${PORT}`);
+})

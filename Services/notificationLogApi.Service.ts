@@ -1,3 +1,10 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Notification Log API Service - Logic for notification history API.   │
+│  Handles retrieval, filtering, stats, and read status for logs.       │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import { Request, Response, NextFunction } from "express";
 import NotificationLogModel from "../Databases/Models/notificationLog.model";
 import { ApiError } from "../Utils/ApiError";

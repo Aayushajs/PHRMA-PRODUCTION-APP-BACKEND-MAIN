@@ -1,3 +1,10 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Notification Logger - Service for sending and logging notifications. │
+│  Handles push notifications via FCM and creating log entries.         │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import { sendPushNotification } from '../../Utils/notification';
 import NotificationLogModel from '../../Databases/Models/notificationLog.model';
 import { INotificationLogCreate } from '../../Databases/Entities/notificationLog.interface';
@@ -18,7 +25,7 @@ export class NotificationService {
     }
   ) {
     let status: 'SENT' | 'FAILED' = 'SENT';
-    
+
     try {
       // Send the actual notification
       await sendPushNotification(fcmToken, title, body, options.payload || {});
@@ -63,10 +70,10 @@ export class NotificationService {
     }
   ) {
     const results = [];
-    
+
     for (const user of users) {
       if (!user.fcmToken) continue;
-      
+
       const result = await this.sendNotificationWithLog(
         user._id,
         user.fcmToken,
@@ -93,11 +100,11 @@ export class NotificationService {
   public static async markAsRead(logId: string, userId: string) {
     try {
       return await NotificationLogModel.findOneAndUpdate(
-        { 
+        {
           _id: logId,
           userId: userId
         },
-        { 
+        {
           isRead: true,
           readAt: new Date()
         },
@@ -112,11 +119,11 @@ export class NotificationService {
   public static async markMultipleAsRead(logIds: string[], userId: string) {
     try {
       return await NotificationLogModel.updateMany(
-        { 
+        {
           _id: { $in: logIds },
           userId: userId
         },
-        { 
+        {
           isRead: true,
           readAt: new Date()
         }

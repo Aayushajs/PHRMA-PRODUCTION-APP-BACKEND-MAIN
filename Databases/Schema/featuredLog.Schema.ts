@@ -1,9 +1,13 @@
 import mongoose, { Schema, Document } from "mongoose";
 import { IFeaturedMedicineLog, IDataChange } from "../Entities/featuredLog.Interface";
-
-/*───────────────────────────────────────────────────────
-  Featured Medicine Log Schema — Store every operation log
-───────────────────────────────────────────────────────*/
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Featured Medicine Log Schema — Store every operation log             │
+│                                                                       │
+│  Tracks changes to featured medicines, recording the operation type,  │
+│  data changes, summary, and the user responsible.                     │
+└───────────────────────────────────────────────────────────────────────┘
+*/
 
 const DataChangeSchema = new Schema<IDataChange>(
   {

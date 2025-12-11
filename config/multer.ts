@@ -1,5 +1,11 @@
 import { v2 as cloudinary } from "cloudinary";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Multer Config - Middleware for handling file uploads.                │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import multer from "multer";
 
 // Cloudinary storage setup for Multer

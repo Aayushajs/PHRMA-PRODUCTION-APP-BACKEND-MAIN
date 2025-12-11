@@ -1,3 +1,9 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Roles Enum - Enumeration of user roles (Customer, Admin, etc).       │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 enum RoleIndex {
   CUSTOMER = "CUSTOMER",
   ADMIN = "ADMIN",
@@ -6,4 +12,3 @@ enum RoleIndex {
 
 export default RoleIndex;
 export type Roles = keyof typeof RoleIndex;
-  

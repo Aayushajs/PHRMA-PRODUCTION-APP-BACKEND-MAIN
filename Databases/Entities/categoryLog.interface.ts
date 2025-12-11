@@ -1,3 +1,10 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Category Log Interface - Type definitions for category audit logs.   │
+│  Defines payload for tracking data changes in categories.             │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import mongoose from "mongoose";
 
 export interface IDataChange {
@@ -12,8 +19,8 @@ export interface ICategoryLog {
     operation: string;
     action: "CREATE" | "UPDATE" | "DELETE";
     performedBy?: mongoose.Types.ObjectId;
-    oldData?: IDataChange[];  
-    newData?: IDataChange[]; 
-    summary?: string;         
+    oldData?: IDataChange[];
+    newData?: IDataChange[];
+    summary?: string;
     timestamp?: Date;
 }

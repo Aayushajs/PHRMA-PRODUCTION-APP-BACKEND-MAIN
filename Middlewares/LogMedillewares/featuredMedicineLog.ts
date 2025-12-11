@@ -1,7 +1,9 @@
-/*───────────────────────────────────────────────────────────────────────────────
-  Hooks for FeaturedMedicine model — handles automatic logging
-  on create, update, and delete events.
-───────────────────────────────────────────────────────────────────────────────*/
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Featured Medicine Logger - Middleware hooks for Featured Medicines.  │
+│  Logs create, update, and delete events to FeaturedLog.               │
+└───────────────────────────────────────────────────────────────────────┘
+*/
 
 import { Schema } from "mongoose";
 import FeaturedLog from "../../Databases/Models/feturedLog.model";

@@ -1,3 +1,9 @@
+/*
+┌────────────────────────────────────────────────────────────────────────┐
+│  Notification Utility - Helper for sending push notifications via Expo.│
+└────────────────────────────────────────────────────────────────────────┘
+*/
+
 import axios from "axios";
 
 export const sendPushNotification = async (
@@ -19,7 +25,7 @@ export const sendPushNotification = async (
       body,
       data,
     };
-console.log(" Sending notification:", message);
+    console.log(" Sending notification:", message);
     const response = await axios.post("https://exp.host/--/api/v2/push/send", message, {
       headers: {
         "Accept": "application/json",

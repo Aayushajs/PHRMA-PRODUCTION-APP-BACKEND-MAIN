@@ -1,11 +1,10 @@
-/*┌───────────────────────────────────────────────────────────────────────────────┐                                                                            │
-  │  Defines the structure for storing highlighted medicines in                   │
-  │  the e-pharmacy app.  Includes fields like title, category, stock, discount,  │
-  │  image, and ratings.                                                          │   
-  │  Supports timestamps and references to Category and User                      │
-  │  models for relations.                                                        │
-  └───────────────────────────────────────────────────────────────────────────────┘
-  */
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Defines the structure for storing highlighted medicines in           │
+│  the e-pharmacy app. Includes fields like title, category, stock,     │
+│  discount, image, and ratings. Supports timestamps and references.    │
+└───────────────────────────────────────────────────────────────────────┘
+*/
 
 import { IFeaturedMedicine } from "../Entities/featuredMedicine.interface";
 import mongoose, { Schema, Document } from "mongoose";
@@ -67,15 +66,15 @@ export const featuredMedicineSchema = new Schema<IFeaturedMedicine & Document>(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
-   remarks: {
-     type: [
-       {
-         type: String,
-         trim: true,
-       },
-     ],
-     default: [],
-   },
+    remarks: {
+      type: [
+        {
+          type: String,
+          trim: true,
+        },
+      ],
+      default: [],
+    },
   },
   {
     timestamps: true,

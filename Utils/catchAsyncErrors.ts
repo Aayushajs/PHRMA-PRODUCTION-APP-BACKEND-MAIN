@@ -1,3 +1,9 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Async Error Handler - Wrapper to catch async errors in routes.       │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import { Request, Response, NextFunction } from 'express';
 
 type AsynCFunction = (
@@ -11,6 +17,6 @@ export const catchAsyncErrors =
         req: Request,
         res: Response,
         next: NextFunction
-    ) =>{
-            Promise.resolve(fn(req, res, next)).catch(next);
-        };
+    ) => {
+        Promise.resolve(fn(req, res, next)).catch(next);
+    };

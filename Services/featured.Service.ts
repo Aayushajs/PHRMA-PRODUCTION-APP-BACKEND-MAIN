@@ -1,3 +1,10 @@
+/*
+┌────────────────────────────────────────────────────────────────────────┐
+│  Featured Service - Logic for featured medicines and their logs.       │
+│  Manages featured items, caching, audit logging, and stats retrieval.  │
+└────────────────────────────────────────────────────────────────────────┘
+*/
+
 import { Request, Response, NextFunction } from "express";
 import FeaturedMedicine from "../Databases/Models/FeaturedMedicine.model";
 import FeaturedMedicineLog from "../Databases/Models/feturedLog.model";

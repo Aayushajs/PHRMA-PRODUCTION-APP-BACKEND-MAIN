@@ -1,9 +1,13 @@
 import mongoose, { Schema, Document } from "mongoose";
 import { ICategoryLog, IDataChange } from "../Entities/categoryLog.interface";
-
-/*───────────────────────────────────────────────────────
-  Category Log Schema — Store every operation log
-───────────────────────────────────────────────────────*/
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Category Log Schema — Store every operation log                      │
+│                                                                       │
+│  Tracks changes to category data, including old/new values, action    │
+│  type (CREATE, UPDATE, DELETE), and the user who performed it.        │
+└───────────────────────────────────────────────────────────────────────┘
+*/
 
 const DataChangeSchema = new Schema<IDataChange>(
   {

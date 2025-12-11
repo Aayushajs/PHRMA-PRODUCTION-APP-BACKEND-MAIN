@@ -1,3 +1,10 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  GST Service - Business logic for Tax/GST management.                 │
+│  Handles creation, retrieval, updates, and deletion of GST records.   │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import { Request, Response, NextFunction } from "express";
 import { catchAsyncErrors } from "../Utils/catchAsyncErrors";
 import { ApiError } from "../Utils/ApiError";
@@ -54,7 +61,7 @@ export default class GSTServices {
 
             const newGSTData: Partial<Igst> = {
                 gstName: gstName.trim(),
-                gstRate : gstRate ?? 0,
+                gstRate: gstRate ?? 0,
                 gstDescription: gstDescription?.trim(),
                 cgstRate,
                 sgstRate,

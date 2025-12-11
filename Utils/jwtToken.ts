@@ -1,3 +1,9 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  JWT Utility - Helper to generate and verify JSON Web Tokens.         │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import jwt, { SignOptions, Secret } from 'jsonwebtoken';
 import dotenv from 'dotenv';
 dotenv.config({ path: './config/.env' });

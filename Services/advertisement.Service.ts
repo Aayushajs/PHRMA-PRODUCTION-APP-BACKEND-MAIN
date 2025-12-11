@@ -1,3 +1,10 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Advertisement Service - Business logic for advertisement management. │
+│  Handles creation, updates, retrieval, and click tracking for ads.    │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import Advertisement from '../Databases/Models/advertisement.model';
 import { Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
@@ -25,14 +32,14 @@ export default class AdvertisementService {
             const allAds = await Advertisement.find({})
                 .select('title type isActive startDate endDate createdAt')
                 .lean();
-            
+
             return handleResponse(req, res, 200, "Advertisement debug info", {
                 totalAds,
                 activeAds,
                 allAds: allAds.map(ad => ({
                     ...ad,
-                    isCurrentlyActive: ad.isActive && 
-                        new Date(ad.startDate) <= currentDate && 
+                    isCurrentlyActive: ad.isActive &&
+                        new Date(ad.startDate) <= currentDate &&
                         new Date(ad.endDate) >= currentDate,
                     startDateCheck: new Date(ad.startDate) <= currentDate,
                     endDateCheck: new Date(ad.endDate) >= currentDate
@@ -63,8 +70,8 @@ export default class AdvertisementService {
             if (
                 !title?.trim()
                 || !description?.trim()
-                || !type 
-                || !startDate 
+                || !type
+                || !startDate
                 || !endDate) {
                 return next(new ApiError(
                     400, "Title, description, type, startDate, and endDate are required"
@@ -85,7 +92,7 @@ export default class AdvertisementService {
 
             const start = new Date(startDate);
             const end = new Date(endDate);
-            
+
             if (start >= end) {
                 return next(new ApiError(400, "End date must be after start date"));
             }
@@ -100,7 +107,7 @@ export default class AdvertisementService {
             }
 
             let imageUrl: string;
-            
+
             try {
                 const uploadResult = await uploadToCloudinary(imageFile.buffer, "advertisements/images");
                 imageUrl = uploadResult.secure_url;
@@ -290,7 +297,7 @@ export default class AdvertisementService {
             if (startDate !== undefined || endDate !== undefined) {
                 const start = startDate ? new Date(startDate) : existingAd.startDate;
                 const end = endDate ? new Date(endDate) : existingAd.endDate;
-                
+
                 if (start >= end) {
                     return next(new ApiError(400, "End date must be after start date"));
                 }
@@ -323,9 +330,9 @@ export default class AdvertisementService {
             const updatedAd = await Advertisement.findByIdAndUpdate(
                 adId,
                 updateData,
-                { 
-                    new: true, 
-                    runValidators: true 
+                {
+                    new: true,
+                    runValidators: true
                 }
             );
 
@@ -632,8 +639,8 @@ export default class AdvertisementService {
                 endDate: ad.endDate,
                 isActive: ad.isActive,
                 clickCount: ad.adClickTracking?.length || 0,
-                isCurrentlyActive: ad.isActive && 
-                    new Date(ad.startDate) <= currentDate && 
+                isCurrentlyActive: ad.isActive &&
+                    new Date(ad.startDate) <= currentDate &&
                     new Date(ad.endDate) >= currentDate,
                 daysRemaining: Math.round((new Date(ad.endDate).getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24) * 10) / 10,
                 createdAt: ad.createdAt,
@@ -674,9 +681,9 @@ export default class AdvertisementService {
             if (!userId || !(await User.findById(userId))) {
                 return next(new ApiError(401, "User authentication required"));
             }
-         
+
             const advertisement = await Advertisement.findById(adId);
-            
+
             if (!advertisement) {
                 return next(new ApiError(404, "Advertisement not found"));
             }
@@ -693,7 +700,7 @@ export default class AdvertisementService {
             // Check if user already clicked in last 24 hours (prevent spam)
             const twentyFourHoursAgo = new Date(currentDate.getTime() - (24 * 60 * 60 * 1000));
 
-            const recentClick = advertisement.adClickTracking.find(click => 
+            const recentClick = advertisement.adClickTracking.find(click =>
                 click.userId.toString() === userId.toString() &&
                 click.timestamp >= twentyFourHoursAgo
             );
@@ -701,7 +708,7 @@ export default class AdvertisementService {
             if (recentClick) {
                 const nextAllowedClick = new Date(recentClick.timestamp.getTime() + (24 * 60 * 60 * 1000));
                 const hoursLeft = Math.ceil((nextAllowedClick.getTime() - currentDate.getTime()) / (60 * 60 * 1000));
-                
+
                 return handleResponse(
                     req,
                     res,
@@ -817,7 +824,7 @@ export default class AdvertisementService {
                     default:
                         daysBack = 7;
                 }
-                
+
                 const startPeriod = new Date(currentDate.getTime() - (daysBack * 24 * 60 * 60 * 1000));
                 dateFilter = { $gte: startPeriod, $lte: currentDate };
             }
@@ -909,7 +916,7 @@ export default class AdvertisementService {
             };
 
             const deletedAd = await Advertisement.findByIdAndDelete(adId);
-            
+
             if (!deletedAd) {
                 return next(new ApiError(404, "Advertisement not found or already deleted"));
             }
@@ -1179,7 +1186,7 @@ export class AdvertisementLogService {
                 ];
 
                 const [result] = await AdvertisementLog.aggregate(pipeline);
-                
+
                 const totalLogs = result?.totalCount[0]?.count || 0;
                 const logs = result?.logs || [];
 
@@ -1194,11 +1201,11 @@ export class AdvertisementLogService {
                         hasPrevPage: pageNum > 1
                     },
                     filters: { search, action, userId, advertisementId, startDate, endDate },
-                    meta: { 
-                        sortBy, 
-                        order, 
+                    meta: {
+                        sortBy,
+                        order,
                         aggregationUsed: true,
-                        cacheStatus: "fresh_from_db" 
+                        cacheStatus: "fresh_from_db"
                     }
                 };
 
@@ -1332,13 +1339,13 @@ export class AdvertisementLogService {
                                 action: "$action"
                             },
                             count: { $sum: 1 },
-                            logs: { 
-                                $push: { 
-                                    _id: "$_id", 
+                            logs: {
+                                $push: {
+                                    _id: "$_id",
                                     advertisementId: "$advertisementId",
                                     performedBy: "$performedBy",
-                                    timestamp: "$timestamp" 
-                                } 
+                                    timestamp: "$timestamp"
+                                }
                             }
                         }
                     },
@@ -1541,7 +1548,7 @@ export class AdvertisementLogService {
                 ];
 
                 const [result] = await AdvertisementLog.aggregate(pipeline);
-                
+
                 const totalLogs = result?.totalCount[0]?.count || 0;
                 const logs = result?.logs || [];
 

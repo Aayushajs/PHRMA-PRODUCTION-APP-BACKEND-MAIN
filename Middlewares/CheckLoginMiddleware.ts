@@ -1,3 +1,10 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Check Login Middleware - Authentication and authorization checks.    │
+│  Validates JWT tokens for Customer, Admin, and User roles.            │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import jwt from "jsonwebtoken";
 import { Request, Response, NextFunction } from "express";
 import { ApiError } from "../Utils/ApiError";

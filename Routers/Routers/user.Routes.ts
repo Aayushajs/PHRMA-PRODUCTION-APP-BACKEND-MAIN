@@ -1,12 +1,19 @@
-import {Router} from "express";
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  User Routes - API endpoints for user authentication and profiles.    │
+│  Routes for signup, login, OTP verification, and profile updates.     │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
+import { Router } from "express";
 import UserService from "../../Services/user.Service";
 import { customersMiddleware } from '../../Middlewares/CheckLoginMiddleware'
-import  {uploadImage}  from "../../config/multer";
+import uploadImage from "../../config/multer";
 
 const userRouter = Router();
 const r = userRouter
 
-r.get('/verify-token',customersMiddleware, (req, res) => {
+r.get('/verify-token', customersMiddleware, (req, res) => {
     res.status(200).json({
         success: true,
         message: "Token is valid",

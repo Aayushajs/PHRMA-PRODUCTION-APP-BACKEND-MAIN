@@ -1,7 +1,7 @@
 /*
 ┌───────────────────────────────────────────────────────────────────────┐
-│  Middleware hooks for Advertisement schema operations. Logs CREATE,   │
-│  UPDATE, and DELETE events automatically to AdvertisementLog.         │
+│  Advertisement Logger - Middleware hooks for Advertisement schema.    │
+│  Logs create, update, and delete events to AdvertisementLog.          │
 └───────────────────────────────────────────────────────────────────────┘
 */
 

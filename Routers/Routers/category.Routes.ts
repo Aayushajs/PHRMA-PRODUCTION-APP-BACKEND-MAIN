@@ -1,3 +1,10 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Category Routes - API endpoints for category operations.             │
+│  Routes for creating, updating, deleting, and retrieving categories.  │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import express from "express";
 import CategoryService, { CategoryLogService } from "../../Services/category.Service";
 import {uploadImage} from "../../config/multer";
@@ -41,7 +48,10 @@ r.put(
 r.delete("/:id", adminMiddleware, CategoryService.ActiovationCategory);
 
 r.patch(
-  "/bulk/toggle-active",adminMiddleware, CategoryService.bulkToggleActive
+  "/bulk/toggle-active", adminMiddleware, CategoryService.bulkToggleActive
 );
+
+r.get("/recently-viewed", CategoryService.getRecentlyViewedCategories);
+r.post("/recently-viewed/:categoryId", CategoryService.addToRecentlyViewedCategories);
 
 export default router;

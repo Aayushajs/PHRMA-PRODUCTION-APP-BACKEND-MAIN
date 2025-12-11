@@ -1,3 +1,10 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Category Service - Business logic for category management.           │
+│  Handles category creation, updates, retrieval, and caching.          │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import { CategoryModel } from "../Databases/Models/Category.model";
 import CategoryLogModel from "../Databases/Models/categoryLog.model";
 import { Request, Response, NextFunction } from "express";
@@ -14,6 +21,7 @@ import { handleResponse } from "../Utils/handleResponse";
 import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
 import { catchAsyncErrors } from "../Utils/catchAsyncErrors";
 import mongoose from "mongoose";
+import jwtTokens from "jsonwebtoken";
 import {
   ICategory,
   CategoryServiceResponse,
@@ -110,10 +118,10 @@ export default class CategoryService {
             ),
             bannerFiles.length
               ? Promise.all(
-                  bannerFiles.map((f: any) =>
-                    uploadToCloudinary(f.buffer, CLOUDINARY_FOLDERS.BANNERS)
-                  )
+                bannerFiles.map((f: any) =>
+                  uploadToCloudinary(f.buffer, CLOUDINARY_FOLDERS.BANNERS)
                 )
+              )
               : [],
           ]);
 
@@ -289,6 +297,28 @@ export default class CategoryService {
       const limitNum = parseInt(limit as string) || 10;
       const skip = (pageNum - 1) * limitNum;
 
+      // Extract User ID for Personalization (Optional Auth)
+      let userId = (req as any).user?._id;
+      if (!userId && req.headers.authorization) {
+        try {
+          const token = req.headers.authorization.split(" ")[1];
+          if (token) {
+            const decoded: any = jwtTokens.verify(token, process.env.USER_SECRET_KEY as string);
+            userId = decoded._id;
+          }
+        } catch (e) {
+          // Ignore invalid tokens for public feed
+        }
+      }
+
+      let viewedCategoryIds: any[] = [];
+      if (userId) {
+        const user = await User.findById(userId).select("viewedCategories");
+        if (user?.viewedCategories) {
+          viewedCategoryIds = user.viewedCategories;
+        }
+      }
+
       let matchStage: any = { isActive: isActive === "true" };
 
       if (search && search.toString().trim()) {
@@ -300,10 +330,10 @@ export default class CategoryService {
         ];
       }
 
-      // Cache key
+      // Cache key (Personalized if userId exists)
       const cacheKey = `${CACHE_PREFIX}:simple:${crypto
         .createHash("md5")
-        .update(JSON.stringify({ search, page, limit, isActive }))
+        .update(JSON.stringify({ search, page, limit, isActive, userId: userId || "guest" }))
         .digest("hex")}`;
 
       const cachedData = await getCache(cacheKey);
@@ -336,6 +366,14 @@ export default class CategoryService {
                 else: null,
               },
             },
+            // Prioritize Recently Viewed
+            isRecentlyViewed: {
+              $cond: {
+                if: { $in: ["$_id", viewedCategoryIds] },
+                then: 1,
+                else: 0
+              }
+            }
           },
         },
 
@@ -346,11 +384,13 @@ export default class CategoryService {
             imageUrl: "$firstImage",
             priority: 1,
             createdAt: 1,
+            isRecentlyViewed: 1
           },
         },
 
         {
           $sort: {
+            isRecentlyViewed: -1 as const, // Viewed first
             priority: -1 as const,
             createdAt: -1 as const,
           },
@@ -533,10 +573,8 @@ export default class CategoryService {
       }
 
       const files = req.files as any;
-      let uploadedImageUrls: string[] = [...(existingCategory.imageUrl || [])];
-      let uploadedBannerUrls: string[] = [
-        ...(existingCategory.bannerUrl || []),
-      ];
+      let uploadedImageUrls: string[] = [];
+      let uploadedBannerUrls: string[] = [];
 
       if (files && files.imageUrl) {
         const imageFiles = Array.isArray(files.imageUrl)
@@ -597,8 +635,12 @@ export default class CategoryService {
       if (isFeatured !== undefined) updateData.isFeatured = Boolean(isFeatured);
       if (isActive !== undefined) updateData.isActive = Boolean(isActive);
 
-      if (files && files.imageUrl) updateData.imageUrl = uploadedImageUrls;
-      if (files && files.bannerUrl) updateData.bannerUrl = uploadedBannerUrls;
+      if (files && files.imageUrl && uploadedImageUrls.length > 0) {
+        updateData.imageUrl = uploadedImageUrls;
+      }
+      if (files && files.bannerUrl && uploadedBannerUrls.length > 0) {
+        updateData.bannerUrl = uploadedBannerUrls;
+      }
 
       const updatedCategory = await CategoryModel.findByIdAndUpdate(
         id,
@@ -793,8 +835,7 @@ export default class CategoryService {
         req,
         res,
         200,
-        `Successfully ${isActive ? "activated" : "deactivated"} ${
-          updateResult.modifiedCount
+        `Successfully ${isActive ? "activated" : "deactivated"} ${updateResult.modifiedCount
         } categories`,
         {
           modifiedCount: updateResult.modifiedCount,
@@ -810,6 +851,83 @@ export default class CategoryService {
       );
     }
   }
+
+  public static addToRecentlyViewedCategories = catchAsyncErrors(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const { categoryId } = req.params;
+      const userId = (req as any).user?._id;
+
+      if (!categoryId) {
+        return next(new ApiError(400, "Category ID is required"));
+      }
+
+      if (!userId) {
+        return next(new ApiError(401, "User not authenticated"));
+      }
+
+      // LIFO Logic
+      await User.findByIdAndUpdate(userId, {
+        $pull: { viewedCategories: categoryId }
+      });
+
+      await User.findByIdAndUpdate(userId, {
+        $push: {
+          viewedCategories: {
+            $each: [categoryId],
+            $position: 0,
+            $slice: 15
+          }
+        }
+      });
+
+      // Invalidate Redis Cache
+      await deleteCache(`recently_viewed_categories:${userId}`);
+
+      return handleResponse(req, res, 200, "Recently viewed category updated");
+    }
+  );
+
+  public static getRecentlyViewedCategories = catchAsyncErrors(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const userId = (req as any).user?._id;
+
+      if (!userId) {
+        return next(new ApiError(401, "User not authenticated"));
+      }
+
+      const cacheKey = `recently_viewed_categories:${userId}`;
+      const cachedData = await getCache(cacheKey);
+
+      if (cachedData) {
+        return handleResponse(
+          req,
+          res,
+          200,
+          "Recently viewed categories fetched from cache",
+          cachedData
+        );
+      }
+
+      const user = await User.findById(userId).populate("viewedCategories");
+
+      if (!user) {
+        return next(new ApiError(404, "User not found"));
+      }
+
+      const viewedCategories = user.viewedCategories || [];
+
+      // Cache for 10 minutes
+      await setCache(cacheKey, viewedCategories, 600);
+
+      return handleResponse(
+        req,
+        res,
+        200,
+        "Recently viewed categories fetched successfully",
+        viewedCategories
+      );
+    }
+  );
 }
 
 export class CategoryLogService {
@@ -1262,4 +1380,6 @@ export class CategoryLogService {
       );
     }
   );
+
+
 }

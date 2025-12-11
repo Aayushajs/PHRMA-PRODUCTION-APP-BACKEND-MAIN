@@ -1,3 +1,10 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Featured Medicine Routes - API endpoints for featured items.         │
+│  Routes for managing featured medicines and viewing logs.             │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import { Router } from "express";
 import FeaturedMedicineService, { FeaturedMedicineLogService } from "../../Services/featured.Service";
 import {uploadImage} from "../../config/multer";
@@ -6,7 +13,8 @@ import { adminMiddleware } from "../../Middlewares/CheckLoginMiddleware";
 const featuredRouter = Router();
 const r = featuredRouter;
 
-r.post("/create",adminMiddleware,uploadImage.single("imageUrl"),
+
+r.post("/create", adminMiddleware, uploadImage.single("imageUrl"),
   FeaturedMedicineService.createFeaturedMedicine
 );
 
@@ -16,7 +24,7 @@ r.put("/:id", adminMiddleware, uploadImage.single("imageUrl"),
   FeaturedMedicineService.updateFeaturedMedicine
 );
 
-r.delete("/:id",adminMiddleware,
+r.delete("/:id", adminMiddleware,
   FeaturedMedicineService.deleteFeaturedMedicine
 );
 

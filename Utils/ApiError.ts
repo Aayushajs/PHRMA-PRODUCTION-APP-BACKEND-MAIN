@@ -1,11 +1,17 @@
 
-export class ApiError extends Error{
-    statusCode : number;
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  API Error - Custom error class for API responses.                    │
+└───────────────────────────────────────────────────────────────────────┘
+*/
 
-    constructor(statusCode : number, message : string){
+export class ApiError extends Error {
+    statusCode: number;
+
+    constructor(statusCode: number, message: string) {
         super(message);
         this.statusCode = statusCode;
-        
+
         Object.setPrototypeOf(this, ApiError.prototype);
         Error.captureStackTrace(this, this.constructor);
     }

@@ -1,3 +1,11 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Defines the structure for Items/Medicines in the inventory.          │
+│  Includes pricing, expiry, stock info, GST links, formulation,        │
+│  and parent/child unit relations. Tracks audits and view counts.      │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import { Iitem } from '../Entities/item.Interface';
 import mongoose, { Schema, Document } from "mongoose";
 
@@ -62,6 +70,33 @@ export const itemSchema = new Schema<Iitem & Document>(
         itemDiscount: {
             type: Number,
             default: 0,
+        },
+        otherInformation: {
+            keyFeatures: {
+                type: [String],
+                default: []
+            },
+            benefits: {
+                type: [String],
+                default: []
+            },
+            allergyInfo: {
+                type: [String],
+                default: []
+            },
+            sideEffects: {
+                type: [String],
+                default: []
+            },
+            howToUse: { type: String, trim: true },
+            safetyAdvice: {
+                type: [String],
+                default: []
+            },
+            ingredients: {
+                type: [String],
+                default: []
+            },
         },
         itemRatings: {
             type: Number,
@@ -128,6 +163,31 @@ export const itemSchema = new Schema<Iitem & Document>(
         updatedAt: {
             type: Date,
             default: Date.now,
+        },
+        mrpVerification: {
+            status: {
+                type: String,
+                enum: ['approved', 'warning', 'rejected', 'pending'],
+                default: 'pending'
+            },
+            systemFinalMRP: { type: Number },
+            userEnteredPrice: { type: Number },
+            maxAllowedPrice: { type: Number },
+            finalScore: { type: Number },
+            reason: { type: String },
+            difference: { type: String },
+            stageUsed: { type: String },
+            needsAdminReview: { type: Boolean, default: false },
+            verifiedAt: { type: Date },
+            realtimeReferences: [{
+                source: String,
+                matchedProduct: String,
+                mrp: Number,
+                pack: String,
+                normalizedMRP: Number,
+                weightUsed: Number,
+                matchScore: Number
+            }]
         },
         deletedBy: {
             type: Schema.Types.ObjectId,

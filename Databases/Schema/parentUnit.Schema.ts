@@ -1,3 +1,10 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Defines the structure for Parent Units (e.g., Boxes, Cases).         │
+│  Linked to Child Units for stock management and unit conversion.      │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import { Schema, Document } from "mongoose";
 import { IParentUnit } from "../Entities/parentUnit.interface";
 
@@ -16,7 +23,7 @@ export const parentUnitSchema = new Schema<IParentUnit & Document>(
       trim: true,
       uppercase: true
     },
-    childUnitId:{
+    childUnitId: {
       type: Schema.Types.ObjectId,
       ref: "ChildUnit"
     },

@@ -1,3 +1,9 @@
+/*
+┌───────────────────────────────────────────────────────────────────────┐
+│  Cloudinary Config - Configuration for Cloudinary service.            │
+└───────────────────────────────────────────────────────────────────────┘
+*/
+
 import { v2 as cloudinary } from "cloudinary";
 
 cloudinary.config({
