@@ -30,6 +30,6 @@ itemsRouter.get("/details/:itemId", ItemServices.getItemDetails);
 itemsRouter.get("/trending/AiPersonalized", ItemServices.getAITrendingProducts);
 itemsRouter.get("/GetItemFeed",authenticatedUserMiddleware, ItemServices.getDynamicFeed);
 itemsRouter.get("/GetRecentlyViewedItems", authenticatedUserMiddleware, ItemServices.getRecentlyViewedItems);
-itemsRouter.post("/AddToRecentlyViewedItems/:itemId", adminMiddleware, ItemServices.addToRecentlyViewedItems);
+itemsRouter.post("/AddToRecentlyViewedItems/:itemId", authenticatedUserMiddleware, ItemServices.addToRecentlyViewedItems);
 
 export default itemsRouter;

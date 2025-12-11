@@ -8,7 +8,7 @@
 import express from "express";
 import CategoryService, { CategoryLogService } from "../../Services/category.Service";
 import upload from "../../config/multer";
-import { adminMiddleware } from "../../Middlewares/CheckLoginMiddleware";
+import { adminMiddleware, authenticatedUserMiddleware } from "../../Middlewares/CheckLoginMiddleware";
 import { CATEGORY_CONSTANTS } from "../../types/Category";
 
 const router = express.Router();
@@ -33,6 +33,7 @@ r.get("/logs/stats", CategoryLogService.getLogStats);
 r.get("/logs/date-range", CategoryLogService.getLogsByDateRange);
 r.get("/logs/:id", CategoryLogService.getLogById);
 
+r.get("/RecentlyViewed",authenticatedUserMiddleware, CategoryService.getRecentlyViewedCategories);
 r.get("/:id", CategoryService.getCategoryById);
 
 r.put(
@@ -45,13 +46,13 @@ r.put(
   CategoryService.updateCategory
 );
 
+r.post("/recently-viewed/:categoryId", authenticatedUserMiddleware, CategoryService.addToRecentlyViewedCategories);
+
 r.delete("/:id", adminMiddleware, CategoryService.ActiovationCategory);
 
 r.patch(
   "/bulk/toggle-active", adminMiddleware, CategoryService.bulkToggleActive
 );
 
-r.get("/recently-viewed", CategoryService.getRecentlyViewedCategories);
-r.post("/recently-viewed/:categoryId", CategoryService.addToRecentlyViewedCategories);
 
 export default router;
