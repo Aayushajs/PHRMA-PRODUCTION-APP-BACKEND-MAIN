@@ -908,23 +908,52 @@ export default class CategoryService {
         );
       }
 
-      const user = await User.findById(userId).populate("viewedCategories");
+      // Check if user has viewed categories
+      const userCheck = await User.findById(userId).select('viewedCategories').lean();
 
-      if (!user) {
-        return next(new ApiError(404, "User not found"));
+      if (!userCheck || !userCheck.viewedCategories || userCheck.viewedCategories.length === 0) {
+        return handleResponse(req, res, 200, "Recently viewed categories fetched successfully", []);
       }
 
-      const viewedCategories = user.viewedCategories || [];
+      // Use aggregation for fast fetch
+      const result = await User.aggregate([
+        { $match: { _id: new mongoose.Types.ObjectId(userId) } },
+        {
+          $project: {
+            viewedCategories: { $slice: ["$viewedCategories", -15] } // Last 15 categories
+          }
+        },
+        { $unwind: { path: "$viewedCategories", preserveNullAndEmptyArrays: false } },
+        {
+          $lookup: {
+            from: "categories",
+            localField: "viewedCategories",
+            foreignField: "_id",
+            as: "categoryData"
+          }
+        },
+        { $unwind: { path: "$categoryData", preserveNullAndEmptyArrays: false } },
+        {
+          $project: {
+            _id: "$categoryData._id",
+            name: "$categoryData.name",
+            imageUrl: { $arrayElemAt: ["$categoryData.imageUrl", 0] }
+          }
+        }
+      ]);
+
+      // Reverse to show most recent first
+      result.reverse();
 
       // Cache for 10 minutes
-      await setCache(cacheKey, viewedCategories, 600);
+      await setCache(cacheKey, result, 600);
 
       return handleResponse(
         req,
         res,
         200,
         "Recently viewed categories fetched successfully",
-        viewedCategories
+        result
       );
     }
   );

@@ -668,8 +668,8 @@ export default class ItemServices {
                 }
             });
 
-            // Invalidate Redis Cache
-            await redis.del(`recently_viewed_items:${userId}`);
+            // Invalidate Redis Cache (use correct key)
+            await redis.del(`recently-viewed:${userId}`);
 
             return handleResponse(req, res, 200, "Recently viewed item updated");
         }
@@ -678,30 +678,59 @@ export default class ItemServices {
     public static getRecentlyViewedItems = catchAsyncErrors(
         async (req: Request, res: Response, next: NextFunction) => {
             const userId = req.user?._id;
-
             if (!userId) {
-                return next(new ApiError(401, "User not authenticated"));
+                return next(new ApiError(401, "Unauthorized"));
             }
 
-            const cacheKey = `recently_viewed_items:${userId}`;
+            const cacheKey = `recently-viewed:${userId}`;
             const cachedData = await redis.get(cacheKey);
-
             if (cachedData) {
-                return handleResponse(req, res, 200, "Recently viewed items fetched from cache", JSON.parse(cachedData));
+                return handleResponse(req, res, 200, "Recently viewed items retrieved", JSON.parse(cachedData));
             }
 
-            const user = await userModel.findById(userId).populate("viewedItems");
+            // First check if user has any viewed items
+            const userCheck = await userModel.findById(userId).select('viewedItems').lean();
 
-            if (!user) {
-                return next(new ApiError(404, "User not found"));
+            if (!userCheck?.viewedItems || userCheck.viewedItems.length === 0) {
+                return handleResponse(req, res, 200, "Recently viewed items retrieved", []);
             }
 
-            const viewedItems = user.viewedItems || [];
+            // Fast aggregation with proper schema structure
+            const result = await userModel.aggregate([
+                { $match: { _id: new mongoose.Types.ObjectId(userId) } },
+                {
+                    $project: {
+                        viewedItems: { $slice: ["$viewedItems", -15] } // Last 15 items
+                    }
+                },
+                { $unwind: { path: "$viewedItems", preserveNullAndEmptyArrays: false } },
+                {
+                    $lookup: {
+                        from: "items",
+                        localField: "viewedItems",
+                        foreignField: "_id",
+                        as: "itemData"
+                    }
+                },
+                { $unwind: { path: "$itemData", preserveNullAndEmptyArrays: false } },
+                {
+                    $project: {
+                        _id: "$itemData._id",
+                        itemName: "$itemData.itemName",
+                        itemDescription: "$itemData.itemDescription",
+                        itemImages: "$itemData.itemImages",
+                        itemFinalPrice: "$itemData.itemFinalPrice"
+                    }
+                }
+            ]);
 
-            // Cache for 10 minutes
-            await redis.set(cacheKey, JSON.stringify(viewedItems), { EX: 600 });
 
-            return handleResponse(req, res, 200, "Recently viewed items fetched successfully", viewedItems);
+            // Reverse to show most recent first
+            result.reverse();
+
+            await redis.set(cacheKey, JSON.stringify(result), { EX: 600 }); // 10 mins cache
+
+            handleResponse(req, res, 200, "Recently viewed items retrieved", result);
         }
     )
 
@@ -907,7 +936,9 @@ export default class ItemServices {
                 itemName: i.itemName,
                 itemDescription: i.itemDescription || "",
                 image: i.itemImages?.[0] || null,
-                itemRatings: i.itemRatings || 0
+                itemRatings: i.itemRatings || 0,
+                itemFinalPrice: i.itemFinalPrice || 0,
+                itemDiscount: i.itemDiscount || 0,
             }));
 
             // Cache for User (10 mins)
@@ -990,29 +1021,40 @@ export default class ItemServices {
                         itemDescription: 1,
                         itemInitialPrice: 1,
                         itemFinalPrice: 1,
+                        itemImages: 1,
+                        itemCompany: 1,
+                        itemBatchNumber: 1,
                         itemDiscount: 1,
                         itemRatings: 1,
-                        itemImages: 1,
-                        itemMfgDate: 1,
-                        itemExpiryDate: 1,
+                        views: 1,
                         code: 1,
                         HSNCode: 1,
-                        views: 1,
-                        weight: 1,
                         formula: 1,
+                        weight: 1,
+                        itemMfgDate: 1,
+                        itemExpiryDate: 1,
+                        isTrending: 1,
+                        otherInformation: 1,
                         category: {
                             _id: "$categoryDetails._id",
                             name: "$categoryDetails.name",
-                            description: "$categoryDetails.description"
+                            description: "$categoryDetails.description",
+                            imageUrl: "$categoryDetails.imageUrl"
                         },
                         units: {
-                            parent: "$parentUnitDetails.name",
-                            child: "$childUnitDetails.name",
-                            conversion: "$parentUnitDetails.conversionFactor"
+                            parent: {
+                                _id: "$parentUnitDetails._id",
+                                name: "$parentUnitDetails.name"
+                            },
+                            child: {
+                                _id: "$childUnitDetails._id",
+                                name: "$childUnitDetails.name",
+                                conversionFactor: "$childUnitDetails.conversionFactor"
+                            }
                         },
                         gst: {
-                            rate: "$gstDetails.gstRate",
-                            id: "$gstDetails._id"
+                            id: "$gstDetails._id",
+                            rate: "$gstDetails.gstRate"
                         }
                     }
                 }

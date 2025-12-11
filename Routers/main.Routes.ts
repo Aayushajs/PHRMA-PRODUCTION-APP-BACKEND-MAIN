@@ -13,7 +13,6 @@ import itemsRouter from './Routers/item.Routes';
 import advertisementRouter from './Routers/advertisement.Routes';
 import units from './Routers/unit.Routes';
 import gstRouter from './Routers/gst.Routes';
-import notificationLogRouter from './Routers/notificationLog.Routes';
 const mainRouter = Router();
 
 mainRouter.use('/users', userRouter);
@@ -23,6 +22,5 @@ mainRouter.use('/items', itemsRouter);
 mainRouter.use('/advertisements', advertisementRouter);
 mainRouter.use('/units', units);
 mainRouter.use('/gsts', gstRouter);
-mainRouter.use('/notifications', notificationLogRouter);
 
 export default mainRouter;
