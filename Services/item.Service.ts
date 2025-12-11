@@ -857,33 +857,32 @@ export default class ItemServices {
             }
 
             // --- 2. Global Candidates (Base Layer - Cached 1h) ---
-            const globalCacheKey = "global_ai_candidates_v2";
+            const globalCacheKey = "global_ai_candidates_v4";
             let globalCandidates: any[] = [];
             const cachedGlobals = await redis.get(globalCacheKey);
 
             if (cachedGlobals) {
                 globalCandidates = JSON.parse(cachedGlobals);
             } else {
-                // Optimized Aggregation Pipeline
+                // Optimized Aggregation Pipeline: Fetch enough candidates for scoring
                 globalCandidates = await ItemModel.aggregate([
                     {
-                        $match: {
-                            $or: [
-                                { views: { $gt: 50 } },
-                                { itemDiscount: { $gt: 15 } },
-                                { itemRatings: { $gt: 4 } }
-                            ]
-                        }
+                        $match: { deletedAt: { $exists: false } } // Correctly filter active items
                     },
+                    {
+                        $sort: { views: -1, itemRatings: -1, createdAt: -1 } // Prioritize popular items
+                    },
+                    { $limit: 50 }, // Pool size for scoring engine
                     {
                         $project: {
                             _id: 1,
                             itemName: 1,
                             itemDescription: 1,
                             itemRatings: 1,
+                            itemFinalPrice: 1, // Added for frontend
                             // Performance: Slice image array in DB
                             itemImages: { $slice: ["$itemImages", 1] },
-                            // Scoring Signals (Needed for logic, removed in final response)
+                            // Scoring Signals
                             itemCategory: 1,
                             views: 1,
                             itemDiscount: 1
