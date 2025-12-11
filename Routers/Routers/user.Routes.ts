@@ -1,7 +1,7 @@
 import {Router} from "express";
 import UserService from "../../Services/user.Service";
 import { customersMiddleware } from '../../Middlewares/CheckLoginMiddleware'
-import  uploadImage  from "../../config/multer";
+import  {uploadImage}  from "../../config/multer";
 
 const userRouter = Router();
 const r = userRouter

@@ -1,18 +1,18 @@
 import { Router } from "express";
 import FeaturedMedicineService, { FeaturedMedicineLogService } from "../../Services/featured.Service";
-import upload from "../../config/multer";
+import {uploadImage} from "../../config/multer";
 import { adminMiddleware } from "../../Middlewares/CheckLoginMiddleware";
 
 const featuredRouter = Router();
 const r = featuredRouter;
 
-r.post("/create",adminMiddleware,upload.single("imageUrl"),
+r.post("/create",adminMiddleware,uploadImage.single("imageUrl"),
   FeaturedMedicineService.createFeaturedMedicine
 );
 
 r.get("/", FeaturedMedicineService.getFeaturedMedicines);
 
-r.put("/:id", adminMiddleware, upload.single("imageUrl"),
+r.put("/:id", adminMiddleware, uploadImage.single("imageUrl"),
   FeaturedMedicineService.updateFeaturedMedicine
 );
 

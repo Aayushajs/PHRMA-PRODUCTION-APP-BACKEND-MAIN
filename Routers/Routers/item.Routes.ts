@@ -1,13 +1,13 @@
 import express from "express";
 import ItemServices from "../../Services/item.Service";
-import upload from "../../config/multer";
+import {uploadImage} from "../../config/multer";
 
 
 const itemsRouter = express.Router();
 
-itemsRouter.post("/add", upload.array("itemImages"), ItemServices.createItem);
+itemsRouter.post("/add", uploadImage.array("itemImages"), ItemServices.createItem);
 
-itemsRouter.put("/update/:itemId", upload.array("itemImages"), ItemServices.updateItem);
+itemsRouter.put("/update/:itemId", uploadImage.array("itemImages"), ItemServices.updateItem);
 
 itemsRouter.delete("/delete/:itemId", ItemServices.deleteItem);
 

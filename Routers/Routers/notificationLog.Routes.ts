@@ -21,6 +21,46 @@ r.get('/stats', authenticatedUserMiddleware, NotificationLogService.getUserStats
 // Mark notification as read (requires authentication)
 r.patch('/mark-read/:id', authenticatedUserMiddleware, NotificationLogService.markAsRead);
 
+// Send test notification (requires authentication)
+r.post('/send-test', authenticatedUserMiddleware, async (req, res) => {
+  try {
+    const userId = (req as any).user?._id;
+    const fcmToken = (req as any).user?.fcmToken;
+    const { title, body, type = 'OTHER' } = req.body;
+
+    if (!fcmToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'FCM token not found. Please update your device token.'
+      });
+    }
+
+    const result = await NotificationService.sendNotificationWithLog(
+      userId,
+      fcmToken,
+      title || 'Test Notification',
+      body || 'This is a test notification from Postman',
+      {
+        type: type,
+        payload: { source: 'postman_test', timestamp: new Date().toISOString() }
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'Test notification sent',
+      data: result
+    });
+
+  } catch (error: any) {
+    console.error('Send test notification error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to send test notification'
+    });
+  }
+});
+
 // Mark multiple notifications as read (requires authentication)
 r.patch('/mark-multiple-read', authenticatedUserMiddleware, async (req, res, next) => {
   try {

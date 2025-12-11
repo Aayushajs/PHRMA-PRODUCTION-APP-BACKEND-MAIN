@@ -1,6 +1,6 @@
 import express from "express";
 import CategoryService, { CategoryLogService } from "../../Services/category.Service";
-import upload from "../../config/multer";
+import {uploadImage} from "../../config/multer";
 import { adminMiddleware } from "../../Middlewares/CheckLoginMiddleware";
 import { CATEGORY_CONSTANTS } from "../../types/Category";
 
@@ -10,7 +10,7 @@ const r = router;
 r.post(
   "/create",
   adminMiddleware,
-  upload.fields([
+  uploadImage.fields([
     { name: "imageUrl", maxCount: CATEGORY_CONSTANTS.MAX_IMAGES },
     { name: "bannerUrl", maxCount: CATEGORY_CONSTANTS.MAX_BANNERS },
   ]),
@@ -31,7 +31,7 @@ r.get("/:id", CategoryService.getCategoryById);
 r.put(
   "/:id",
   adminMiddleware,
-  upload.fields([
+  uploadImage.fields([
     { name: "imageUrl", maxCount: CATEGORY_CONSTANTS.MAX_IMAGES },
     { name: "bannerUrl", maxCount: CATEGORY_CONSTANTS.MAX_BANNERS },
   ]),

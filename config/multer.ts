@@ -1,30 +1,16 @@
+import { v2 as cloudinary } from "cloudinary";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
 import multer from "multer";
-import path from "path";
 
-
-const storage = multer.memoryStorage();
-
-// File filter - sirf images accept karenge
-const fileFilter = (
-  req: any,
-  file: Express.Multer.File,
-  cb: multer.FileFilterCallback
-) => {
-  const allowedMimes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-
-  if (allowedMimes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error("Only image files are allowed (jpeg, png, gif, webp)"));
-  }
-};
-
-const upload = multer({
-  storage: storage,
-  fileFilter: fileFilter,
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
-  },
+// Cloudinary storage setup for Multer
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: async (req, file) => ({
+    folder: "Epharma",
+    allowed_formats: ["jpg", "jpeg", "png", "webp"],
+    transformation: [{ width: 800, height: 800, crop: "limit" }],
+    public_id: `${Date.now()}-${file.originalname}`,
+  }),
 });
 
-export default upload;
+export const uploadImage = multer({ storage });
