@@ -80,6 +80,10 @@ export const itemSchema = new Schema<Iitem & Document>(
                 type: [String],
                 default: []
             },
+            precautions: {
+                type: [String],
+                default: []
+            },
             allergyInfo: {
                 type: [String],
                 default: []

@@ -57,6 +57,21 @@ export interface Iitem {
 
   isTrending?: boolean;
 
+  otherInformation?:{ 
+    keyFeatures?:string[],
+    benefits?:string[],
+    sideEffects?:string[],
+    precautions?:string[],
+    contraindications?:string[],
+    interactions?:string[],
+    allergyInfo?:string[],
+    warnings?:string[],
+    howToUse?:string,
+    safetyAdvice?:string[],
+    ingredients?:string[],
+    
+  };
+
   mrpVerification?: {
     status?: 'approved' | 'warning' | 'rejected' | 'pending';
     systemFinalMRP?: number;

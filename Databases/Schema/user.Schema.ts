@@ -45,12 +45,12 @@ export const userSchema = new Schema<Iuser & Document>(
     },
     itemsPurchased: {
       type: [Schema.Types.ObjectId],
-      ref: "items",
+      ref: "Item",
       default: [],
     },
     viewedItems: {
       type: [Schema.Types.ObjectId],
-      ref: "items",
+      ref: "Item",
       default: [],
     },
     viewedCategories: {
