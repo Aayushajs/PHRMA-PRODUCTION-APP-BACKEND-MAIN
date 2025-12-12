@@ -18,6 +18,7 @@ import { sendEmail } from "../Utils/mailer";
 import { OAuth2Client, TokenPayload } from "google-auth-library";
 import RoleIndex from "../Utils/Roles.enum";
 import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
+import { sendPushNotification } from "../Utils/notification";
 
 export default class UserService {
   public static signup = catchAsyncErrors(
@@ -136,6 +137,12 @@ export default class UserService {
         updatedAt: user.updatedAt,
       };
 
+      try {
+        await sendEmail(user.email, 'welcome', { name: user.name });
+      } catch (emailError) {
+        console.error('Failed to send welcome email:', emailError);
+      }
+
       return handleResponse(req, res, 201, "User Created Successfully", User);
     }
   );
@@ -211,6 +218,19 @@ export default class UserService {
         sameSite: "lax",
         maxAge: 14 * 24 * 60 * 60 * 1000,
       });
+
+      if (userExist.fcmToken) {
+        try {
+          await sendPushNotification(
+            userExist.fcmToken,
+            "Welcome Back!",
+            `Hello ${userExist.name}, you've successfully logged in to Velcart.`,
+            { type: "login", timestamp: new Date().toISOString() }
+          );
+        } catch (notificationError) {
+          console.error('Failed to send login notification:', notificationError);
+        }
+      }
 
       return handleResponse(req, res, 200, "Login Successful", {
         user: userData,
