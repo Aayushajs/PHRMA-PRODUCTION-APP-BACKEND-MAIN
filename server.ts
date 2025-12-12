@@ -11,7 +11,6 @@ import cors from 'cors';
 import { connectDB } from './Databases/db';
 import { errorHandler } from './Middlewares/errorHandler';
 import mainRouter from './Routers/main.Routes';
-import { firebaseAdmin } from './Utils/serviceAccount';
 
 dotenv.config({ path: './config/.env' });
 
