@@ -268,14 +268,22 @@ export default class UserService {
 
   public static verifyOtp = catchAsyncErrors(
     async (req: Request, res: Response, next: NextFunction) => {
-      const userId = req.user?._id;
-      const { otp } = req.body;
+      const { otp, email } = req.body;
 
       if (!otp) {
         return next(new ApiError(400, "OTP is required"));
       }
 
-      const SystemGeneratedOtp = await redis.get(`otp:${userId}`);
+      if (!email) {
+        return next(new ApiError(400, "Email is required"));
+      }
+
+      const user = await UserModel.findOne({ email });
+      if (!user) {
+        return next(new ApiError(400, "User not found"));
+      }
+
+      const SystemGeneratedOtp = await redis.get(`otp:${user._id}`);
 
       if (!SystemGeneratedOtp) {
         return next(new ApiError(400, "OTP expired"));

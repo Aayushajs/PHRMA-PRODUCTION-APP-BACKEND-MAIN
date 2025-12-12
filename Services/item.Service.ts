@@ -683,17 +683,17 @@ export default class ItemServices {
                 return next(new ApiError(401, "User not authenticated"));
             }
 
-            // LIFO Logic
+            // FIFO Logic - Remove if exists to avoid duplicates
             await userModel.findByIdAndUpdate(userId, {
                 $pull: { viewedItems: itemId }
             });
 
+            // Add at the end and keep last 15 items
             await userModel.findByIdAndUpdate(userId, {
                 $push: {
                     viewedItems: {
                         $each: [itemId],
-                        $position: 0,
-                        $slice: 15
+                        $slice: -15  // Keep last 15 items (FIFO)
                     }
                 }
             });
