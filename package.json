@@ -34,8 +34,10 @@
     "multer-storage-cloudinary": "^4.0.0",
     "next-cloudinary": "^6.17.0",
     "node-mailjet": "^6.0.11",
+    "node-tesseract-ocr": "^2.2.1",
     "nodemailer": "^7.0.6",
-    "redis": "^5.8.2"
+    "redis": "^5.8.2",
+    "uuid": "^13.0.0"
   },
   "scripts": {
     "start": "bun run server.ts",

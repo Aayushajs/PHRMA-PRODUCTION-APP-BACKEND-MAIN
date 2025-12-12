@@ -16,6 +16,7 @@ import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
 import crypto from "crypto";
 import mongoose from "mongoose";
 import NotificationService from "../Middlewares/LogMedillewares/notificationLogger";
+import { processPrescriptionBuffer } from "./ocrService";
 import User from "../Databases/Models/user.Models";
 
 const CACHE_KEY = "featuredMedicines";
@@ -38,6 +39,7 @@ export default class FeaturedMedicineService {
       } = req.body;
 
       const createdById = (req as any).user?._id ?? createdBy;
+      if (req.file) { const result = await processPrescriptionBuffer((req.file as Express.Multer.File).buffer); return res.json(result); }
       if (!title?.trim() || !category || stock == null) {
         return next(new ApiError(400, "Missing or invalid required fields"));
       }
@@ -51,7 +53,7 @@ export default class FeaturedMedicineService {
       if (req.file) {
         try {
           const uploadResult = await uploadToCloudinary(
-            req.file.buffer,
+            (req.file as Express.Multer.File).buffer,
             "Epharma/medicines"
           );
           imageUrl = uploadResult.secure_url;
@@ -263,7 +265,7 @@ export default class FeaturedMedicineService {
       if (req.file) {
         try {
           const uploadResult = await uploadToCloudinary(
-            req.file.buffer,
+            (req.file as Express.Multer.File).buffer,
             "Epharma/medicines"
           );
           updates.imageUrl = uploadResult.secure_url;
