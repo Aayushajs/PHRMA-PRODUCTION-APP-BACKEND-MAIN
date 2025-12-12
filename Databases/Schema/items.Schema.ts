@@ -104,7 +104,7 @@ export const itemSchema = new Schema<Iitem & Document>(
         },
         itemRatings: {
             type: Number,
-            default: 0,
+            default: 2.5,
         },
         code: {
             type: String,
