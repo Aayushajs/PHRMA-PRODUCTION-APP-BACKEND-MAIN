@@ -3,7 +3,6 @@
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "Node",
-    "outDir": "dist",
     "typeRoots": [
       "./types",
       "./node_modules/@types"
@@ -13,19 +12,21 @@
     ],
     "strict": true,
     "esModuleInterop": true,
-    "allowJs": false,
+    "allowJs": true,
     "skipLibCheck": true,
+    "noEmit": false,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
-    "noEmit": false,
     "forceConsistentCasingInFileNames": true
   },
   "include": [
-    "./**/*.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
+    "server.ts",
+    "types/**/*",
+    "Databases/**/*",
+    "Middlewares/**/*",
+    "Routers/**/*",
+    "Services/**/*",
+    "Utils/**/*"
   ]
 }
