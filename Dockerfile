@@ -1,7 +1,7 @@
-# Use official bun image (includes bun runtime)
+# ------------- BASE IMAGE WITH BUN + UBUNTU -------------
 FROM oven/bun:latest
 
-# Install Tesseract and english language pack
+# ------------- INSTALL TESSERACT -------------
 USER root
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -11,26 +11,28 @@ RUN apt-get update && \
 
 WORKDIR /usr/src/app
 
-# Copy package.json only (don't require bun.lockb)
-COPY package.json ./
+# ------------- COPY DEPENDENCY FILES -------------
+COPY package.json bun.lock ./
 
-# Install deps with bun
-RUN bun install --production
+# Install all dependencies (including devDeps for build)
+RUN bun install
 
-# Copy rest of project
+# ------------- COPY SOURCE CODE -------------
 COPY . .
 
-# Create app user 'bunbun', temp dir and set ownership
-RUN useradd --create-home --shell /bin/bash bunbun \
- && mkdir -p /usr/src/app/temp_uploads \
- && chown -R bunbun:bunbun /usr/src/app/temp_uploads
+# ------------- BUILD TYPESCRIPT -------------
+RUN bun run build   # must generate dist/
 
-# Optional: print tesseract version to build logs
-RUN tesseract -v || true
+# Create necessary folder
+RUN mkdir -p /usr/src/app/temp_uploads
 
-EXPOSE 4000
+# Fix ownership (optional)
+RUN chown -R bun:bun /usr/src/app
 
-# Switch to the non-root 'bunbun' user
-USER bunbun
+EXPOSE 5000
 
-CMD ["bun", "run", "server.ts"]
+# Switch user
+USER bun
+
+# ------------- START APPLICATION -------------
+CMD ["bun", "run", "dist/server.js"]

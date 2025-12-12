@@ -41,6 +41,7 @@
   },
   "scripts": {
     "start": "bun run server.ts",
-    "dev": "bun --watch server.ts"
+    "dev": "bun --watch server.ts",
+    "build": "tsc"
   }
 }
