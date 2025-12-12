@@ -23,7 +23,7 @@ r.get('/verify-token', customersMiddleware, (req, res) => {
 r.post('/signup', uploadImage.single('profileImage'), UserService.signup);
 r.post('/login', UserService.login);
 r.post('/forgot-password', UserService.forgotPassword);
-r.post('/verify-otp', customersMiddleware, UserService.verifyOtp);
+r.post('/verify-otp', UserService.verifyOtp);
 r.post('/reset-password', customersMiddleware, UserService.ResetPassword);
 r.post('/google-login', UserService.googleAuthLogin);
 r.get('/profile', customersMiddleware, UserService.getUserProfile);
