@@ -50,8 +50,10 @@ export default class ItemServices {
                 itemChildUnit,
                 itemGST,
                 code,
+                formula,
                 HSNCode,
-                weight
+                weight,
+                otherInformation
             } = req.body;
 
             console.log("Requested to body : ", req.body);
@@ -143,7 +145,20 @@ export default class ItemServices {
             const gstRate = gstId?.gstRate ?? 0;
 
             const calculatedFinalPrice = +(itemInitialPrice * (1 + (Number(gstRate) || 0) / 100)).toFixed(2);
-            console.log("calculatedFinalPrice : ", calculatedFinalPrice)
+
+            const processedOtherInfo: any = {};
+            if (otherInformation) {
+                const info = typeof otherInformation === 'string' ? JSON.parse(otherInformation) : otherInformation;
+                
+                if (info.keyFeatures) processedOtherInfo.keyFeatures = Array.isArray(info.keyFeatures) ? info.keyFeatures : [info.keyFeatures];
+                if (info.benefits) processedOtherInfo.benefits = Array.isArray(info.benefits) ? info.benefits : [info.benefits];
+                if (info.precautions) processedOtherInfo.precautions = Array.isArray(info.precautions) ? info.precautions : [info.precautions];
+                if (info.allergyInfo) processedOtherInfo.allergyInfo = Array.isArray(info.allergyInfo) ? info.allergyInfo : [info.allergyInfo];
+                if (info.sideEffects) processedOtherInfo.sideEffects = Array.isArray(info.sideEffects) ? info.sideEffects : [info.sideEffects];
+                if (info.howToUse) processedOtherInfo.howToUse = String(info.howToUse).trim();
+                if (info.safetyAdvice) processedOtherInfo.safetyAdvice = Array.isArray(info.safetyAdvice) ? info.safetyAdvice : [info.safetyAdvice];
+                if (info.ingredients) processedOtherInfo.ingredients = Array.isArray(info.ingredients) ? info.ingredients : [info.ingredients];
+            }
 
             // === MRP VERIFICATION (REAL-TIME) ===
             let mrpVerificationData: any = { status: 'pending', needsAdminReview: true };
@@ -193,7 +208,7 @@ export default class ItemServices {
                 createdBy: req.user?._id,
                 createAt: Date.now(),
                 mrpVerification: mrpVerificationData,
-                otherInformation: req.body.otherInformation || {}
+                otherInformation: processedOtherInfo
             }
 
             console.log("New data : ", newItemData);
@@ -227,7 +242,8 @@ export default class ItemServices {
                 itemGST,
                 code,
                 HSNCode,
-                weight
+                weight,
+                otherInformation
             } = req.body;
 
             console.log("Requested to body : ", req.body);
@@ -319,7 +335,20 @@ export default class ItemServices {
             const gstRate = gstId?.gstRate ?? 0;
 
             const calculatedFinalPrice = +(itemInitialPrice * (1 + (Number(gstRate) || 0) / 100)).toFixed(2);
-            console.log("calculatedFinalPrice : ", calculatedFinalPrice)
+
+            const processedOtherInfo: any = {};
+            if (otherInformation) {
+                const info = typeof otherInformation === 'string' ? JSON.parse(otherInformation) : otherInformation;
+                
+                if (info.keyFeatures) processedOtherInfo.keyFeatures = Array.isArray(info.keyFeatures) ? info.keyFeatures : [info.keyFeatures];
+                if (info.benefits) processedOtherInfo.benefits = Array.isArray(info.benefits) ? info.benefits : [info.benefits];
+                if (info.precautions) processedOtherInfo.precautions = Array.isArray(info.precautions) ? info.precautions : [info.precautions];
+                if (info.allergyInfo) processedOtherInfo.allergyInfo = Array.isArray(info.allergyInfo) ? info.allergyInfo : [info.allergyInfo];
+                if (info.sideEffects) processedOtherInfo.sideEffects = Array.isArray(info.sideEffects) ? info.sideEffects : [info.sideEffects];
+                if (info.howToUse) processedOtherInfo.howToUse = String(info.howToUse).trim();
+                if (info.safetyAdvice) processedOtherInfo.safetyAdvice = Array.isArray(info.safetyAdvice) ? info.safetyAdvice : [info.safetyAdvice];
+                if (info.ingredients) processedOtherInfo.ingredients = Array.isArray(info.ingredients) ? info.ingredients : [info.ingredients];
+            }
 
             const newItemData: any = {
                 itemName,
@@ -337,7 +366,8 @@ export default class ItemServices {
                 weight,
                 itemGST,
                 createdBy: req.user?._id,
-                createAt: Date.now()
+                createAt: Date.now(),
+                otherInformation: processedOtherInfo
             }
 
             console.log("New data : ", newItemData);
