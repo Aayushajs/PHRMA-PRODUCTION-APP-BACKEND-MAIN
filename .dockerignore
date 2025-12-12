@@ -1,0 +1,9 @@
+node_modules
+dist
+.vscode
+.git
+.gitignore
+.env
+.env.example
+temp_uploads
+*.log
