@@ -21,6 +21,7 @@ itemsRouter.post("/add", uploadImage.array("itemImages"), ItemServices.createIte
 itemsRouter.put("/update/:itemId", uploadImage.array("itemImages"), ItemServices.updateItem);
 
 itemsRouter.delete("/delete/:itemId", adminMiddleware, ItemServices.deleteItem);
+itemsRouter.delete("/delete-all", ItemServices.deleteAllItems)
 
 itemsRouter.get("/", ItemServices.getAllItems);
 

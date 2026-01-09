@@ -18,13 +18,13 @@ dotenv.config({ path: "./config/.env" });
 export const customersMiddleware = catchAsyncErrors(
   async (req: Request, res: Response, next: NextFunction) => {
     const token = req.cookies.userToken;
-    console.log("Token from cookies   : ", token);
+    // console.log("Token from cookies   : ", token);
 
     const headerToken = req.headers.authorization?.split(" ")[1] || token;
-    console.log("Token from header : ", headerToken);
+    // console.log("Token from header : ", headerToken);
 
     if (!headerToken) {
-      console.log("No token provided[TOKEN] : ", headerToken);
+      // console.log("No token provided[TOKEN] : ", headerToken);
       return next(new ApiError(401, "Unauthorized: No token provided"));
     }
 

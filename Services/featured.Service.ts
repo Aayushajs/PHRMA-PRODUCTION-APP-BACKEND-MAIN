@@ -16,7 +16,7 @@ import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
 import crypto from "crypto";
 import mongoose from "mongoose";
 import NotificationService from "../Middlewares/LogMedillewares/notificationLogger";
-import { processPrescriptionBuffer } from "./ocrService";
+import { processPrescriptionBuffer } from "./ocr.Service";
 import User from "../Databases/Models/user.Models";
 
 const CACHE_KEY = "featuredMedicines";

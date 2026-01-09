@@ -141,7 +141,7 @@ export const itemSchema = new Schema<Iitem & Document>(
             default: [],
         },
         weight: {
-            type: Number,
+            type: String,
         },
         // stockAisleIds: {
         //     type: [mongoose.Schema.Types.ObjectId],

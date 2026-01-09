@@ -46,7 +46,7 @@ class ParentUnitServices {
 
             return handleResponse(req, res, 201, 'Parent Unit created successfully', newParentUnit);
         }
-    );
+    );  
 
     // Get all Parent Units
     public static getAllParentUnits = catchAsyncErrors(

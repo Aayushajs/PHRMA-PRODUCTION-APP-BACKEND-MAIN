@@ -51,7 +51,7 @@ export interface Iitem {
     };
   }[];
 
-  weight?: number;
+  weight?: string;
 
   stockAisleIds?: Types.ObjectId[];
 

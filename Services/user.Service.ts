@@ -296,7 +296,7 @@ export default class UserService {
 
       const normalizedEmail = email.toLowerCase().trim();
       const user = await UserModel.findOne({ email: normalizedEmail }).select("_id email").lean();
-      
+
       if (!user) {
         return next(new ApiError(400, "Invalid request"));
       }
@@ -333,7 +333,7 @@ export default class UserService {
       }
 
       const normalizedEmail = email.toLowerCase().trim();
-      
+
       const user = await UserModel.findOne({ email: normalizedEmail }).select("+password");
 
       if (!user) {
@@ -359,8 +359,8 @@ export default class UserService {
       await redis.del(`otp:${user._id}`);
 
       try {
-        await sendEmail(normalizedEmail, 'notification', { 
-          name: user.name 
+        await sendEmail(normalizedEmail, 'notification', {
+          name: user.name
         });
       } catch (emailError) {
         console.error("Failed to send confirmation email:", emailError);
@@ -372,61 +372,145 @@ export default class UserService {
 
   public static googleAuthLogin = catchAsyncErrors(
     async (req: Request, res: Response, next: NextFunction) => {
-      const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+      try {
+        // console.log('🔐 Google Auth Login Starting...');
+        // console.log('📝 Request body:', {
+        //   userToken: req.body.userToken ? req.body.userToken.substring(0, 50) + '...' : 'missing',
+        //   fcmToken: req.body.fcmToken ? 'present' : 'missing',
+        //   hasClientId: !!process.env.GOOGLE_CLIENT_ID
+        // });
 
-      const { userToken } = req.body;
+        const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-      const ticket = await client.verifyIdToken({
-        idToken: userToken,
-        audience: process.env.GOOGLE_CLIENT_ID,
-      });
+        const { userToken, fcmToken } = req.body;
 
-      const payload: TokenPayload | undefined = ticket.getPayload();
-      if (!payload) {
-        return next(new ApiError(400, "Invalid token"));
-      }
+        if (!userToken) {
+          // console.error('❌ Missing userToken in request body');
+          // console.error('📦 Full body received:', req.body);
+          return next(new ApiError(400, "No id token received from google"));
+        }
 
-      const name = payload.name ?? payload.given_name ?? "Unknown User";
-      const { email } = payload;
+        if (!process.env.GOOGLE_CLIENT_ID) {
+          // console.error('❌ GOOGLE_CLIENT_ID not configured in .env');
+          return next(new ApiError(500, "Google Client ID not configured on server"));
+        }
 
-      if (!name || !email) {
-        return next(new ApiError(400, "Invalid token"));
-      }
+        // console.log('🔐 Verifying Google token with Client ID:', process.env.GOOGLE_CLIENT_ID.substring(0, 20) + '...');
+        let ticket;
+        try {
+          ticket = await client.verifyIdToken({
+            idToken: userToken,
+            audience: process.env.GOOGLE_CLIENT_ID,
+          });
+          // console.log('✅ Token verified successfully');
+        } catch (tokenError: any) {
+          // console.error('❌ Token verification failed:', {
+          //   error: tokenError.message,
+          //   code: tokenError.code,
+          // });
 
-      const userFind = await UserModel.findOne({ email });
-      if (!userFind) {
-        const userCreated = await UserModel.create({
-          name,
-          email,
-        });
+          // Specific error messages for common issues
+          if (tokenError.message.includes('Token used too early')) {
+            return next(new ApiError(400, "Token used too early - please try again"));
+          }
+          if (tokenError.message.includes('Token used too late')) {
+            return next(new ApiError(400, "Token expired - please sign in again"));
+          }
+          if (tokenError.message.includes('Invalid audience')) {
+            return next(new ApiError(400, "Invalid Google Client ID configuration"));
+          }
 
-        const userToken = generateUserToken(userCreated);
+          return next(new ApiError(400, `Token verification failed: ${tokenError.message}`));
+        }
 
-        res.cookie("userToken", userToken, {
+        const payload: TokenPayload | undefined = ticket.getPayload();
+        if (!payload) {
+          console.error('❌ No payload from verified ticket');
+          return next(new ApiError(400, "Invalid token payload - no data from Google"));
+        }
+
+        const name = payload.name ?? payload.given_name ?? "Unknown User";
+        const email = payload.email;
+        const picture = payload.picture;
+
+        // console.log('👤 Extracted data from token:', {
+        //   name: name ? name.substring(0, 30) : 'missing',
+        //   email: email ? email : 'missing',
+        //   picture: picture ? 'present' : 'missing'
+        // });
+
+        if (!name || !email) {
+          console.error('❌ Invalid token: missing required fields', {
+            name: !!name,
+            email: !!email
+          });
+          return next(new ApiError(400, "Invalid token: missing name or email"));
+        }
+
+        // console.log('👤 Looking up user:', email);
+        let user = await UserModel.findOne({ email });
+
+        if (!user) {
+          console.log('🆕 Creating new user from Google Sign-In:', email);
+          // Create new user from Google Sign-In
+          user = await UserModel.create({
+            name,
+            email,
+            password: "",
+            phone: "",
+            role: RoleIndex.CUSTOMER,
+            lastLogin: new Date(),
+            fcmToken: fcmToken || "",
+          });
+
+          // console.log('User created with ID:', user._id);
+          // console.log(`User details: ${JSON.stringify(user)}`);
+          // console.log('✅ New user created via Google Sign-In:', email);
+        } else {
+          // console.log('🔄 Updating existing user:', email);
+
+          user.lastLogin = new Date();
+          if (fcmToken) {
+            user.fcmToken = fcmToken;
+          }
+          if (picture && !user.ProfileImage?.includes(picture)) {
+            user.ProfileImage = [picture];
+          }
+          await user.save();
+          // console.log('✅ Existing user updated with Google Sign-In:', email);
+        }
+
+        // console.log('🔑 Generating JWT token...');
+        const jwtToken = generateUserToken(user.toObject());;
+
+        res.cookie("userToken", jwtToken, {
           httpOnly: true,
-          secure: false,
+          secure: process.env.NODE_ENV === 'production',
           sameSite: "lax",
           maxAge: 14 * 24 * 60 * 60 * 1000,
         });
 
-        return handleResponse(req, res, 200, "Login Successful", {
-          user: userCreated,
-          token: userToken,
+        // console.log('✅ Google authentication complete');
+        return handleResponse(req, res, 200, "Google Login Successful", {
+          user: user,
+          token: jwtToken,
         });
-      } else {
-        const userToken = generateUserToken(userFind);
+      } catch (error: any) {
+        // console.error('❌ Google authentication error:', error);
 
-        res.cookie("userToken", userToken, {
-          httpOnly: true,
-          secure: false,
-          sameSite: "lax",
-          maxAge: 14 * 24 * 60 * 60 * 1000,
-        });
+        // Handle specific Google token verification errors
+        if (error.message && error.message.includes('Token used too early')) {
+          return next(new ApiError(400, "Token used too early - please try again"));
+        }
+        if (error.message && error.message.includes('Token used too late')) {
+          return next(new ApiError(400, "Token expired - please sign in again"));
+        }
+        if (error.message && error.message.includes('Invalid audience')) {
+          return next(new ApiError(400, "Invalid Google Client ID configuration"));
+        }
 
-        return handleResponse(req, res, 200, "Login Successful", {
-          user: userFind,
-          token: userToken,
-        });
+        // Re-throw for catchAsyncErrors to handle
+        throw error;
       }
     }
   );

@@ -149,7 +149,7 @@ export default class ItemServices {
             const processedOtherInfo: any = {};
             if (otherInformation) {
                 const info = typeof otherInformation === 'string' ? JSON.parse(otherInformation) : otherInformation;
-                
+
                 if (info.keyFeatures) processedOtherInfo.keyFeatures = Array.isArray(info.keyFeatures) ? info.keyFeatures : [info.keyFeatures];
                 if (info.benefits) processedOtherInfo.benefits = Array.isArray(info.benefits) ? info.benefits : [info.benefits];
                 if (info.precautions) processedOtherInfo.precautions = Array.isArray(info.precautions) ? info.precautions : [info.precautions];
@@ -228,7 +228,7 @@ export default class ItemServices {
         async (
             req: Request,
             res: Response,
-            next: NextFunction
+            next: NextFunction  
         ) => {
             const {
                 itemName,
@@ -339,7 +339,7 @@ export default class ItemServices {
             const processedOtherInfo: any = {};
             if (otherInformation) {
                 const info = typeof otherInformation === 'string' ? JSON.parse(otherInformation) : otherInformation;
-                
+
                 if (info.keyFeatures) processedOtherInfo.keyFeatures = Array.isArray(info.keyFeatures) ? info.keyFeatures : [info.keyFeatures];
                 if (info.benefits) processedOtherInfo.benefits = Array.isArray(info.benefits) ? info.benefits : [info.benefits];
                 if (info.precautions) processedOtherInfo.precautions = Array.isArray(info.precautions) ? info.precautions : [info.precautions];
@@ -516,6 +516,71 @@ export default class ItemServices {
         }
     )
 
+    public static deleteAllItems = catchAsyncErrors(
+        async (req: Request, res: Response, next: NextFunction) => {
+
+            const items = await ItemModel.find({}, { itemImages: 1 });
+
+            if (!items.length) {
+                return next(new ApiError(404, "No items found"));
+            }
+
+
+            const publicIds: string[] = [];
+
+            items.forEach(item => {
+                if (item.itemImages && item.itemImages.length > 0) {
+                    item.itemImages.forEach((url: string) => {
+                        const parts = url.split("/");
+                        const fileName = parts[parts.length - 1];
+                        const publicId = fileName ? fileName.split(".")[0] : "";
+                        if (publicId) {
+                            publicIds.push(`Epharma/items/${publicId}`);
+                        }
+                    });
+                }
+            });
+
+            if (publicIds.length > 0) {
+                try {
+                    await Promise.all(
+                        publicIds.map(pid =>
+                            cloudinary.uploader.destroy(pid).catch(err => {
+                                console.warn(`Cloudinary delete failed for ${pid}`, err);
+                            })
+                        )
+                    );
+                    console.log(`Deleted ${publicIds.length} images from Cloudinary`);
+                } catch (err) {
+                    console.error("Cloudinary bulk delete failed:", err);
+                }
+            }
+
+            const deleteResult = await ItemModel.deleteMany({});
+            if (!deleteResult.deletedCount) {
+                return next(new ApiError(404, "No items found to delete"));
+            }
+
+            try {
+                const redisKeys = await redis.keys("items:*");
+                if (redisKeys.length > 0) {
+                    await redis.del(redisKeys);
+                    console.log(`Cleared ${redisKeys.length} Redis cache keys`);
+                }
+            } catch (err) {
+                console.error("Redis cache cleanup failed:", err);
+            }
+
+            const deleteItemsCount = {
+                deletedItems: deleteResult.deletedCount,
+                deletedImages: publicIds.length
+            }
+
+            handleResponse(req, res, 200, "All items deleted successfully",deleteItemsCount);
+        }
+    );
+
+
     public static getAllItems = catchAsyncErrors(
         async (
             req: Request,
@@ -527,6 +592,10 @@ export default class ItemServices {
             const redisKey = `items:page=${page}:limit=${limit}`;
             const cachedItems = await redis.get(redisKey);
             if (cachedItems) {
+                // console.log("Cached Items Found: ", JSON.parse(cachedItems));
+                // console.log("limti of items: ", limit);
+                // console.log("cached items : ",JSON.parse(cachedItems).length);
+                // console.log("cached items : ",cachedItems.length);
                 return handleResponse(req, res, 200, "Items retrieved successfully", JSON.parse(cachedItems));
             }
 

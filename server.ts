@@ -22,7 +22,7 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors({
-  origin: ['exp://10.168.86.226:8081', '*'],
+  origin: ['*'],
   // origin: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -48,7 +48,7 @@ try {
   console.error("❌ Firebase initialization failed:", err);
 }
 
-const PORT = process.env.PORT || 5001;
-app.listen(PORT, async () => {
-  console.log(`Server is running on port http://localhost:${PORT}`);
+const PORT = parseInt(process.env.PORT || '5001', 10);
+app.listen(PORT, '0.0.0.0', async () => {
+  console.log(`Server is running on port http://0.0.0.0:${PORT}`);
 })

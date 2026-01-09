@@ -25,11 +25,15 @@ export const userSchema = new Schema<Iuser & Document>(
     },
     password: {
       type: String,
-      required: true,
+      required: function (this: any) {
+        // ✔ password only required for local users
+        return this.provider === "local";
+      },
     },
     phone: {
       type: String,
-      required: true,
+      sparse: true, // Allows null/empty for Google sign-in users
+      default: "",
     },
     age: {
       type: Number,

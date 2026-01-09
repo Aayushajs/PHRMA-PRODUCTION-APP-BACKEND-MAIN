@@ -7,7 +7,7 @@
 import { Request, Response, NextFunction } from "express";
 import { catchAsyncErrors } from "../Utils/catchAsyncErrors";
 import { ApiError } from "../Utils/ApiError";
-import { processPrescriptionBuffer, MedicineDetails } from "./ocrService";
+import { processPrescriptionBuffer, MedicineDetails } from "./ocr.Service";
 
 interface EnrichedMedicine extends MedicineDetails {
   price: number;
