@@ -228,7 +228,7 @@ export default class ItemServices {
         async (
             req: Request,
             res: Response,
-            next: NextFunction  
+            next: NextFunction
         ) => {
             const {
                 itemName,
@@ -387,6 +387,20 @@ export default class ItemServices {
         ) => {
             const itemId = req.params.itemId;
             const updateData = req.body;
+
+            if (
+                updateData.otherInformation &&
+                typeof updateData.otherInformation === "string"
+            ) {
+                try {
+                    updateData.otherInformation = JSON.parse(updateData.otherInformation);
+                } catch (err) {
+                    return next(
+                        new ApiError(400, "Invalid otherInformation format")
+                    );
+                }
+            }
+
             const existingItem = await ItemModel.findById(itemId);
             if (!existingItem) {
                 return next(new ApiError(404, "Item not found"));
@@ -576,7 +590,7 @@ export default class ItemServices {
                 deletedImages: publicIds.length
             }
 
-            handleResponse(req, res, 200, "All items deleted successfully",deleteItemsCount);
+            handleResponse(req, res, 200, "All items deleted successfully", deleteItemsCount);
         }
     );
 
@@ -686,6 +700,9 @@ export default class ItemServices {
             //     return handleResponse(req, res, 200, "Deals retrieved successfully", JSON.parse(cachedDeals));
             // }
 
+            // Get total count of all deals available
+            const totalDeals = await ItemModel.countDocuments({ itemDiscount: { $gte: 40 } });
+
             const deals = await ItemModel
                 .find({ itemDiscount: { $gte: 40 } })
                 .sort({ itemDiscount: -1, updatedAt: -1 })
@@ -693,9 +710,6 @@ export default class ItemServices {
                 .select("_id itemName itemInitialPrice itemDiscount itemGST gstRate itemImages itemCategory itemCompany updatedAt")
                 .populate("itemGST")
                 .lean();
-
-            // console.log(`Found ${deals.length} deals of the day`);
-            // console.log("Deals:", deals);
 
             if (deals.length === 0) {
                 return next(new ApiError(404, "No deals found today"));
@@ -706,14 +720,8 @@ export default class ItemServices {
                 const discountPrice = +(deal.itemInitialPrice * (1 - ((deal.itemDiscount ?? 0) / 100))).toFixed(2);
                 const gstAmount = +(discountPrice * (gstRate / 100));
                 const finalPrice = +((discountPrice + gstAmount)).toFixed(2);
-
-                // console.log(`Deal: ${deal.itemName}`);
-                // console.log(`  Initial Price: ${deal.itemInitialPrice}`);
-                // console.log(`  Discount: ${deal.itemDiscount}% => Discounted Price: ${discountPrice}`);
-                // console.log(`  GST Rate: ${gstRate}% => GST Amount: ${gstAmount}`);
-                // console.log(`  Final Price: ${finalPrice}`);
-
-
+            
+                
                 return {
                     _id: deal._id,
                     itemName: deal.itemName,
@@ -731,11 +739,15 @@ export default class ItemServices {
                 };
             });
 
-            // console.log("Formatted Deals:", formattedDeals);
+            const responseData = {
+                deals: formattedDeals,
+                totalDeals,
+                displayedDeals: formattedDeals.length
+            };
 
-            await redis.set(cacheKey, JSON.stringify(formattedDeals), { EX: 21600 });
+            await redis.set(cacheKey, JSON.stringify(responseData), { EX: 21600 });
 
-            return handleResponse(req, res, 200, "Deals fetched successfully", formattedDeals);
+            return handleResponse(req, res, 200, "Deals fetched successfully", responseData);
         }
     )
 
