@@ -14,6 +14,7 @@ import advertisementRouter from './Routers/advertisement.Routes';
 import units from './Routers/unit.Routes';
 import gstRouter from './Routers/gst.Routes';
 import prescriptionRouter from './Routers/prescription.Routes';
+import notification from "./Routers/notificationLog.Routes";
 const mainRouter = Router();
 
 mainRouter.use('/users', userRouter);
@@ -24,5 +25,6 @@ mainRouter.use('/advertisements', advertisementRouter);
 mainRouter.use('/units', units);
 mainRouter.use('/gsts', gstRouter);
 mainRouter.use('/prescriptions', prescriptionRouter);
+mainRouter.use('/notifications',notification)
 
 export default mainRouter;

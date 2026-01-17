@@ -12,18 +12,18 @@ import { authenticatedUserMiddleware } from '../../Middlewares/CheckLoginMiddlew
 import { handleResponse } from '../../Utils/handleResponse';
 import { ApiError } from '../../Utils/ApiError';
 
-const router = Router();
+const notification = Router();
 
 // ============================================================================
 // NOTIFICATION LOG ENDPOINTS
 // ============================================================================
-router.get('/active-logs', NotificationLogService.getActiveLogs);
-router.get('/myNotification', authenticatedUserMiddleware, NotificationLogService.getUserLogs);
-router.get('/log/:id', NotificationLogService.getLogById);
-router.get('/stats', authenticatedUserMiddleware, NotificationLogService.getUserStats);
-router.patch('/mark-read/:id', authenticatedUserMiddleware, NotificationLogService.markAsRead);
+notification.get('/active-logs', NotificationLogService.getActiveLogs);
+notification.get('/myNotification', authenticatedUserMiddleware, NotificationLogService.getUserLogs);
+notification.get('/log/:id', NotificationLogService.getLogById);
+notification.get('/stats', authenticatedUserMiddleware, NotificationLogService.getUserStats);
+notification.patch('/mark-read/:id', authenticatedUserMiddleware, NotificationLogService.markAsRead);
 
-router.patch('/mark-multiple-read', authenticatedUserMiddleware, async (req: Request, res: Response) => {
+notification.patch('/mark-multiple-read', authenticatedUserMiddleware, async (req: Request, res: Response) => {
   try {
     const { logIds } = req.body;
     const userId = (req as any).user?._id;
@@ -55,7 +55,7 @@ router.patch('/mark-multiple-read', authenticatedUserMiddleware, async (req: Req
 // FCM TOKEN MANAGEMENT
 // ============================================================================
 
-router.post('/register-token', authenticatedUserMiddleware, async (req: Request, res: Response) => {
+notification.post('/register-token', authenticatedUserMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?._id;
     const { token } = req.body;
@@ -99,7 +99,7 @@ router.post('/register-token', authenticatedUserMiddleware, async (req: Request,
 // TESTING ENDPOINT (Development/Testing only)
 // ============================================================================
 
-router.post('/send-test', authenticatedUserMiddleware, async (req: Request, res: Response) => {
+notification.post('/send-test', authenticatedUserMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?._id;
     const fcmToken = (req as any).user?.fcmToken;
@@ -140,4 +140,4 @@ router.post('/send-test', authenticatedUserMiddleware, async (req: Request, res:
   }
 });
 
-export default router;
+export default notification;
