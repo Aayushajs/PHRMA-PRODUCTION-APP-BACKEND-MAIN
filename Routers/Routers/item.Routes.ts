@@ -32,7 +32,19 @@ itemsRouter.get('/deals-of-the-day', ItemServices.getDealsOfTheDay);
 itemsRouter.get("/details/:itemId", ItemServices.getItemDetails);
 itemsRouter.get("/trending/AiPersonalized", ItemServices.getAITrendingProducts);
 itemsRouter.get("/GetItemFeed",authenticatedUserMiddleware, ItemServices.getDynamicFeed);
+
+// Similar Products API - O(n) complexity with smart scoring
+itemsRouter.get("/similar/:itemId", ItemServices.getSimilarProducts);
+
 itemsRouter.get("/GetRecentlyViewedItems", authenticatedUserMiddleware, ItemServices.getRecentlyViewedItems);
+
 itemsRouter.post("/AddToRecentlyViewedItems/:itemId", authenticatedUserMiddleware, ItemServices.addToRecentlyViewedItems);
 
+itemsRouter.delete("/wishlist/remove/:itemId", authenticatedUserMiddleware, ItemServices.removeFromWishlist);
+
+//only testing perpose
+itemsRouter.get("/wishlist", authenticatedUserMiddleware, ItemServices.getWishlist);
+itemsRouter.get("/wishlist/check/:itemId", authenticatedUserMiddleware, ItemServices.checkWishlistStatus);
+itemsRouter.delete("/wishlist/clear", authenticatedUserMiddleware, ItemServices.clearWishlist);
+    
 export default itemsRouter;

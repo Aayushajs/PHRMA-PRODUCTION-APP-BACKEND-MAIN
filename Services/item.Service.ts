@@ -20,6 +20,7 @@ import { v2 as cloudinary } from "cloudinary";
 import { gstModel } from '../Databases/Models/gst.Model'
 import mongoose from "mongoose";
 import { MRPVerificationService } from './mrpVerification.Service';
+import crypto from 'crypto';
 
 
 
@@ -601,33 +602,282 @@ export default class ItemServices {
             res: Response,
             next: NextFunction
         ) => {
-            const [page, limit] = [+(req.query.page ?? 1), +(req.query.limit ?? 10)];
 
-            const redisKey = `items:page=${page}:limit=${limit}`;
-            const cachedItems = await redis.get(redisKey);
-            if (cachedItems) {
-                // console.log("Cached Items Found: ", JSON.parse(cachedItems));
-                // console.log("limti of items: ", limit);
-                // console.log("cached items : ",JSON.parse(cachedItems).length);
-                // console.log("cached items : ",cachedItems.length);
-                return handleResponse(req, res, 200, "Items retrieved successfully", JSON.parse(cachedItems));
+            const {
+                page = 1,
+                limit = 20,
+                category,          
+                company,           
+                minPrice,          
+                maxPrice,          
+                priceRange,        
+                minDiscount,       
+                minRating,         
+                formula,           
+                HSNCode,         
+                search,           
+                sortBy = 'createdAt',  
+                order = 'desc',    
+                isTrending,        
+                inStock,           
+                
+            } = req.query;
+
+            const pageNum = parseInt(page as string) || 1;
+            const limitNum = Math.min(100, parseInt(limit as string) || 20);
+            const skip = (pageNum - 1) * limitNum;
+
+            const filterQuery: any = {
+                deletedAt: { $exists: false } // Only active items
+            };
+
+            if (category) {
+                const categoryIds = (category as string).split(',')
+                    .filter(id => mongoose.isValidObjectId(id))
+                    .map(id => new mongoose.Types.ObjectId(id));
+                
+                if (categoryIds.length > 0) {
+                    filterQuery.itemCategory = { $in: categoryIds };
+                }
             }
 
-            const items: any = await ItemModel.find()
-                .skip((page - 1) * limit)
-                .limit(limit);
+            // Company filter (case-insensitive)
+            if (company) {
+                filterQuery.itemCompany = { 
+                    $regex: new RegExp(company as string, 'i') 
+                };
+            }
 
-            console.log("total items : ", items.length);
+            // Price filters
+            if (minPrice || maxPrice) {
+                filterQuery.itemFinalPrice = {};
+                if (minPrice) {
+                    filterQuery.itemFinalPrice.$gte = parseFloat(minPrice as string);
+                }
+                if (maxPrice) {
+                    filterQuery.itemFinalPrice.$lte = parseFloat(maxPrice as string);
+                }
+            }
 
-            if (items.length === 0) {
-                return next(
-                    new ApiError(404, "No items found")
+            // Predefined price ranges
+            if (priceRange) {
+                const range = priceRange as string;
+                if (range === '0-100') {
+                    filterQuery.itemFinalPrice = { $gte: 0, $lte: 100 };
+                } else if (range === '100-500') {
+                    filterQuery.itemFinalPrice = { $gte: 100, $lte: 500 };
+                } else if (range === '500-1000') {
+                    filterQuery.itemFinalPrice = { $gte: 500, $lte: 1000 };
+                } else if (range === '1000+') {
+                    filterQuery.itemFinalPrice = { $gte: 1000 };
+                }
+            }
+
+            // Discount filter
+            if (minDiscount) {
+                filterQuery.itemDiscount = { 
+                    $gte: parseFloat(minDiscount as string) 
+                };
+            }
+
+            // Rating filter
+            if (minRating) {
+                filterQuery.itemRatings = { 
+                    $gte: parseFloat(minRating as string) 
+                };
+            }
+
+            // Medicine-specific filters
+            if (formula) {
+                filterQuery.formula = { 
+                    $regex: new RegExp(formula as string, 'i') 
+                };
+            }
+
+            if (HSNCode) {
+                filterQuery.HSNCode = HSNCode;
+            }
+
+            // Trending filter
+            if (isTrending === 'true') {
+                filterQuery.isTrending = true;
+            }
+
+            // Search filter (searches in name, description, company)
+            if (search) {
+                const searchRegex = new RegExp(search as string, 'i');
+                filterQuery.$or = [
+                    { itemName: searchRegex },
+                    { itemDescription: searchRegex },
+                    { itemCompany: searchRegex },
+                    { formula: searchRegex }
+                ];
+            }
+
+            const cacheKey = `items:filtered:${crypto.createHash('md5')
+                .update(JSON.stringify({ 
+                    ...filterQuery, 
+                    page: pageNum, 
+                    limit: limitNum, 
+                    sortBy, 
+                    order 
+                }))
+                .digest('hex')}`;
+
+            // Check cache
+            const cachedItems = await redis.get(cacheKey);
+            if (cachedItems) {
+                return handleResponse(
+                    req, 
+                    res, 
+                    200, 
+                    "Items retrieved from cache", 
+                    JSON.parse(cachedItems)
                 );
             }
 
-            await redis.set(redisKey, JSON.stringify(items), { EX: 3600 });
+            // ============================================================
+            // SORT CONFIGURATION - O(1)
+            // ============================================================
+            const sortOrder = order === 'asc' ? 1 : -1;
+            const sortConfig: any = {};
+            
+            // Validate sortBy field
+            const validSortFields = [
+                'itemName', 'itemFinalPrice', 'itemInitialPrice', 
+                'itemDiscount', 'itemRatings', 'views', 'createdAt', 
+                'updatedAt', 'itemCompany'
+            ];
+            
+            if (validSortFields.includes(sortBy as string)) {
+                sortConfig[sortBy as string] = sortOrder;
+            } else {
+                sortConfig.createdAt = -1; // Default sort
+            }
 
-            handleResponse(req, res, 200, "Items retrieved successfully", items);
+
+            const pipeline: any[] = [
+                { $match: filterQuery },
+                
+                {
+                    $lookup: {
+                        from: 'categories',
+                        localField: 'itemCategory',
+                        foreignField: '_id',
+                        as: 'categoryDetails'
+                    }
+                },
+                { $unwind: { path: '$categoryDetails', preserveNullAndEmptyArrays: true } },
+
+                { $sort: sortConfig },
+                
+                {
+                    $facet: {
+                        items: [
+                            { $skip: skip },
+                            { $limit: limitNum },
+                            {
+                                $project: {
+                                    _id: 1,
+                                    itemName: 1,
+                                    code: 1,
+                                    itemDescription: 1,
+                                    itemImages: 1,
+                                    itemInitialPrice: 1,
+                                    itemFinalPrice: 1,
+                                    itemDiscount: 1,
+                                    itemCompany: 1,
+                                    itemRatings: 1,
+                                    views: 1,
+                                    isTrending: 1,
+                                    formula: 1,
+                                    HSNCode: 1,
+                                    weight: 1,
+                                    itemMfgDate: 1,
+                                    itemExpiryDate: 1,
+                                    createdAt: 1,
+                                    category: {
+                                        _id: '$categoryDetails._id',
+                                        name: '$categoryDetails.name',
+                                        imageUrl: '$categoryDetails.imageUrl'
+                                    }
+                                }
+                            }
+                        ],
+                        totalCount: [{ $count: 'count' }],
+                        
+                        // Aggregated statistics
+                        stats: [
+                            {
+                                $group: {
+                                    _id: null,
+                                    avgPrice: { $avg: '$itemFinalPrice' },
+                                    minPrice: { $min: '$itemFinalPrice' },
+                                    maxPrice: { $max: '$itemFinalPrice' },
+                                    avgRating: { $avg: '$itemRatings' },
+                                    totalViews: { $sum: '$views' }
+                                }
+                            }
+                        ]
+                    }
+                }
+            ];
+
+            const [result] = await ItemModel.aggregate(pipeline);
+
+            const totalItems = result?.totalCount[0]?.count || 0;
+            const items = result?.items || [];
+            const stats = result?.stats[0] || {};
+
+            
+            const responseData = {
+                items,
+                pagination: {
+                    currentPage: pageNum,
+                    totalPages: Math.ceil(totalItems / limitNum),
+                    totalItems,
+                    itemsPerPage: limitNum,
+                    hasNextPage: pageNum < Math.ceil(totalItems / limitNum),
+                    hasPrevPage: pageNum > 1
+                },
+                filters: {
+                    applied: {
+                        category: category || null,
+                        company: company || null,
+                        priceRange: (minPrice || maxPrice) ? { min: minPrice, max: maxPrice } : null,
+                        minDiscount: minDiscount || null,
+                        minRating: minRating || null,
+                        search: search || null,
+                        isTrending: isTrending || null
+                    }
+                },
+                stats: {
+                    avgPrice: stats.avgPrice ? Math.round(stats.avgPrice * 100) / 100 : 0,
+                    priceRange: {
+                        min: stats.minPrice || 0,
+                        max: stats.maxPrice || 0
+                    },
+                    avgRating: stats.avgRating ? Math.round(stats.avgRating * 10) / 10 : 0,
+                    totalViews: stats.totalViews || 0
+                },
+                meta: {
+                    sortBy,
+                    order,
+                    complexity: 'O(n)',
+                    cached: false
+                }
+            };
+
+            // Cache for 10 minutes
+            await redis.set(cacheKey, JSON.stringify(responseData), { EX: 600 });
+
+            return handleResponse(
+                req, 
+                res, 
+                200, 
+                "Items retrieved successfully", 
+                responseData
+            );
         }
     )
 
@@ -751,6 +1001,11 @@ export default class ItemServices {
         }
     )
 
+    /**
+     * Logic:
+     * - If itemId starts with "wishlistitem" → Add to wishlist (LIFO - most recent at top)
+     * - Otherwise → Add to recently viewed (FIFO - maintain last 15)
+     */
     public static addToRecentlyViewedItems = catchAsyncErrors(
         async (req: Request, res: Response, next: NextFunction) => {
             const { itemId } = req.params;
@@ -764,25 +1019,107 @@ export default class ItemServices {
                 return next(new ApiError(401, "User not authenticated"));
             }
 
-            // FIFO Logic - Remove if exists to avoid duplicates
-            await userModel.findByIdAndUpdate(userId, {
-                $pull: { viewedItems: itemId }
-            });
 
-            // Add at the end and keep last 15 items
-            await userModel.findByIdAndUpdate(userId, {
-                $push: {
-                    viewedItems: {
-                        $each: [itemId],
-                        $slice: -15  // Keep last 15 items (FIFO)
-                    }
+            const isWishlistOperation = itemId.startsWith('wishlistitem');
+            
+            let actualItemId: string;
+            
+            if (isWishlistOperation) {
+                // Extract actual itemId: "wishlistitem64abc..." → "64abc..."
+                actualItemId = itemId.replace(/^wishlistitem/, '');
+                
+                if (!mongoose.isValidObjectId(actualItemId)) {
+                    return next(new ApiError(400, "Invalid item ID format after wishlistitem prefix"));
                 }
-            });
 
-            // Invalidate Redis Cache (use correct key)
-            await redis.del(`recently-viewed:${userId}`);
+                // ========================================================
+                // WISHLIST LOGIC (LIFO - Last In First Out)
+                // Most recent items at index 0 (top)
+                // ========================================================
+                
+                // Verify item exists (with cache)
+                const itemCacheKey = `item:exists:${actualItemId}`;
+                let itemExists = await redis.get(itemCacheKey);
 
-            return handleResponse(req, res, 200, "Recently viewed item updated");
+                if (!itemExists) {
+                    const item = await ItemModel.findById(actualItemId).select('_id').lean();
+                    if (!item) {
+                        return next(new ApiError(404, "Item not found"));
+                    }
+                    itemExists = 'true';
+                    await redis.set(itemCacheKey, itemExists, { EX: 3600 });
+                }
+
+                // Atomic Operation 1: Remove if already exists (for re-positioning)
+                await userModel.findByIdAndUpdate(userId, {
+                    $pull: { wishlist: actualItemId }
+                });
+
+                // Atomic Operation 2: Add to beginning (index 0) - LIFO
+                await userModel.findByIdAndUpdate(userId, {
+                    $push: { 
+                        wishlist: {
+                            $each: [actualItemId],
+                            $position: 0  // Add at index 0 (top of stack)
+                        }
+                    }
+                });
+
+                // Invalidate wishlist caches
+                const wishlistPattern = `user:wishlist:${userId}*`;
+                const keys = await redis.keys(wishlistPattern);
+                if (keys.length > 0) {
+                    await Promise.all(keys.map(key => redis.del(key)));
+                }
+
+                return handleResponse(
+                    req, 
+                    res, 
+                    200, 
+                    "Item added to wishlist successfully (LIFO - at top)",
+                    { 
+                        operation: "wishlist",
+                        itemId: actualItemId,
+                        position: "top"
+                    }
+                );
+
+            } else {
+                actualItemId = itemId;
+                
+                if (!mongoose.isValidObjectId(actualItemId)) {
+                    return next(new ApiError(400, "Invalid item ID format"));
+                }
+
+                await userModel.findByIdAndUpdate(userId, {
+                    $pull: { viewedItems: actualItemId }
+                });
+
+                // Step 2: Enqueue - Add at the end and maintain queue size of 15
+                await userModel.findByIdAndUpdate(userId, {
+                    $push: {
+                        viewedItems: {
+                            $each: [actualItemId],
+                            $slice: -15  // Keep last 15 items (FIFO queue)
+                        }
+                    }
+                });
+
+                // Invalidate cache
+                await redis.del(`recently-viewed:${userId}`);
+
+                return handleResponse(
+                    req, 
+                    res, 
+                    200, 
+                    "Item added to recently viewed (FIFO queue)",
+                    {
+                        operation: "recently_viewed",
+                        itemId: actualItemId,
+                        queueSize: 15
+                    }
+                );
+            }
         }
     )
 
@@ -1185,4 +1522,439 @@ export default class ItemServices {
             return handleResponse(req, res, 200, "Item details fetched successfully", item);
         }
     )
+
+
+
+    /**
+     * Remove item from wishlist
+     */
+    public static removeFromWishlist = catchAsyncErrors(
+        async (req: Request, res: Response, next: NextFunction) => {
+            const userId = (req as any).user?._id;
+            const { itemId } = req.params;
+
+            if (!userId) {
+                return next(new ApiError(401, "User not authenticated"));
+            }
+
+            if (!itemId || !mongoose.isValidObjectId(itemId)) {
+                return next(new ApiError(400, "Valid item ID is required"));
+            }
+
+            // Atomic remove operation
+            const updateResult = await userModel.findByIdAndUpdate(
+                userId,
+                {
+                    $pull: { wishlist: itemId }
+                },
+                { new: true, select: 'wishlist' }
+            );
+
+            if (!updateResult) {
+                return next(new ApiError(404, "User not found"));
+            }
+
+            // Clear cache
+            const wishlistCacheKey = `user:wishlist:${userId}`;
+            await redis.del(wishlistCacheKey);
+
+            return handleResponse(
+                req, 
+                res, 
+                200, 
+                "Item removed from wishlist successfully",
+                { 
+                    wishlistCount: updateResult.wishlist?.length || 0,
+                    itemId
+                }
+            );
+        }
+    );
+
+    /**
+     * Get user's wishlist with full item details (cached for performance)
+     */
+    public static getWishlist = catchAsyncErrors(
+        async (req: Request, res: Response, next: NextFunction) => {
+            const userId = (req as any).user?._id;
+            const { page = 1, limit = 20 } = req.query;
+
+            if (!userId) {
+                return next(new ApiError(401, "User not authenticated"));
+            }
+
+            const pageNum = parseInt(page as string) || 1;
+            const limitNum = Math.min(50, parseInt(limit as string) || 20);
+            const skip = (pageNum - 1) * limitNum;
+
+            const wishlistCacheKey = `user:wishlist:${userId}:p${pageNum}:l${limitNum}`;
+
+            // Check cache first
+            const cachedWishlist = await redis.get(wishlistCacheKey);
+            if (cachedWishlist) {
+                return handleResponse(
+                    req, 
+                    res, 
+                    200, 
+                    "Wishlist fetched from cache", 
+                    JSON.parse(cachedWishlist)
+                );
+            }
+
+            // Optimized aggregation pipeline
+            const result = await userModel.aggregate([
+                { $match: { _id: new mongoose.Types.ObjectId(userId) } },
+                {
+                    $project: {
+                        wishlist: { $slice: ["$wishlist", skip, limitNum] },
+                        totalCount: { $size: "$wishlist" }
+                    }
+                },
+                { $unwind: { path: "$wishlist", preserveNullAndEmptyArrays: false } },
+                {
+                    $addFields: {
+                        wishlistItemId: { $toObjectId: "$wishlist" }
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "items",
+                        localField: "wishlistItemId",
+                        foreignField: "_id",
+                        as: "itemData"
+                    }
+                },
+                { $unwind: { path: "$itemData", preserveNullAndEmptyArrays: false } },
+                {
+                    $lookup: {
+                        from: "categories",
+                        localField: "itemData.itemCategory",
+                        foreignField: "_id",
+                        as: "categoryData"
+                    }
+                },
+                { $unwind: { path: "$categoryData", preserveNullAndEmptyArrays: true } },
+                {
+                    $group: {
+                        _id: "$_id",
+                        totalCount: { $first: "$totalCount" },
+                        items: {
+                            $push: {
+                                _id: "$itemData._id",
+                                itemName: "$itemData.itemName",
+                                itemDescription: "$itemData.itemDescription",
+                                itemImages: "$itemData.itemImages",
+                                itemInitialPrice: "$itemData.itemInitialPrice",
+                                itemFinalPrice: "$itemData.itemFinalPrice",
+                                itemDiscount: "$itemData.itemDiscount",
+                                itemCompany: "$itemData.itemCompany",
+                                itemRatings: "$itemData.itemRatings",
+                                isTrending: "$itemData.isTrending",
+                                category: {
+                                    _id: "$categoryData._id",
+                                    name: "$categoryData.name",
+                                    imageUrl: "$categoryData.imageUrl"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    $project: {
+                        items: 1,
+                        totalCount: 1,
+                        totalPages: { 
+                            $ceil: { $divide: ["$totalCount", limitNum] } 
+                        },
+                        currentPage: { $literal: pageNum },
+                        hasNextPage: { 
+                            $gt: ["$totalCount", skip + limitNum] 
+                        }
+                    }
+                }
+            ]);
+
+            const responseData = result[0] || {
+                items: [],
+                totalCount: 0,
+                totalPages: 0,
+                currentPage: pageNum,
+                hasNextPage: false
+            };
+
+            // Cache for 5 minutes
+            await redis.set(wishlistCacheKey, JSON.stringify(responseData), { EX: 300 });
+
+            return handleResponse(
+                req, 
+                res, 
+                200, 
+                "Wishlist fetched successfully", 
+                responseData
+            );
+        }
+    );
+
+    /**
+     * Check if item is in user's wishlist (fast check)
+     */
+    public static checkWishlistStatus = catchAsyncErrors(
+        async (req: Request, res: Response, next: NextFunction) => {
+            const userId = (req as any).user?._id;
+            const { itemId } = req.params;
+
+            if (!userId) {
+                return next(new ApiError(401, "User not authenticated"));
+            }
+
+            if (!itemId || !mongoose.isValidObjectId(itemId)) {
+                return next(new ApiError(400, "Valid item ID is required"));
+            }
+
+            // Fast lookup using projection
+            const user = await userModel.findById(userId)
+                .select('wishlist')
+                .lean();
+
+            const isInWishlist = user?.wishlist?.includes(itemId) || false;
+
+            return handleResponse(
+                req, 
+                res, 
+                200, 
+                "Wishlist status checked", 
+                { 
+                    itemId,
+                    isInWishlist 
+                }
+            );
+        }
+    );
+
+    /**
+     * Clear entire wishlist
+     */
+    public static clearWishlist = catchAsyncErrors(
+        async (req: Request, res: Response, next: NextFunction) => {
+            const userId = (req as any).user?._id;
+
+            if (!userId) {
+                return next(new ApiError(401, "User not authenticated"));
+            }
+
+            const updateResult = await userModel.findByIdAndUpdate(
+                userId,
+                { $set: { wishlist: [] } },
+                { new: true, select: 'wishlist' }
+            );
+
+            if (!updateResult) {
+                return next(new ApiError(404, "User not found"));
+            }
+
+            // Clear all wishlist caches for this user
+            const pattern = `user:wishlist:${userId}*`;
+            const keys = await redis.keys(pattern);
+            if (keys.length > 0) {
+                await Promise.all(keys.map(key => redis.del(key)));
+            }
+
+            return handleResponse(
+                req, 
+                res, 
+                200, 
+                "Wishlist cleared successfully",
+                { wishlistCount: 0 }
+            );
+        }
+    );
+
+    public static getSimilarProducts = catchAsyncErrors(
+        async (req: Request, res: Response, next: NextFunction) => {
+            const { itemId } = req.params;
+            const { page = 1, limit = 20 } = req.query;
+
+            if (!itemId || !mongoose.isValidObjectId(itemId)) {
+                return next(new ApiError(400, "Valid item ID is required"));
+            }
+
+            const pageNum = parseInt(page as string) || 1;
+            const limitNum = Math.min(50, parseInt(limit as string) || 20);
+            const skip = (pageNum - 1) * limitNum;
+
+            const cacheKey = `similar_products:${itemId}:p${pageNum}:l${limitNum}`;
+            
+            const cachedData = await redis.get(cacheKey);
+            if (cachedData) {
+                return handleResponse(
+                    req, 
+                    res, 
+                    200, 
+                    "Similar products fetched from cache", 
+                    JSON.parse(cachedData)
+                );
+            }
+
+            const sourceProduct = await ItemModel.findById(itemId)
+                .select('itemCategory itemFinalPrice itemCompany itemName')
+                .lean();
+
+            if (!sourceProduct) {
+                return next(new ApiError(404, "Product not found"));
+            }
+
+            // Calculate price range (±30% tolerance for similarity)
+            const priceMin = sourceProduct.itemFinalPrice * 0.7;
+            const priceMax = sourceProduct.itemFinalPrice * 1.3;
+
+  
+            const pipeline: any[] = [
+                // Stage 1: Filter similar products (O(n) with indexes)
+                {
+                    $match: {
+                        _id: { $ne: new mongoose.Types.ObjectId(itemId) },
+                        itemCategory: sourceProduct.itemCategory, 
+                        itemFinalPrice: { $gte: priceMin, $lte: priceMax }, 
+                        deletedAt: { $exists: false } 
+                    }
+                },
+                
+                // Stage 2: Calculate similarity score (O(n))
+                {
+                    $addFields: {
+                        similarityScore: {
+                            $add: [
+                                // Score 1: Same company = +50 points
+                                {
+                                    $cond: [
+                                        { $eq: ["$itemCompany", sourceProduct.itemCompany] },
+                                        50,
+                                        0
+                                    ]
+                                },
+                                // Score 2: Price proximity = up to 30 points
+                                {
+                                    $multiply: [
+                                        30,
+                                        {
+                                            $subtract: [
+                                                1,
+                                                {
+                                                    $divide: [
+                                                        {
+                                                            $abs: {
+                                                                $subtract: ["$itemFinalPrice", sourceProduct.itemFinalPrice]
+                                                            }
+                                                        },
+                                                        sourceProduct.itemFinalPrice
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                },
+                                // Score 3: Ratings weight = up to 20 points
+                                {
+                                    $multiply: ["$itemRatings", 4]
+                                }
+                            ]
+                        }
+                    }
+                },
+                
+                // Stage 3: Sort by similarity score DESC (O(n log n))
+                {
+                    $sort: { 
+                        similarityScore: -1, 
+                        itemRatings: -1, 
+                        views: -1 
+                    }
+                },
+                
+                // Stage 4: Pagination (O(1))
+                {
+                    $facet: {
+                        items: [
+                            { $skip: skip },
+                            { $limit: limitNum },
+                            {
+                                $project: {
+                                    _id: 1,
+                                    itemName: 1,
+                                    code: 1,
+                                    image: { $arrayElemAt: ["$itemImages", 0] }, // First image only
+                                    itemDescription: 1,
+                                    itemDiscount: 1,
+                                    itemRatings: 1,
+                                    itemFinalPrice: 1,
+                                    itemInitialPrice: 1,
+                                    itemCompany: 1,
+                                    views: 1,
+                                    similarityScore: 1
+                                }
+                            }
+                        ],
+                        totalCount: [
+                            { $count: "count" }
+                        ]
+                    }
+                }
+            ];
+
+            // Execute aggregation pipeline (O(n) total)
+            const [result] = await ItemModel.aggregate(pipeline);
+
+            const totalItems = result?.totalCount[0]?.count || 0;
+            const items = result?.items || [];
+
+            // Format response (O(k) where k = items.length)
+            const responseData = {
+                sourceProduct: {
+                    _id: sourceProduct._id,
+                    itemName: sourceProduct.itemName,
+                    itemCategory: sourceProduct.itemCategory,
+                    itemFinalPrice: sourceProduct.itemFinalPrice
+                },
+                items: items.map((item: any) => ({
+                    _id: item._id,
+                    itemName: item.itemName,
+                    code: item.code,
+                    image: item.image,
+                    itemDescription: item.itemDescription,
+                    itemDiscount: item.itemDiscount,
+                    itemRatings: item.itemRatings,
+                    itemFinalPrice: item.itemFinalPrice,
+                    itemInitialPrice: item.itemInitialPrice,
+                    itemCompany: item.itemCompany,
+                    views: item.views,
+                    similarityScore: Math.round(item.similarityScore)
+                })),
+                pagination: {
+                    currentPage: pageNum,
+                    totalPages: Math.ceil(totalItems / limitNum),
+                    totalItems: totalItems,
+                    itemsPerPage: limitNum,
+                    hasNextPage: pageNum < Math.ceil(totalItems / limitNum),
+                    hasPrevPage: pageNum > 1
+                },
+                meta: {
+                    algorithm: "Multi-factor similarity scoring",
+                    factors: ["category", "price_range", "company", "ratings"],
+                    priceRange: { min: priceMin, max: priceMax },
+                    complexity: "O(n)"
+                }
+            };
+
+            // Cache for 30 minutes (O(1))
+            await redis.set(cacheKey, JSON.stringify(responseData), { EX: 1800 });
+
+            return handleResponse(
+                req, 
+                res, 
+                200, 
+                "Similar products fetched successfully", 
+                responseData
+            );
+        }
+    );
 }

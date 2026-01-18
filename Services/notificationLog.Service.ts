@@ -826,4 +826,121 @@ export default class NotificationLogService {
       }
     }
   );
+
+  public static receiveNotification = catchAsyncErrors(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const userId = (req as any).user?._id;
+
+      if (!userId || !mongoose.isValidObjectId(userId)) {
+        return next(new ApiError(400, 'Valid user ID is required'));
+      }
+
+      try {
+        // Backend automatically detects notifications sent to this user
+        // Find all notifications that were sent to this user but not yet acknowledged as received
+        const recentNotifications = await NotificationLogModel.find({
+          userId: userId,
+          status: 'SENT',
+           sentAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } 
+        })
+        .sort({ sentAt: -1 })
+        .limit(50)
+        .select('_id type title body relatedEntityId relatedEntityType payload sentAt isRead')
+        .lean();
+
+        // Optionally mark them as delivered/received
+        if (recentNotifications.length > 0) {
+          const notificationIds = recentNotifications.map(n => n._id);
+          
+          // Update to mark as received (you can add a 'receivedAt' field if needed)
+          await NotificationLogModel.updateMany(
+            { _id: { $in: notificationIds } },
+            { 
+              $set: { 
+                'payload.receivedAt': new Date(),
+                'payload.receivedFromBackend': true
+              } 
+            }
+          );
+        }
+
+        const responseData = {
+          total: recentNotifications.length,
+          notifications: recentNotifications,
+          message: 'Automatically detected notifications sent to user'
+        };
+
+        return handleResponse(
+          req, 
+          res, 
+          200, 
+          `Found ${recentNotifications.length} notifications sent to user`, 
+          responseData
+        );
+
+      } catch (error: any) {
+        console.error("Receive notification error:", error);
+        return next(new ApiError(500, error.message || "Internal Server Error"));
+      }
+    }
+  );
+
+  public static getReceivedNotifications = catchAsyncErrors(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const userId = (req as any).user?._id;
+      const { 
+        page = 1, 
+        limit = 20, 
+        type,
+        isRead,
+        sortBy = 'sentAt',
+        order = 'desc'
+      } = req.query;
+
+      const pageNum = parseInt(page as string) || 1;
+      const limitNum = Math.min(100, parseInt(limit as string) || 20);
+      const skip = (pageNum - 1) * limitNum;
+
+      try {
+        const NotificationService = (await import('../Middlewares/LogMedillewares/notificationLogger')).default;
+
+        const query: any = { userId };
+        if (type) query.type = type;
+        if (isRead !== undefined) query.isRead = isRead === 'true';
+
+        const sortOrder = order === 'desc' ? -1 : 1;
+        const sortObj = { [sortBy as string]: sortOrder };
+
+        const [notifications, total] = await Promise.all([
+          NotificationService.getNotificationsByUserId(userId, query, sortObj, skip, limitNum),
+          NotificationService.countNotificationsByUserId(userId, query)
+        ]);
+
+        const responseData = {
+          notifications,
+          pagination: {
+            currentPage: pageNum,
+            totalPages: Math.ceil(total / limitNum),
+            totalItems: total,
+            itemsPerPage: limitNum,
+            hasNextPage: pageNum < Math.ceil(total / limitNum),
+            hasPrevPage: pageNum > 1,
+          },
+          filters: { type, isRead }
+        };
+
+        return handleResponse(
+          req, 
+          res, 
+          200, 
+          'Notifications fetched successfully', 
+          responseData
+        );
+
+      } catch (error: any) {
+        console.error("Get received notifications error:", error);
+        return next(new ApiError(500, error.message || "Internal Server Error"));
+      }
+    }
+  );
 }

@@ -177,7 +177,10 @@ export default class AdvertisementService {
                             type: "AD_CREATED",
                             relatedEntityId: advertisement._id.toString(),
                             relatedEntityType: "Advertisement",
-                            payload: { adId: advertisement._id }
+                            payload: { 
+                                adId: advertisement._id,
+                                image: advertisement.imageUrl || null
+                            }
                         }
                     );
                 } catch (err) {
@@ -377,7 +380,11 @@ export default class AdvertisementService {
                             type: "AD_UPDATED",
                             relatedEntityId: updatedAd._id.toString(),
                             relatedEntityType: "Advertisement",
-                            payload: { adId: updatedAd._id, updatedBy: actorName }
+                            payload: { 
+                                adId: updatedAd._id, 
+                                updatedBy: actorName,
+                                image: updatedAd.imageUrl || null
+                            }
                         }
                     );
                 } catch (err) {
@@ -766,7 +773,11 @@ export default class AdvertisementService {
                             type: 'AD_CLICKED',
                             relatedEntityId: advertisement._id.toString(),
                             relatedEntityType: "Advertisement",
-                            payload: { adId: advertisement._id, clickedBy: actorName }
+                            payload: { 
+                                adId: advertisement._id, 
+                                clickedBy: actorName,
+                                image: advertisement.imageUrl || null
+                            }
                         }
                     );
                 } catch (err) {

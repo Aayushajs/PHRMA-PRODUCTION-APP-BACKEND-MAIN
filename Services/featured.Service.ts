@@ -120,7 +120,10 @@ export default class FeaturedMedicineService {
               type: "FEATURED_CREATED",
               relatedEntityId: newMedicine._id.toString(),
               relatedEntityType: "FeaturedMedicine",
-              payload: { medicineId: newMedicine._id }
+              payload: { 
+                medicineId: newMedicine._id,
+                image: newMedicine.imageUrl || null
+              }
             }
           );
         } catch (err) {
@@ -313,7 +316,10 @@ export default class FeaturedMedicineService {
               type: "FEATURED_UPDATED",
               relatedEntityId: updatedMedicine._id.toString(),
               relatedEntityType: "FeaturedMedicine",
-              payload: { medicineId: updatedMedicine._id }
+              payload: { 
+                medicineId: updatedMedicine._id,
+                image: (updatedMedicine as any).imageUrl || null
+              }
             }
           );
         } catch (err) {

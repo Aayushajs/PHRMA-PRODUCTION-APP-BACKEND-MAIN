@@ -204,6 +204,72 @@ export class NotificationService {
       return null;
     }
   }
+
+  /**
+   * Create a notification log without sending (for client-received notifications)
+   */
+  public static async createNotificationLog(
+    userId: string | mongoose.Types.ObjectId,
+    title: string,
+    body: string,
+    options: NotificationOptions
+  ) {
+    try {
+      const logData: INotificationLogCreate = {
+        userId: userId as any,
+        type: options.type,
+        title,
+        body,
+        relatedEntityId: options.relatedEntityId as any,
+        relatedEntityType: options.relatedEntityType,
+        status: 'SENT', // Mark as SENT since it was received by client
+        payload: options.payload,
+        sentAt: new Date()
+      };
+
+      const notificationLog = await NotificationLogModel.create(logData);
+      return notificationLog;
+    } catch (error: any) {
+      throw new Error(`Failed to create notification log: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get notifications by user ID with filters
+   */
+  public static async getNotificationsByUserId(
+    userId: string | mongoose.Types.ObjectId,
+    query: any,
+    sort: any,
+    skip: number,
+    limit: number
+  ) {
+    try {
+      return await NotificationLogModel
+        .find(query)
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .select('-fcmToken')
+        .lean();
+    } catch (error: any) {
+      throw new Error(`Failed to fetch notifications: ${error.message}`);
+    }
+  }
+
+  /**
+   * Count notifications by user ID with filters
+   */
+  public static async countNotificationsByUserId(
+    userId: string | mongoose.Types.ObjectId,
+    query: any
+  ) {
+    try {
+      return await NotificationLogModel.countDocuments(query);
+    } catch (error: any) {
+      throw new Error(`Failed to count notifications: ${error.message}`);
+    }
+  }
 }
 
 export default NotificationService;

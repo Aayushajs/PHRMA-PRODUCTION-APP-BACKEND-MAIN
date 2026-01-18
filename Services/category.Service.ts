@@ -155,7 +155,7 @@ export default class CategoryService {
               relatedEntityType: "Category",
               payload: {
                 categoryId: category._id,
-                imageUrl: imageResults.length > 0 ? imageResults[0].secure_url : null
+                image: imageResults.length > 0 ? imageResults[0].secure_url : null
               },
 
             }
@@ -685,7 +685,7 @@ export default class CategoryService {
                 categoryId: id,
                 updatedBy: actorName,
                 timestamp: new Date().toISOString(),
-                imageUrl: (updatedCategory as any)?.imageUrl?.length > 0 ? (updatedCategory as any)?.imageUrl[0] : null
+                image: (updatedCategory as any)?.imageUrl?.length > 0 ? (updatedCategory as any)?.imageUrl[0] : null
               }
             }
           );

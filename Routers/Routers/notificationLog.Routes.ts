@@ -12,18 +12,22 @@ import { authenticatedUserMiddleware } from '../../Middlewares/CheckLoginMiddlew
 import { handleResponse } from '../../Utils/handleResponse';
 import { ApiError } from '../../Utils/ApiError';
 
-const notification = Router();
+const notificationLog = Router();
 
 // ============================================================================
 // NOTIFICATION LOG ENDPOINTS
 // ============================================================================
-notification.get('/active-logs', NotificationLogService.getActiveLogs);
-notification.get('/myNotification', authenticatedUserMiddleware, NotificationLogService.getUserLogs);
-notification.get('/log/:id', NotificationLogService.getLogById);
-notification.get('/stats', authenticatedUserMiddleware, NotificationLogService.getUserStats);
-notification.patch('/mark-read/:id', authenticatedUserMiddleware, NotificationLogService.markAsRead);
+notificationLog.get('/active-logs', authenticatedUserMiddleware, NotificationLogService.getActiveLogs);
+notificationLog.get('/myNotification', authenticatedUserMiddleware, NotificationLogService.getUserLogs);
+notificationLog.get('/received', authenticatedUserMiddleware, NotificationLogService.getReceivedNotifications);
+notificationLog.get('/log/:id', authenticatedUserMiddleware, NotificationLogService.getLogById);
+notificationLog.get('/stats', authenticatedUserMiddleware, NotificationLogService.getUserStats);
+notificationLog.patch('/mark-read/:id', authenticatedUserMiddleware, NotificationLogService.markAsRead);
 
-notification.patch('/mark-multiple-read', authenticatedUserMiddleware, async (req: Request, res: Response) => {
+notificationLog.post('/receive', authenticatedUserMiddleware, NotificationLogService.receiveNotification);
+
+
+notificationLog.patch('/mark-multiple-read', authenticatedUserMiddleware, async (req: Request, res: Response) => {
   try {
     const { logIds } = req.body;
     const userId = (req as any).user?._id;
@@ -55,7 +59,7 @@ notification.patch('/mark-multiple-read', authenticatedUserMiddleware, async (re
 // FCM TOKEN MANAGEMENT
 // ============================================================================
 
-notification.post('/register-token', authenticatedUserMiddleware, async (req: Request, res: Response) => {
+notificationLog.post('/register-token', authenticatedUserMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?._id;
     const { token } = req.body;
@@ -99,7 +103,7 @@ notification.post('/register-token', authenticatedUserMiddleware, async (req: Re
 // TESTING ENDPOINT (Development/Testing only)
 // ============================================================================
 
-notification.post('/send-test', authenticatedUserMiddleware, async (req: Request, res: Response) => {
+notificationLog.post('/send-test', authenticatedUserMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?._id;
     const fcmToken = (req as any).user?.fcmToken;
@@ -140,4 +144,4 @@ notification.post('/send-test', authenticatedUserMiddleware, async (req: Request
   }
 });
 
-export default notification;
+export default notificationLog;

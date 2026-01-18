@@ -11,7 +11,7 @@ import cors from 'cors';
 import { connectDB } from './Databases/db';
 import { errorHandler } from './Middlewares/errorHandler';
 import mainRouter from './Routers/main.Routes';
-import { startKeepAliveCron } from './keepAlive';
+import { startKeepAliveCron } from './cronjob/keepAlive';
 
 dotenv.config({ path: './config/.env' });
 
@@ -46,7 +46,7 @@ connectDB().catch(err => {
 try {
   console.log("✅ Firebase Admin SDK initialized successfully");
 } catch (err) {
-  console.error("❌ Firebase initialization failed:", err);
+  console.error(" Firebase initialization failed:", err);
 }
 
 const PORT = parseInt(process.env.PORT || '5001', 10);
@@ -56,6 +56,6 @@ app.listen(PORT, '0.0.0.0', async () => {
   // Start keep-alive cron job to prevent cold starts on Render
   if (process.env.NODE_ENV === 'production') {
     startKeepAliveCron();
-    console.log('🔄 Keep-Alive cron job initialized');
+    console.log(' Keep-Alive cron job initialized');
   }
 })
