@@ -17,6 +17,16 @@ import prescriptionRouter from './Routers/prescription.Routes';
 import notification from "./Routers/notificationLog.Routes";
 const mainRouter = Router();
 
+// Health check endpoint to prevent cold starts
+mainRouter.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    message: 'Server is running'
+  });
+});
+
 mainRouter.use('/users', userRouter);
 mainRouter.use('/featured-medicines', featuredRouter);
 mainRouter.use('/categories', categoryRouter);

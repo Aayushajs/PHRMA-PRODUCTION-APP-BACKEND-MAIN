@@ -11,6 +11,7 @@ import cors from 'cors';
 import { connectDB } from './Databases/db';
 import { errorHandler } from './Middlewares/errorHandler';
 import mainRouter from './Routers/main.Routes';
+import { startKeepAliveCron } from './keepAlive';
 
 dotenv.config({ path: './config/.env' });
 
@@ -51,4 +52,10 @@ try {
 const PORT = parseInt(process.env.PORT || '5001', 10);
 app.listen(PORT, '0.0.0.0', async () => {
   console.log(`Server is running on port http://0.0.0.0:${PORT}`);
+  
+  // Start keep-alive cron job to prevent cold starts on Render
+  if (process.env.NODE_ENV === 'production') {
+    startKeepAliveCron();
+    console.log('🔄 Keep-Alive cron job initialized');
+  }
 })
