@@ -27,6 +27,14 @@ itemsRouter.get("/", ItemServices.getAllItems);
 
 itemsRouter.get("/category/:categoryId", ItemServices.getItemsByCategory);
 
+itemsRouter.get("/search/suggestions", ItemServices.getSearchSuggestions);
+itemsRouter.get("/search/popular-terms", ItemServices.getPopularSearchTerms);
+
+itemsRouter.post("/search/recent", authenticatedUserMiddleware, ItemServices.saveRecentSearch);
+itemsRouter.get("/search/get-recent", authenticatedUserMiddleware, ItemServices.getRecentSearches);
+itemsRouter.delete("/search/recent/clear", authenticatedUserMiddleware, ItemServices.clearRecentSearches);
+itemsRouter.delete("/search/recent/:query", authenticatedUserMiddleware, ItemServices.deleteRecentSearch);
+
 itemsRouter.get('/deals-of-the-day', ItemServices.getDealsOfTheDay);
 
 itemsRouter.get("/details/:itemId", ItemServices.getItemDetails);
