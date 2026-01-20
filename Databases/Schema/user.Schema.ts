@@ -96,6 +96,20 @@ export const userSchema = new Schema<Iuser & Document>(
       type: [String],
       default: [],
     },
+    recentSearches: {
+      type: [
+        {
+          query: { 
+            type: String, 
+                 },
+          timestamp: { 
+            type: Number,
+             default: Date.now
+             }
+        }
+      ],
+      default: [],
+    },
     createdAt: {
       type: Date,
       default: Date.now,

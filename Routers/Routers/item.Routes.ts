@@ -27,6 +27,7 @@ itemsRouter.get("/", ItemServices.getAllItems);
 
 itemsRouter.get("/category/:categoryId", ItemServices.getItemsByCategory);
 
+
 itemsRouter.get("/search/suggestions", ItemServices.getSearchSuggestions);
 itemsRouter.get("/search/popular-terms", ItemServices.getPopularSearchTerms);
 

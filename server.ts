@@ -8,10 +8,12 @@ import express, { Express } from 'express';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
+import { createServer } from 'http';
 import { connectDB } from './Databases/db';
 import { errorHandler } from './Middlewares/errorHandler';
 import mainRouter from './Routers/main.Routes';
 import { startKeepAliveCron } from './cronjob/keepAlive';
+import { initializeSocket } from './config/socket';
 
 dotenv.config({ path: './config/.env' });
 
@@ -50,8 +52,17 @@ try {
 }
 
 const PORT = parseInt(process.env.PORT || '5001', 10);
-app.listen(PORT, '0.0.0.0', async () => {
-  console.log(`Server is running on port http://0.0.0.0:${PORT}`);
+
+// Create HTTP server
+const httpServer = createServer(app);
+
+// Initialize Socket.IO
+const io = initializeSocket(httpServer);
+console.log(' Socket.IO initialized');
+
+httpServer.listen(PORT, '0.0.0.0', async () => {
+  console.log(`Server is running on http://0.0.0.0:${PORT}`);
+  console.log(`✅ WebSocket server ready on ws://0.0.0.0:${PORT}`);
   
   // Start keep-alive cron job to prevent cold starts on Render
   if (process.env.NODE_ENV === 'production') {

@@ -36,6 +36,10 @@ export interface Iuser {
   role: RoleIndex;
   ProfileImage?: string[];
   wishlist?: string[];
+  recentSearches?: Array<{
+    query: string;
+    timestamp: number;
+  }>;
   createdAt?: Date;
   updatedAt?: Date;
 }

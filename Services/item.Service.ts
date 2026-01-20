@@ -22,6 +22,7 @@ import mongoose from "mongoose";
 import { MRPVerificationService } from './mrpVerification.Service';
 import crypto from 'crypto';
 import {getTimeAgo} from "../Utils/timerHelperFn";
+import { emitRecentlyViewedUpdate, emitNewProductAdded, emitWishlistUpdate } from '../Utils/socketEmitters';
 
 
 
@@ -218,6 +219,16 @@ export default class ItemServices {
             const newItem: any = await ItemModel.create(newItemData);
             await redis.del("deals:of-the-day");
 
+            // Emit real-time event for new product
+            emitNewProductAdded({
+                _id: newItem._id,
+                itemName: newItem.itemName,
+                itemFinalPrice: newItem.itemFinalPrice,
+                itemDiscount: newItem.itemDiscount,
+                itemCategory: newItem.itemCategory,
+                image: newItem.itemImages?.[0] || null
+            });
+
             return handleResponse(req, res, 201, "Item created successfully", {
                 item: newItem,
                 priceVerification: mrpVerificationData
@@ -376,6 +387,17 @@ export default class ItemServices {
 
             const newItem: any = await ItemModel.create(newItemData);
             await redis.del("deals:of-the-day");
+
+            // Emit real-time event for new premium product
+            emitNewProductAdded({
+                _id: newItem._id,
+                itemName: newItem.itemName,
+                itemFinalPrice: newItem.itemFinalPrice,
+                itemDiscount: newItem.itemDiscount,
+                itemCategory: newItem.itemCategory,
+                image: newItem.itemImages?.[0] || null,
+                isPremium: true
+            });
 
             return handleResponse(req, res, 201, "Item created successfully", newItem);
         }
@@ -1033,12 +1055,6 @@ export default class ItemServices {
                     return next(new ApiError(400, "Invalid item ID format after wishlistitem prefix"));
                 }
 
-                // ========================================================
-                // WISHLIST LOGIC (LIFO - Last In First Out)
-                // Most recent items at index 0 (top)
-                // ========================================================
-                
-                // Verify item exists (with cache)
                 const itemCacheKey = `item:exists:${actualItemId}`;
                 let itemExists = await redis.get(itemCacheKey);
 
@@ -1071,6 +1087,22 @@ export default class ItemServices {
                 const keys = await redis.keys(wishlistPattern);
                 if (keys.length > 0) {
                     await Promise.all(keys.map(key => redis.del(key)));
+                }
+
+                // Get item details for WebSocket event
+                const item = await ItemModel.findById(actualItemId)
+                    .select('_id itemName itemFinalPrice itemDiscount itemImages')
+                    .lean();
+
+                if (item) {
+                    // Emit real-time WebSocket event
+                    emitWishlistUpdate(userId.toString(), 'added', {
+                        _id: item._id,
+                        itemName: item.itemName,
+                        itemFinalPrice: item.itemFinalPrice,
+                        itemDiscount: item.itemDiscount,
+                        image: (item as any).itemImages?.[0] || null
+                    });
                 }
 
                 return handleResponse(
@@ -1108,6 +1140,21 @@ export default class ItemServices {
 
                 // Invalidate cache
                 await redis.del(`recently-viewed:${userId}`);
+
+                // Emit real-time update for recently viewed
+                const viewedItem = await ItemModel.findById(actualItemId)
+                    .select('_id itemName itemFinalPrice itemDiscount itemImages')
+                    .lean();
+                
+                if (viewedItem) {
+                    emitRecentlyViewedUpdate(userId.toString(), {
+                        _id: viewedItem._id,
+                        itemName: viewedItem.itemName,
+                        itemFinalPrice: viewedItem.itemFinalPrice,
+                        itemDiscount: viewedItem.itemDiscount,
+                        image: (viewedItem as any).itemImages?.[0] || null
+                    });
+                }
 
                 return handleResponse(
                     req, 
@@ -1559,6 +1606,22 @@ export default class ItemServices {
             const wishlistCacheKey = `user:wishlist:${userId}`;
             await redis.del(wishlistCacheKey);
 
+            // Get item details for WebSocket event
+            const item = await ItemModel.findById(itemId)
+                .select('_id itemName itemFinalPrice itemDiscount itemImages')
+                .lean();
+
+            if (item) {
+                // Emit real-time WebSocket event
+                emitWishlistUpdate(userId.toString(), 'removed', {
+                    _id: item._id,
+                    itemName: item.itemName,
+                    itemFinalPrice: item.itemFinalPrice,
+                    itemDiscount: item.itemDiscount,
+                    image: (item as any).itemImages?.[0] || null
+                });
+            }
+
             return handleResponse(
                 req, 
                 res, 
@@ -1759,6 +1822,9 @@ export default class ItemServices {
             if (keys.length > 0) {
                 await Promise.all(keys.map(key => redis.del(key)));
             }
+
+            // Emit real-time WebSocket event
+            emitWishlistUpdate(userId.toString(), 'cleared', null);
 
             return handleResponse(
                 req, 
@@ -1989,7 +2055,7 @@ export default class ItemServices {
             const searchQuery = q.trim();
 
             // Minimum 2 characters for suggestions
-            if (searchQuery.length < 2) {
+            if (searchQuery.length < 1) {
                 return handleResponse(req, res, 200, "Minimum 2 characters required", {
                     suggestions: [],
                     found: false,
@@ -2198,7 +2264,8 @@ export default class ItemServices {
 
             const searchQuery = query.trim().toLowerCase();
             const redisKey = `recent:searches:${userId}`;
-            const MAX_RECENT_SEARCHES = 10;
+            const MAX_RECENT_SEARCHES = 10; // Redis can store more
+            const MAX_DB_SEARCHES = 7; // Database limit
 
             const searchEntry = JSON.stringify({
                 query: searchQuery,
@@ -2209,6 +2276,7 @@ export default class ItemServices {
                 timestamp: Date.now()
             });
 
+            // Remove duplicate from Redis if exists
             const existingSearches = await redis.lRange(redisKey, 0, -1);
             
             for (let i = 0; i < existingSearches.length; i++) {
@@ -2225,11 +2293,47 @@ export default class ItemServices {
                 }
             }
 
+            // Add to Redis (LIFO - latest at top)
             await redis.lPush(redisKey, searchEntry);
-
             await redis.lTrim(redisKey, 0, MAX_RECENT_SEARCHES - 1);
-
             await redis.expire(redisKey, 30 * 24 * 60 * 60);
+
+            // Save to Database (FIFO - bottom to top, max 7 items)
+            const searchObject = {
+                query: searchQuery,
+                displayQuery: query.trim(),
+                itemId: itemId || null,
+                itemName: itemName || null,
+                itemImage: itemImage || null,
+                timestamp: Date.now()
+            };
+
+            // Get current user's recent searches from database
+            const user = await userModel.findById(userId).select('recentSearches');
+            
+            if (user) {
+                let recentSearches = user.recentSearches || [];
+                
+                // Remove duplicate if exists
+                recentSearches = recentSearches.filter(
+                    (search: any) => search.query !== searchQuery
+                );
+                
+                // Add new search at the beginning (bottom to top - latest first)
+                recentSearches.unshift(searchObject);
+                
+                // Keep only last 7 items (FIFO - when 8th enters, 1st is removed)
+                if (recentSearches.length > MAX_DB_SEARCHES) {
+                    recentSearches = recentSearches.slice(0, MAX_DB_SEARCHES);
+                }
+                
+                // Update user document
+                await userModel.findByIdAndUpdate(
+                    userId,
+                    { $set: { recentSearches } },
+                    { new: true }
+                );
+            }
 
             return handleResponse(req, res, 201, "Search saved successfully", {
                 query: searchQuery,
@@ -2250,38 +2354,77 @@ export default class ItemServices {
             const maxLimit = Math.min(parseInt(limit as string) || 10, 20);
             const redisKey = `recent:searches:${userId}`;
 
-
+            // Try to get from Redis first
             const recentSearches = await redis.lRange(redisKey, 0, maxLimit - 1);
 
-            if (!recentSearches || recentSearches.length === 0) {
-                return handleResponse(req, res, 200, "No recent searches found", {
-                    searches: [],
-                    count: 0
+            // If Redis has data, use it
+            if (recentSearches && recentSearches.length > 0) {
+                const formattedSearches = recentSearches
+                    .map((search: string, index: number) => {
+                        try {
+                            const parsed = JSON.parse(search);
+                            return {
+                                id: index,
+                                query: parsed.displayQuery || parsed.query,
+                                itemId: parsed.itemId,
+                                itemName: parsed.itemName,
+                                itemImage: parsed.itemImage,
+                                timestamp: parsed.timestamp,
+                                timeAgo: getTimeAgo(parsed.timestamp)
+                            };
+                        } catch (e) {
+                            return null;
+                        }
+                    })
+                    .filter((search: any) => search !== null);
+
+                return handleResponse(req, res, 200, "Recent searches fetched successfully", {
+                    searches: formattedSearches,
+                    count: formattedSearches.length,
+                    source: "redis"
                 });
             }
 
-            const formattedSearches = recentSearches
-                .map((search: string, index: number) => {
-                    try {
-                        const parsed = JSON.parse(search);
-                        return {
-                            id: index,
-                            query: parsed.displayQuery || parsed.query,
-                            itemId: parsed.itemId,
-                            itemName: parsed.itemName,
-                            itemImage: parsed.itemImage,
-                            timestamp: parsed.timestamp,
-                            timeAgo: getTimeAgo(parsed.timestamp)
-                        };
-                    } catch (e) {
-                        return null;
-                    }
-                })
-                .filter((search: any) => search !== null);
+            // If Redis is empty, fallback to database
+            const user = await userModel.findById(userId)
+                .select('recentSearches')
+                .lean();
+
+            if (!user || !user.recentSearches || user.recentSearches.length === 0) {
+                return handleResponse(req, res, 200, "No recent searches found", {
+                    searches: [],
+                    count: 0,
+                    source: "database"
+                });
+            }
+
+            // Format database searches
+            const formattedSearches = user.recentSearches
+                .slice(0, maxLimit)
+                .map((search: any, index: number) => ({
+                    id: index,
+                    query: search.displayQuery || search.query,
+                    itemId: search.itemId,
+                    itemName: search.itemName,
+                    itemImage: search.itemImage,
+                    timestamp: search.timestamp,
+                    timeAgo: getTimeAgo(search.timestamp)
+                }));
+
+            // Repopulate Redis cache from database
+            for (const search of user.recentSearches) {
+                const searchEntry = JSON.stringify({
+                    query: search.query,
+                    timestamp: search.timestamp
+                });
+                await redis.rPush(redisKey, searchEntry);
+            }
+            await redis.expire(redisKey, 30 * 24 * 60 * 60);
 
             return handleResponse(req, res, 200, "Recent searches fetched successfully", {
                 searches: formattedSearches,
-                count: formattedSearches.length
+                count: formattedSearches.length,
+                source: "database"
             });
         }
     );

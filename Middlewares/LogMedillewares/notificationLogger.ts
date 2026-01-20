@@ -9,6 +9,7 @@ import { sendPushNotification, sendBulkNotifications } from '../../Utils/notific
 import NotificationLogModel from '../../Databases/Models/notificationLog.model';
 import { INotificationLogCreate } from '../../Databases/Entities/notificationLog.interface';
 import mongoose from 'mongoose';
+import { emitNotification } from '../../Utils/socketEmitters';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -75,6 +76,15 @@ export class NotificationService {
     // Send notification
     try {
       await sendPushNotification(fcmToken, title, body, options.payload || {});
+      
+      // Emit real-time WebSocket event
+      emitNotification(userId.toString(), {
+        title,
+        message: body,
+        type: options.type === 'ORDER_STATUS' ? 'info' : 
+              options.type === 'FEATURED' ? 'success' : 
+              options.type === 'ADVERTISEMENT' ? 'info' : 'info'
+      });
     } catch (error: any) {
       status = 'FAILED';
       errorMessage = error.message || 'Unknown error';
@@ -162,6 +172,17 @@ export class NotificationService {
           };
 
           await NotificationLogModel.create(logData);
+          
+          // Emit real-time WebSocket event for successful notifications
+          if (status === 'SENT') {
+            emitNotification(user._id.toString(), {
+              title,
+              message: body,
+              type: options.type === 'ORDER_STATUS' ? 'info' : 
+                    options.type === 'FEATURED' ? 'success' : 
+                    options.type === 'ADVERTISEMENT' ? 'info' : 'info'
+            });
+          }
         } catch (logError) {
           // Log error but don't fail the operation
         }
