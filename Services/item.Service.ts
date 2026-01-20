@@ -21,6 +21,7 @@ import { gstModel } from '../Databases/Models/gst.Model'
 import mongoose from "mongoose";
 import { MRPVerificationService } from './mrpVerification.Service';
 import crypto from 'crypto';
+import {getTimeAgo} from "../Utils/timerHelperFn";
 
 
 
@@ -1955,6 +1956,390 @@ export default class ItemServices {
                 "Similar products fetched successfully", 
                 responseData
             );
+        }
+    );
+
+    /**
+     * Auto-Suggestion API for Search with Debouncing Support
+     * 
+     * Features:
+     * - Fast response time optimized for debounced frontend calls
+     * - Redis caching to reduce database load
+     * - Returns lightweight suggestions (name, id, image only)
+     * - Supports partial text matching with regex
+     * - Rate limiting friendly with short cache TTL
+     * - Shows "no results found" with alternative suggestions when no exact match
+     * 
+     * Frontend should implement debouncing (300-500ms delay) before calling this API
+     */
+    public static getSearchSuggestions = catchAsyncErrors(
+        async (req: Request, res: Response, next: NextFunction) => {
+            const { q, limit = 10 } = req.query;
+
+            // Validate search query
+            if (!q || typeof q !== 'string') {
+                return handleResponse(req, res, 400, "Search query 'q' is required", {
+                    suggestions: [],
+                    found: false,
+                    query: "",
+                    message: "Search query is required"
+                });
+            }
+
+            const searchQuery = q.trim();
+
+            // Minimum 2 characters for suggestions
+            if (searchQuery.length < 2) {
+                return handleResponse(req, res, 200, "Minimum 2 characters required", {
+                    suggestions: [],
+                    found: false,
+                    query: searchQuery,
+                    message: "Please enter at least 2 characters to search"
+                });
+            }
+
+            const maxLimit = Math.min(parseInt(limit as string) || 10, 20);
+
+            // Generate cache key based on search query (lowercase for consistency)
+            const cacheKey = `suggestions:${searchQuery.toLowerCase()}:${maxLimit}`;
+
+            // Check Redis cache first (short TTL for fresh results)
+            const cachedSuggestions = await redis.get(cacheKey);
+            if (cachedSuggestions) {
+                const parsedCache = JSON.parse(cachedSuggestions);
+                return handleResponse(req, res, 200, 
+                    parsedCache.found ? "Suggestions fetched (cached)" : "No results found (cached)", 
+                    {
+                        ...parsedCache,
+                        cached: true
+                    }
+                );
+            }
+
+            // Create regex for partial matching (case-insensitive)
+            const escapedQuery = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const searchRegex = new RegExp(escapedQuery, 'i');
+
+            // Optimized aggregation pipeline for fast suggestions
+            const suggestions = await ItemModel.aggregate([
+                {
+                    $match: {
+                        $or: [
+                            { itemName: searchRegex },
+                            { code: searchRegex },
+                            { itemCompany: searchRegex },
+                            { formula: searchRegex }
+                        ],
+                        deletedAt: { $exists: false }
+                    }
+                },
+                {
+                    // Prioritize exact matches and matches at the beginning
+                    $addFields: {
+                        matchScore: {
+                            $cond: {
+                                if: { $regexMatch: { input: { $toLower: "$itemName" }, regex: `^${searchQuery.toLowerCase()}` } },
+                                then: 3, // Exact prefix match gets highest priority
+                                else: {
+                                    $cond: {
+                                        if: { $regexMatch: { input: { $toLower: "$code" }, regex: `^${searchQuery.toLowerCase()}` } },
+                                        then: 2, // Code match
+                                        else: 1  // Partial match
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                { $sort: { matchScore: -1, itemRatings: -1, views: -1, itemName: 1 } },
+                { $limit: maxLimit },
+                {
+                    $project: {
+                        _id: 1,
+                        itemName: 1,
+                        code: 1,
+                        itemCompany: 1,
+                        image: { $arrayElemAt: ["$itemImages", 0] },
+                        itemFinalPrice: 1,
+                        itemDiscount: 1,
+                        itemRatings: 1
+                    }
+                }
+            ]);
+
+            // Format suggestions for frontend
+            const formattedSuggestions = suggestions.map((item: any) => ({
+                id: item._id,
+                name: item.itemName,
+                code: item.code || null,
+                company: item.itemCompany || null,
+                image: item.image || null,
+                price: item.itemFinalPrice || 0,
+                discount: item.itemDiscount || 0,
+                rating: item.itemRatings || 0
+            }));
+
+            // Check if results found
+            const found = formattedSuggestions.length > 0;
+
+            let responseData: any = {
+                suggestions: formattedSuggestions,
+                found,
+                query: searchQuery,
+                count: formattedSuggestions.length
+            };
+
+            // If no results found, provide helpful alternatives
+            if (!found) {
+                responseData.message = `No results found for "${searchQuery}"`;
+                
+                // Try to get popular/trending items as alternatives
+                const popularItems = await ItemModel.aggregate([
+                    { $match: { deletedAt: { $exists: false } } },
+                    { $sort: { views: -1, itemRatings: -1 } },
+                    { $limit: 5 },
+                    {
+                        $project: {
+                            _id: 1,
+                            itemName: 1,
+                            code: 1,
+                            itemCompany: 1,
+                            image: { $arrayElemAt: ["$itemImages", 0] },
+                            itemFinalPrice: 1,
+                            itemDiscount: 1,
+                            itemRatings: 1
+                        }
+                    }
+                ]);
+
+                responseData.alternativeSuggestions = popularItems.map((item: any) => ({
+                    id: item._id,
+                    name: item.itemName,
+                    code: item.code || null,
+                    company: item.itemCompany || null,
+                    image: item.image || null,
+                    price: item.itemFinalPrice || 0,
+                    discount: item.itemDiscount || 0,
+                    rating: item.itemRatings || 0
+                }));
+                
+                responseData.tip = "Try different keywords or check the spelling";
+            }
+
+            // Cache for 2 minutes (short TTL for fresh data while reducing load)
+            await redis.set(cacheKey, JSON.stringify(responseData), { EX: 120 });
+
+            return handleResponse(
+                req, 
+                res, 
+                200, 
+                found ? "Suggestions fetched successfully" : `No results found for "${searchQuery}"`,
+                {
+                    ...responseData,
+                    cached: false
+                }
+            );
+        }
+    );
+
+    public static getPopularSearchTerms = catchAsyncErrors(
+        async (req: Request, res: Response, next: NextFunction) => {
+            const cacheKey = "popular:search:terms";
+
+            // Check cache first
+            const cachedTerms = await redis.get(cacheKey);
+            if (cachedTerms) {
+                return handleResponse(req, res, 200, "Popular terms fetched (cached)", {
+                    terms: JSON.parse(cachedTerms),
+                    cached: true
+                });
+            }
+
+            const popularItems = await ItemModel.aggregate([
+                { $match: { deletedAt: { $exists: false } } },
+                { $sort: { views: -1, isTrending: -1 } },
+                { $limit: 10 },
+                {
+                    $project: {
+                        _id: 1,
+                        term: "$itemName",
+                        category: "$itemCategory"
+                    }
+                }
+            ]);
+
+            const terms = popularItems.map((item: any) => ({
+                id: item._id,
+                term: item.term
+            }));
+
+            // Cache for 1 hour
+            await redis.set(cacheKey, JSON.stringify(terms), { EX: 3600 });
+
+            return handleResponse(req, res, 200, "Popular terms fetched successfully", {
+                terms,
+                cached: false
+            });
+        }
+    );
+
+    public static saveRecentSearch = catchAsyncErrors(
+        async (req: Request, res: Response, next: NextFunction) => {
+            const userId = (req as any).user?._id;
+            const { query, itemId, itemName, itemImage } = req.body;
+
+            if (!userId) {
+                return next(new ApiError(401, "User not authenticated"));
+            }
+
+            if (!query || typeof query !== 'string' || query.trim().length < 2) {
+                return next(new ApiError(400, "Valid search query is required (min 2 characters)"));
+            }
+
+            const searchQuery = query.trim().toLowerCase();
+            const redisKey = `recent:searches:${userId}`;
+            const MAX_RECENT_SEARCHES = 10;
+
+            const searchEntry = JSON.stringify({
+                query: searchQuery,
+                displayQuery: query.trim(),
+                itemId: itemId || null,
+                itemName: itemName || null,
+                itemImage: itemImage || null,
+                timestamp: Date.now()
+            });
+
+            const existingSearches = await redis.lRange(redisKey, 0, -1);
+            
+            for (let i = 0; i < existingSearches.length; i++) {
+                try {
+                    const searchItem = existingSearches[i];
+                    if (!searchItem) continue;
+                    const parsed = JSON.parse(searchItem);
+                    if (parsed.query === searchQuery) {
+                        await redis.lRem(redisKey, 1, searchItem);
+                        break;
+                    }
+                } catch (e) {
+                    // Skip invalid entries
+                }
+            }
+
+            await redis.lPush(redisKey, searchEntry);
+
+            await redis.lTrim(redisKey, 0, MAX_RECENT_SEARCHES - 1);
+
+            await redis.expire(redisKey, 30 * 24 * 60 * 60);
+
+            return handleResponse(req, res, 201, "Search saved successfully", {
+                query: searchQuery,
+                saved: true
+            });
+        }
+    );
+
+    public static getRecentSearches = catchAsyncErrors(
+        async (req: Request, res: Response, next: NextFunction) => {
+            const userId = (req as any).user?._id;
+            const { limit = 10 } = req.query;
+
+            if (!userId) {
+                return next(new ApiError(401, "User not authenticated"));
+            }
+
+            const maxLimit = Math.min(parseInt(limit as string) || 10, 20);
+            const redisKey = `recent:searches:${userId}`;
+
+
+            const recentSearches = await redis.lRange(redisKey, 0, maxLimit - 1);
+
+            if (!recentSearches || recentSearches.length === 0) {
+                return handleResponse(req, res, 200, "No recent searches found", {
+                    searches: [],
+                    count: 0
+                });
+            }
+
+            const formattedSearches = recentSearches
+                .map((search: string, index: number) => {
+                    try {
+                        const parsed = JSON.parse(search);
+                        return {
+                            id: index,
+                            query: parsed.displayQuery || parsed.query,
+                            itemId: parsed.itemId,
+                            itemName: parsed.itemName,
+                            itemImage: parsed.itemImage,
+                            timestamp: parsed.timestamp,
+                            timeAgo: getTimeAgo(parsed.timestamp)
+                        };
+                    } catch (e) {
+                        return null;
+                    }
+                })
+                .filter((search: any) => search !== null);
+
+            return handleResponse(req, res, 200, "Recent searches fetched successfully", {
+                searches: formattedSearches,
+                count: formattedSearches.length
+            });
+        }
+    );
+
+    public static deleteRecentSearch = catchAsyncErrors(
+        async (req: Request, res: Response, next: NextFunction) => {
+            const userId = (req as any).user?._id;
+            const { query } = req.params;
+
+            if (!userId) {
+                return next(new ApiError(401, "User not authenticated"));
+            }
+
+            if (!query) {
+                return next(new ApiError(400, "Search query is required"));
+            }
+
+            const searchQuery = decodeURIComponent(query).toLowerCase();
+            const redisKey = `recent:searches:${userId}`;
+
+            const existingSearches = await redis.lRange(redisKey, 0, -1);
+            let deleted = false;
+
+            for (const search of existingSearches) {
+                try {
+                    const parsed = JSON.parse(search);
+                    if (parsed.query === searchQuery) {
+                        await redis.lRem(redisKey, 1, search);
+                        deleted = true;
+                        break;
+                    }
+                } catch (e) {
+                    // Skip invalid entries
+                }
+            }
+
+            return handleResponse(req, res, 200, 
+                deleted ? "Search deleted successfully" : "Search not found", 
+                { deleted, query: searchQuery }
+            );
+        }
+    );
+
+    public static clearRecentSearches = catchAsyncErrors(
+        async (req: Request, res: Response, next: NextFunction) => {
+            const userId = (req as any).user?._id;
+
+            if (!userId) {
+                return next(new ApiError(401, "User not authenticated"));
+            }
+
+            const redisKey = `recent:searches:${userId}`;
+
+            await redis.del(redisKey);
+
+            return handleResponse(req, res, 200, "All recent searches cleared", {
+                cleared: true
+            });
         }
     );
 }
