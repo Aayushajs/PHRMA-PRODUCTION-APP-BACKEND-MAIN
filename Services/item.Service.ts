@@ -1008,11 +1008,11 @@ export default class ItemServices {
      */
     public static addToRecentlyViewedItems = catchAsyncErrors(
         async (req: Request, res: Response, next: NextFunction) => {
-            const { itemId } = req.params;
+            const { itemId } = req.query;
             const userId = req.user?._id;
 
-            if (!itemId) {
-                return next(new ApiError(400, "Item ID is required"));
+            if (!itemId || typeof itemId !== 'string') {
+                return next(new ApiError(400, "Item ID is required as query parameter"));
             }
 
             if (!userId) {
