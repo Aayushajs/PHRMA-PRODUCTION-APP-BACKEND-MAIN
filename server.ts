@@ -58,11 +58,10 @@ const httpServer = createServer(app);
 
 // Initialize Socket.IO
 const io = initializeSocket(httpServer);
-console.log(' Socket.IO initialized');
 
 httpServer.listen(PORT, '0.0.0.0', async () => {
-  console.log(`Server is running on http://0.0.0.0:${PORT}`);
-  console.log(`✅ WebSocket server ready on ws://0.0.0.0:${PORT}`);
+  console.log(`✅ Server is running on http://localhost:${PORT}`);
+  console.log(`✅ WebSocket server ready on ws://localhost:${PORT}`);
   
   // Start keep-alive cron job to prevent cold starts on Render
   if (process.env.NODE_ENV === 'production') {

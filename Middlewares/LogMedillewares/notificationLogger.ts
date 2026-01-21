@@ -81,9 +81,8 @@ export class NotificationService {
       emitNotification(userId.toString(), {
         title,
         message: body,
-        type: options.type === 'ORDER_STATUS' ? 'info' : 
-              options.type === 'FEATURED' ? 'success' : 
-              options.type === 'ADVERTISEMENT' ? 'info' : 'info'
+        type: options.type === 'FEATURED_CREATED' || options.type === 'FEATURED_UPDATED' ? 'success' : 
+              options.type === 'AD_CREATED' || options.type === 'AD_UPDATED' || options.type === 'AD_CLICKED' ? 'info' : 'info'
       });
     } catch (error: any) {
       status = 'FAILED';
@@ -178,9 +177,8 @@ export class NotificationService {
             emitNotification(user._id.toString(), {
               title,
               message: body,
-              type: options.type === 'ORDER_STATUS' ? 'info' : 
-                    options.type === 'FEATURED' ? 'success' : 
-                    options.type === 'ADVERTISEMENT' ? 'info' : 'info'
+              type: options.type === 'FEATURED_CREATED' || options.type === 'FEATURED_UPDATED' ? 'success' : 
+                    options.type === 'AD_CREATED' || options.type === 'AD_UPDATED' || options.type === 'AD_CLICKED' ? 'info' : 'info'
             });
           }
         } catch (logError) {
@@ -248,8 +246,7 @@ export class NotificationService {
         sentAt: new Date()
       };
 
-      const notificationLog = await NotificationLogModel.create(logData);
-      return notificationLog;
+      return await NotificationLogModel.create(logData);
     } catch (error: any) {
       throw new Error(`Failed to create notification log: ${error.message}`);
     }
