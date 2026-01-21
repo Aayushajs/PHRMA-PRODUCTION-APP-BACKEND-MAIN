@@ -145,10 +145,10 @@ export const emitCategoryViewUpdate = (userId: string, categoryId: string) => {
 /**
  * Emit wishlist update to specific user
  * @param userId - User ID
- * @param action - 'added' or 'removed'
+ * @param action - 'added', 'removed', or 'cleared'
  * @param item - Item data
  */
-export const emitWishlistUpdate = (userId: string, action: 'added' | 'removed', item: any) => {
+export const emitWishlistUpdate = (userId: string, action: 'added' | 'removed' | 'cleared', item: any) => {
   try {
     const io = getIO();
     io.to(`user:${userId}`).emit('wishlist:update', {

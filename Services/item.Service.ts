@@ -409,7 +409,7 @@ export default class ItemServices {
             res: Response,
             next: NextFunction
         ) => {
-            const itemId = req.params.itemId;
+            const { itemId } = req.params;
             const updateData = req.body;
 
             if (
@@ -452,7 +452,7 @@ export default class ItemServices {
                 }
             }
 
-            let itemFinalPrice = existingItem.itemFinalPrice;
+            let { itemFinalPrice } = existingItem;
             if (updateData.itemInitialPrice || updateData.itemGst) {
                 const basePrice = Number(updateData.itemInitialPrice ?? existingItem.itemInitialPrice);
                 const gstId = updateData.itemGST ?? existingItem.itemGST;
@@ -495,7 +495,7 @@ export default class ItemServices {
             res: Response,
             next: NextFunction
         ) => {
-            const itemId = req.params.itemId;
+            const { itemId } = req.params;
 
             const existingItem = await ItemModel.findById(itemId);
             if (!existingItem) {
@@ -910,7 +910,7 @@ export default class ItemServices {
             res: Response,
             next: NextFunction
         ) => {
-            const categoryId = req.params.categoryId;
+            const { categoryId } = req.params;
             const [page, limit] = [+(req.query.page ?? 1), +(req.query.limit ?? 10)];
 
             const redisKey = `items:category=${categoryId}:page=${page}:limit=${limit}`;
@@ -1031,11 +1031,11 @@ export default class ItemServices {
      */
     public static addToRecentlyViewedItems = catchAsyncErrors(
         async (req: Request, res: Response, next: NextFunction) => {
-            const { itemId } = req.query;
+            const { itemId } = req.body;
             const userId = req.user?._id;
 
             if (!itemId || typeof itemId !== 'string') {
-                return next(new ApiError(400, "Item ID is required as query parameter"));
+                return next(new ApiError(400, "Item ID is required in request body"));
             }
 
             if (!userId) {
@@ -1393,10 +1393,8 @@ export default class ItemServices {
                 let score = 0;
 
                 // A. User Affinity (Weight: 45%)
-                if (userProfile) {
-                    if (userProfile.viewedCategories?.some((c: any) => c.toString() === item.itemCategory?.toString())) {
-                        score += 30;
-                    }
+                if (userProfile && userProfile.viewedCategories?.some((c: any) => c.toString() === item.itemCategory?.toString())) {
+                    score += 30;
                 }
 
                 // B. Global Trend Signals (Weight: 25%)

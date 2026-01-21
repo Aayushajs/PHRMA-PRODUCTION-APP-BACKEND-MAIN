@@ -47,7 +47,7 @@ itemsRouter.get("/similar/:itemId", ItemServices.getSimilarProducts);
 
 itemsRouter.get("/GetRecentlyViewedItems", authenticatedUserMiddleware, ItemServices.getRecentlyViewedItems);
 
-itemsRouter.post("/AddToRecentlyViewedItems/:itemId", authenticatedUserMiddleware, ItemServices.addToRecentlyViewedItems);
+itemsRouter.post("/AddToRecentlyViewedItems", authenticatedUserMiddleware, ItemServices.addToRecentlyViewedItems);
 
 itemsRouter.delete("/wishlist/remove/:itemId", authenticatedUserMiddleware, ItemServices.removeFromWishlist);
 
