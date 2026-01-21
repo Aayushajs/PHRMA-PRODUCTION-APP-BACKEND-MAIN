@@ -1824,7 +1824,7 @@ export default class ItemServices {
             }
 
             // Emit real-time WebSocket event
-            emitWishlistUpdate(userId.toString(), 'cleared', null);
+            emitWishlistUpdate(userId.toString(), 'removed', null);
 
             return handleResponse(
                 req, 

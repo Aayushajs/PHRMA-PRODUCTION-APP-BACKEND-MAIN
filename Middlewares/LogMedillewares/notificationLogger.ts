@@ -23,7 +23,13 @@ type NotificationType =
   | 'AD_CLICKED' 
   | 'FEATURED_CREATED' 
   | 'FEATURED_UPDATED' 
-  | 'OTHER';
+  | 'OTHER'
+  | "ORDER_STATUS"      // Add this
+  | "FEATURED"          // Add this  
+  | "ADVERTISEMENT"     // Add this
+  | "PROMO"
+  | "SYSTEM"
+  | "ALERT";
 
 type EntityType = 'Category' | 'Advertisement' | 'FeaturedMedicine' | 'User' | 'Other';
 
