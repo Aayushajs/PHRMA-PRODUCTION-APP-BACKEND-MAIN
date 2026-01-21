@@ -127,14 +127,14 @@ export const emitTrendingProductsUpdate = (products: any[]) => {
 /**
  * Emit category viewed to specific user
  * @param userId - User ID
- * @param categoryId - Category ID
+ * @param category - Category data
  */
-export const emitCategoryViewUpdate = (userId: string, categoryId: string) => {
+export const emitCategoryViewUpdate = (userId: string, category: any) => {
   try {
     const io = getIO();
     io.to(`user:${userId}`).emit('categoryViewed:update', {
       type: 'category_viewed',
-      data: { categoryId },
+      data: category,
       timestamp: Date.now()
     });
   } catch (error) {

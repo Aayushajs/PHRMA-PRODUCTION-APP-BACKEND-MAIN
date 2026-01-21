@@ -28,6 +28,7 @@ import {
   CATEGORY_CONSTANTS,
 } from "../types/Category";
 import User from "../Databases/Models/user.Models";
+import { emitCategoryViewUpdate } from "../Utils/socketEmitters";
 import NotificationService from "../Middlewares/LogMedillewares/notificationLogger";
 
 const {
@@ -882,6 +883,19 @@ export default class CategoryService {
 
       // Invalidate Redis Cache
       await deleteCache(`recently_viewed_categories:${userId}`);
+
+      // Emit real-time WebSocket event
+      const categoryData = await CategoryModel.findById(categoryId)
+        .select('_id name imageUrl')
+        .lean();
+      
+      if (categoryData) {
+        emitCategoryViewUpdate(userId.toString(), {
+          _id: categoryData._id,
+          name: categoryData.name,
+          imageUrl: (categoryData as any).imageUrl?.[0] || null
+        });
+      }
 
       return handleResponse(req, res, 200, "Recently viewed category updated");
     }
