@@ -1084,7 +1084,7 @@ export default class ItemServices {
                 }
             };
 
-            console.log("Response data prepared:", responseData);
+            // console.log("Response data prepared:", responseData);
             // Cache the result (even if empty) to prevent repeated DB queries
             await redis.set(cacheKey, JSON.stringify(responseData), { EX: 3600 });
 
