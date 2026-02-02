@@ -911,39 +911,190 @@ export default class ItemServices {
             next: NextFunction
         ) => {
             const { categoryId } = req.params;
-            const [page, limit] = [+(req.query.page ?? 1), +(req.query.limit ?? 10)];
+            const {
+                page = 1,
+                limit = 20,
+                minPrice,
+                maxPrice,
+                minRating,
+                minDiscount,
+                isTrending,
+                sortBy = 'createdAt',
+                order = 'desc'
+            } = req.query;
 
-            const redisKey = `items:category=${categoryId}:page=${page}:limit=${limit}`;
-            const cachedItems = await redis.get(redisKey);
-            if (cachedItems) {
-                let items = JSON.parse(cachedItems);
-                // Shuffle cached items too
-                for (let i = items.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [items[i], items[j]] = [items[j], items[i]];
+            if (!mongoose.isValidObjectId(categoryId)) {
+                return next(new ApiError(400, "Invalid category ID"));
+            }
+
+            const pageNum = parseInt(page as string) || 1;
+            const limitNum = Math.min(100, parseInt(limit as string) || 20);
+            const skip = (pageNum - 1) * limitNum;
+
+            // Build filter query - Convert categoryId to ObjectId
+            const filterQuery: any = {
+                itemCategory: new mongoose.Types.ObjectId(categoryId),
+                deletedAt: { $exists: false }
+            };
+
+            // console.log("Initial filter query:", filterQuery);
+
+            // Price filters
+            if (minPrice || maxPrice) {
+                filterQuery.itemFinalPrice = {};
+                if (minPrice) {
+                    filterQuery.itemFinalPrice.$gte = parseFloat(minPrice as string);
                 }
-                return handleResponse(req, res, 200, "Items retrieved successfully", items);
+                if (maxPrice) {
+                    filterQuery.itemFinalPrice.$lte = parseFloat(maxPrice as string);
+                }
             }
 
-            let items: any = await ItemModel.find({ itemCategory: categoryId })
-                .skip((page - 1) * limit)
-                .limit(limit);
-
-            if (items.length === 0) {
-                return next(
-                    new ApiError(404, "No items found")
-                );
+            // Rating filter
+            if (minRating) {
+                filterQuery.itemRatings = {
+                    $gte: parseFloat(minRating as string)
+                };
             }
 
-            // Fisher-Yates shuffle before caching
+            // Discount filter
+            if (minDiscount) {
+                filterQuery.itemDiscount = {
+                    $gte: parseFloat(minDiscount as string)
+                };
+            }
+
+            // Trending filter
+            if (isTrending === 'true') {
+                filterQuery.isTrending = true;
+            }
+
+            const cacheKey = `items:category:${categoryId}:${crypto.createHash('md5')
+                .update(JSON.stringify({ 
+                    ...filterQuery, 
+                    page: pageNum, 
+                    limit: limitNum,
+                    sortBy,
+                    order 
+                }))
+                .digest('hex')}`;
+
+                // console.log("Cache Key:", cacheKey);
+
+            const cachedItems = await redis.get(cacheKey);
+            if (cachedItems) {
+                // console.log("Cache Items : ", JSON.parse(cachedItems));
+                // console.log("Cache Items : ", JSON.parse(cachedItems).items.length);
+                return handleResponse(req, res, 200, "Items retrieved from cache", JSON.parse(cachedItems));
+            }
+
+            // Sort configuration
+            const sortOrder = order === 'asc' ? 1 : -1;
+            const sortConfig: any = {};
+            
+            const validSortFields = [
+                'itemName', 'itemFinalPrice', 'itemInitialPrice', 
+                'itemDiscount', 'itemRatings', 'views', 'createdAt', 
+                'updatedAt', 'itemCompany'
+            ];
+            
+            if (validSortFields.includes(sortBy as string)) {
+                sortConfig[sortBy as string] = sortOrder;
+            } else {
+                sortConfig.createdAt = -1;
+            }
+
+            // Aggregation pipeline
+            const pipeline: any[] = [
+                { $match: filterQuery },
+                
+                {
+                    $lookup: {
+                        from: 'categories',
+                        localField: 'itemCategory',
+                        foreignField: '_id',
+                        as: 'categoryDetails'
+                    }
+                },
+                { $unwind: { path: '$categoryDetails', preserveNullAndEmptyArrays: true } },
+
+                { $sort: sortConfig },
+                
+                {
+                    $facet: {
+                        items: [
+                            { $skip: skip },
+                            { $limit: limitNum },
+                            {
+                                $project: {
+                                    _id: 1,
+                                    itemName: 1,
+                                    code: 1,
+                                    itemDescription: 1,
+                                    itemImages: 1,
+                                    itemInitialPrice: 1,
+                                    itemFinalPrice: 1,
+                                    itemDiscount: 1,
+                                    itemCompany: 1,
+                                    itemRatings: 1,
+                                    views: 1,
+                                    isTrending: 1,
+                                    formula: 1,
+                                    HSNCode: 1,
+                                    weight: 1,
+                                    itemMfgDate: 1,
+                                    itemExpiryDate: 1,
+                                    createdAt: 1,
+                                    category: {
+                                        _id: '$categoryDetails._id',
+                                        name: '$categoryDetails.name',
+                                        imageUrl: '$categoryDetails.imageUrl'
+                                    }
+                                }
+                            }
+                        ],
+                        totalCount: [{ $count: 'count' }]
+                    }
+                }
+            ];
+
+            const [result] = await ItemModel.aggregate(pipeline);
+
+            const totalItems = result?.totalCount[0]?.count || 0;
+            let items = result?.items || [];
+
+            // O(n) Fisher-Yates Shuffle - Randomize items
             for (let i = items.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [items[i], items[j]] = [items[j], items[i]];
             }
 
-            await redis.set(redisKey, JSON.stringify(items), { EX: 3600 });
+            const responseData = {
+                items,
+                pagination: {
+                    currentPage: pageNum,
+                    totalPages: Math.ceil(totalItems / limitNum),
+                    totalItems,
+                    itemsPerPage: limitNum,
+                    hasNextPage: pageNum < Math.ceil(totalItems / limitNum),
+                    hasPrevPage: pageNum > 1
+                },
+                filters: {
+                    applied: {
+                        categoryId,
+                        priceRange: (minPrice || maxPrice) ? { min: minPrice, max: maxPrice } : null,
+                        minRating: minRating || null,
+                        minDiscount: minDiscount || null,
+                        isTrending: isTrending || null
+                    }
+                }
+            };
 
-            handleResponse(req, res, 200, "Items retrieved successfully", items);
+            // console.log("Response data prepared:", responseData);
+            // Cache the result (even if empty) to prevent repeated DB queries
+            await redis.set(cacheKey, JSON.stringify(responseData), { EX: 3600 });
+
+            handleResponse(req, res, 200, "Items retrieved successfully", responseData);
         }
     )
 
@@ -1843,7 +1994,7 @@ export default class ItemServices {
             }
 
             // Emit real-time WebSocket event
-            emitWishlistUpdate(userId.toString(), 'cleared', null);
+            emitWishlistUpdate(userId.toString(), 'removed', null);
 
             return handleResponse(
                 req, 

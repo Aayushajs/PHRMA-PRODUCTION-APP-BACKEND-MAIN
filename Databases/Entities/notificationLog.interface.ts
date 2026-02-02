@@ -13,7 +13,7 @@ export interface INotificationLog extends Document {
   // User who received the notification
   userId: ObjectId;
 
-  type: 'CATEGORY_CREATED' | 'CATEGORY_UPDATED' | 'AD_CREATED' | 'AD_UPDATED' | 'AD_CLICKED' | 'FEATURED_CREATED' | 'FEATURED_UPDATED' | 'OTHER';
+  type: 'CATEGORY_CREATED' | 'CATEGORY_UPDATED' | 'AD_CREATED' | 'AD_UPDATED' | 'AD_CLICKED' | 'FEATURED_CREATED' | 'FEATURED_UPDATED' | 'OTHER' | 'ORDER_STATUS' | 'FEATURED' | 'ADVERTISEMENT' | 'PROMO' | 'SYSTEM' | 'ALERT';
   title: string;
   body: string;
 
