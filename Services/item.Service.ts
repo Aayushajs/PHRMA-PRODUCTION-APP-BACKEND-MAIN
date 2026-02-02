@@ -1057,7 +1057,13 @@ export default class ItemServices {
             const [result] = await ItemModel.aggregate(pipeline);
 
             const totalItems = result?.totalCount[0]?.count || 0;
-            const items = result?.items || [];
+            let items = result?.items || [];
+
+            // O(n) Fisher-Yates Shuffle - Randomize items
+            for (let i = items.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [items[i], items[j]] = [items[j], items[i]];
+            }
 
             const responseData = {
                 items,
@@ -1616,72 +1622,81 @@ export default class ItemServices {
 
             if (cachedGlobals) {
                 globalCandidates = JSON.parse(cachedGlobals);
-            } else {
+            }
+            
+            // Fetch fresh candidates if cache is empty or doesn't exist
+            if (globalCandidates.length === 0) {
                 // Optimized Aggregation Pipeline: Fetch enough candidates for scoring
                 globalCandidates = await ItemModel.aggregate([
                     {
-                        $match: { deletedAt: { $exists: false } } // Correctly filter active items
+                        $match: {} // No restrictive filters - get all active items
                     },
                     {
                         $sort: { views: -1, itemRatings: -1, createdAt: -1 } // Prioritize popular items
                     },
-                    { $limit: 50 }, // Pool size for scoring engine
+                    { $limit: 100 }, // Increased pool size for better variety
                     {
                         $project: {
                             _id: 1,
                             itemName: 1,
                             itemDescription: 1,
                             itemRatings: 1,
-                            itemFinalPrice: 1, // Added for frontend
-                            // Performance: Slice image array in DB
+                            itemFinalPrice: 1,
                             itemImages: { $slice: ["$itemImages", 1] },
-                            // Scoring Signals
                             itemCategory: 1,
                             views: 1,
-                            itemDiscount: 1
+                            itemDiscount: 1,
+                            createdAt: 1
                         }
                     }
                 ]);
-                await redis.set(globalCacheKey, JSON.stringify(globalCandidates), { EX: 3600 });
+                
+                // Only cache if we have results
+                if (globalCandidates.length > 0) {
+                    await redis.set(globalCacheKey, JSON.stringify(globalCandidates), { EX: 3600 });
+                }
+            }
+
+            // Safety check - if still no items, return empty array
+            if (!globalCandidates || globalCandidates.length === 0) {
+                return handleResponse(req, res, 200, "AI Trending Products", []);
             }
 
             // --- 3. AI Scoring Engine (In-Memory Microservice Logic) ---
             const scoredItems = globalCandidates.map(item => {
-                let score = 0;
+                let score = 100; // Base score to ensure ranking even for new items
 
                 // A. User Affinity (Weight: 45%)
                 if (userProfile && userProfile.viewedCategories?.some((c: any) => c.toString() === item.itemCategory?.toString())) {
-                    score += 30;
+                    score += 45;
                 }
 
                 // B. Global Trend Signals (Weight: 25%)
-                if ((item.views || 0) > 100) score += 15;
+                const viewScore = Math.min((item.views || 0) / 10, 15); // Normalize views
+                score += viewScore;
+                
                 if ((item.itemDiscount || 0) > 20) score += 10;
 
                 // C. Product Quality (Weight: 15%)
-                if ((item.itemRatings || 0) >= 4.5) score += 15;
+                const ratingScore = Math.min(((item.itemRatings || 0) / 5) * 15, 15); // Normalize rating
+                score += ratingScore;
 
-                // D. Seasonality (Weight: 15%)
-                // (Simplified Regex Logic)
-                const currentMonth = new Date().getMonth();
-                const isWinter = [10, 11, 0, 1].includes(currentMonth);
-                const nameLower = (item.itemName || "").toLowerCase();
-
-                if (isWinter && (nameLower.includes("code") || nameLower.includes("syrup"))) score += 20; // Example keywords
+                // D. Recency Boost (Weight: 5%)
+                const ageInDays = (Date.now() - new Date(item.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+                if (ageInDays < 7) score += 5; // Recent items get small boost
 
                 return { ...item, finalScore: score };
             });
 
-            // --- 4. Final Sort & Strict Formatting ---
-            scoredItems.sort((a, b) => b.finalScore - a.finalScore);
-
-            if (scoredItems.length > 5) {
-                const rand = Math.random();
-                if (rand > 0.5) [scoredItems[0], scoredItems[1]] = [scoredItems[1], scoredItems[0]];
+            // --- 4. Fisher-Yates Shuffle for True Randomization ---
+            const shuffled = [...scoredItems];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
             }
 
-            // Strictly requested fields: id, name, description, image, rating
-            const formattedResponse = scoredItems.slice(0, 20).map(i => ({
+            // Strictly requested fields: id, name, description, image, rating (Max 15 items)
+            const formattedResponse = shuffled.slice(0, 15).map(i => ({
                 _id: i._id,
                 itemName: i.itemName,
                 itemDescription: i.itemDescription || "",
@@ -2465,7 +2480,8 @@ export default class ItemServices {
 
     public static getPopularSearchTerms = catchAsyncErrors(
         async (req: Request, res: Response, next: NextFunction) => {
-            const cacheKey = "popular:search:terms";
+            const cacheKey = "popular:search:terms:v2";
+            const LIMIT = 10;
 
             // Check cache first
             const cachedTerms = await redis.get(cacheKey);
@@ -2476,26 +2492,22 @@ export default class ItemServices {
                 });
             }
 
-            const popularItems = await ItemModel.aggregate([
-                { $match: { deletedAt: { $exists: false } } },
-                { $sort: { views: -1, isTrending: -1 } },
-                { $limit: 10 },
-                {
-                    $project: {
-                        _id: 1,
-                        term: "$itemName",
-                        category: "$itemCategory"
-                    }
-                }
-            ]);
+            // O(n) optimized: Single query with lean() for speed
+            const popularItems = await ItemModel.find({})
+                .select("_id itemName views isTrending")
+                .sort({ views: -1, isTrending: -1 })
+                .limit(LIMIT)
+                .lean()
+                .exec();
 
+            // O(n) formatting - safely map
             const terms = popularItems.map((item: any) => ({
                 id: item._id,
-                term: item.term
+                term: item.itemName
             }));
 
-            // Cache for 1 hour
-            await redis.set(cacheKey, JSON.stringify(terms), { EX: 3600 });
+            // Cache for 24 hours
+            await redis.set(cacheKey, JSON.stringify(terms), { EX: 86400 });
 
             return handleResponse(req, res, 200, "Popular terms fetched successfully", {
                 terms,
