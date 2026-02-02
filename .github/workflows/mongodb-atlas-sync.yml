@@ -141,6 +141,7 @@ jobs:
             --gzip \
             --numParallelCollections=4 \
             --numInsertionWorkersPerCollection=2 \
+            --noOptionsRestore \
             --verbose"
           
           # Add --drop flag if requested (default: true)
