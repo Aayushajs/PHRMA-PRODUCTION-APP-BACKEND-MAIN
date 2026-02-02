@@ -110,6 +110,20 @@ jobs:
       # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
       # STEP 4: Restore Data to Testing Atlas Database
       # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      # ADD THIS TEMPORARY DEBUG STEP HERE (between line 112 and 113)
+      - name: 🧪 Debug - Check Testing MongoDB URI (Remove after fixing!)
+        env:
+          TEST_MONGO_URI: ${{ secrets.TESTING_MONGO_URI }}
+        run: |
+          echo "Checking if TESTING_MONGO_URI secret is set..."
+          if [ -z "$TEST_MONGO_URI" ]; then
+            echo "❌ ERROR: TESTING_MONGO_URI secret is empty or not set!"
+            exit 1
+          else
+            echo "✅ TESTING_MONGO_URI secret exists"
+            # Show only the first 20 characters (don't expose full credentials)
+            echo "Preview: ${TEST_MONGO_URI:0:20}..."
+          fi
       - name: 📥 Restore to Testing Database
         env:
           TEST_MONGO_URI: ${{ secrets.TESTING_MONGO_URI }}
