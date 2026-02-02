@@ -21,7 +21,7 @@ import { gstModel } from '../Databases/Models/gst.Model'
 import mongoose from "mongoose";
 import { MRPVerificationService } from './mrpVerification.Service';
 import crypto from 'crypto';
-import {getTimeAgo} from "../Utils/timerHelperFn";
+import { getTimeAgo } from "../Utils/timerHelperFn";
 import { emitRecentlyViewedUpdate, emitNewProductAdded, emitWishlistUpdate } from '../Utils/socketEmitters';
 
 
@@ -629,21 +629,21 @@ export default class ItemServices {
             const {
                 page = 1,
                 limit = 20,
-                category,          
-                company,           
-                minPrice,          
-                maxPrice,          
-                priceRange,        
-                minDiscount,       
-                minRating,         
-                formula,           
-                HSNCode,         
-                search,           
-                sortBy = 'createdAt',  
-                order = 'desc',    
-                isTrending,        
-                inStock,           
-                
+                category,
+                company,
+                minPrice,
+                maxPrice,
+                priceRange,
+                minDiscount,
+                minRating,
+                formula,
+                HSNCode,
+                search,
+                sortBy = 'createdAt',
+                order = 'desc',
+                isTrending,
+                inStock,
+
             } = req.query;
 
             const pageNum = parseInt(page as string) || 1;
@@ -658,7 +658,7 @@ export default class ItemServices {
                 const categoryIds = (category as string).split(',')
                     .filter(id => mongoose.isValidObjectId(id))
                     .map(id => new mongoose.Types.ObjectId(id));
-                
+
                 if (categoryIds.length > 0) {
                     filterQuery.itemCategory = { $in: categoryIds };
                 }
@@ -666,8 +666,8 @@ export default class ItemServices {
 
             // Company filter (case-insensitive)
             if (company) {
-                filterQuery.itemCompany = { 
-                    $regex: new RegExp(company as string, 'i') 
+                filterQuery.itemCompany = {
+                    $regex: new RegExp(company as string, 'i')
                 };
             }
 
@@ -698,22 +698,22 @@ export default class ItemServices {
 
             // Discount filter
             if (minDiscount) {
-                filterQuery.itemDiscount = { 
-                    $gte: parseFloat(minDiscount as string) 
+                filterQuery.itemDiscount = {
+                    $gte: parseFloat(minDiscount as string)
                 };
             }
 
             // Rating filter
             if (minRating) {
-                filterQuery.itemRatings = { 
-                    $gte: parseFloat(minRating as string) 
+                filterQuery.itemRatings = {
+                    $gte: parseFloat(minRating as string)
                 };
             }
 
             // Medicine-specific filters
             if (formula) {
-                filterQuery.formula = { 
-                    $regex: new RegExp(formula as string, 'i') 
+                filterQuery.formula = {
+                    $regex: new RegExp(formula as string, 'i')
                 };
             }
 
@@ -738,12 +738,12 @@ export default class ItemServices {
             }
 
             const cacheKey = `items:filtered:${crypto.createHash('md5')
-                .update(JSON.stringify({ 
-                    ...filterQuery, 
-                    page: pageNum, 
-                    limit: limitNum, 
-                    sortBy, 
-                    order 
+                .update(JSON.stringify({
+                    ...filterQuery,
+                    page: pageNum,
+                    limit: limitNum,
+                    sortBy,
+                    order
                 }))
                 .digest('hex')}`;
 
@@ -751,10 +751,10 @@ export default class ItemServices {
             const cachedItems = await redis.get(cacheKey);
             if (cachedItems) {
                 return handleResponse(
-                    req, 
-                    res, 
-                    200, 
-                    "Items retrieved from cache", 
+                    req,
+                    res,
+                    200,
+                    "Items retrieved from cache",
                     JSON.parse(cachedItems)
                 );
             }
@@ -764,14 +764,14 @@ export default class ItemServices {
             // ============================================================
             const sortOrder = order === 'asc' ? 1 : -1;
             const sortConfig: any = {};
-            
+
             // Validate sortBy field
             const validSortFields = [
-                'itemName', 'itemFinalPrice', 'itemInitialPrice', 
-                'itemDiscount', 'itemRatings', 'views', 'createdAt', 
+                'itemName', 'itemFinalPrice', 'itemInitialPrice',
+                'itemDiscount', 'itemRatings', 'views', 'createdAt',
                 'updatedAt', 'itemCompany'
             ];
-            
+
             if (validSortFields.includes(sortBy as string)) {
                 sortConfig[sortBy as string] = sortOrder;
             } else {
@@ -781,7 +781,7 @@ export default class ItemServices {
 
             const pipeline: any[] = [
                 { $match: filterQuery },
-                
+
                 {
                     $lookup: {
                         from: 'categories',
@@ -793,7 +793,7 @@ export default class ItemServices {
                 { $unwind: { path: '$categoryDetails', preserveNullAndEmptyArrays: true } },
 
                 { $sort: sortConfig },
-                
+
                 {
                     $facet: {
                         items: [
@@ -828,7 +828,7 @@ export default class ItemServices {
                             }
                         ],
                         totalCount: [{ $count: 'count' }],
-                        
+
                         // Aggregated statistics
                         stats: [
                             {
@@ -852,7 +852,7 @@ export default class ItemServices {
             const items = result?.items || [];
             const stats = result?.stats[0] || {};
 
-            
+
             const responseData = {
                 items,
                 pagination: {
@@ -895,10 +895,10 @@ export default class ItemServices {
             await redis.set(cacheKey, JSON.stringify(responseData), { EX: 600 });
 
             return handleResponse(
-                req, 
-                res, 
-                200, 
-                "Items retrieved successfully", 
+                req,
+                res,
+                200,
+                "Items retrieved successfully",
                 responseData
             );
         }
@@ -979,25 +979,21 @@ export default class ItemServices {
                 }))
                 .digest('hex')}`;
 
-                // console.log("Cache Key:", cacheKey);
-
             const cachedItems = await redis.get(cacheKey);
             if (cachedItems) {
-                // console.log("Cache Items : ", JSON.parse(cachedItems));
-                // console.log("Cache Items : ", JSON.parse(cachedItems).items.length);
                 return handleResponse(req, res, 200, "Items retrieved from cache", JSON.parse(cachedItems));
             }
 
             // Sort configuration
             const sortOrder = order === 'asc' ? 1 : -1;
             const sortConfig: any = {};
-            
+
             const validSortFields = [
                 'itemName', 'itemFinalPrice', 'itemInitialPrice', 
                 'itemDiscount', 'itemRatings', 'views', 'createdAt', 
                 'updatedAt', 'itemCompany'
             ];
-            
+
             if (validSortFields.includes(sortBy as string)) {
                 sortConfig[sortBy as string] = sortOrder;
             } else {
@@ -1007,7 +1003,7 @@ export default class ItemServices {
             // Aggregation pipeline
             const pipeline: any[] = [
                 { $match: filterQuery },
-                
+
                 {
                     $lookup: {
                         from: 'categories',
@@ -1019,7 +1015,7 @@ export default class ItemServices {
                 { $unwind: { path: '$categoryDetails', preserveNullAndEmptyArrays: true } },
 
                 { $sort: sortConfig },
-                
+
                 {
                     $facet: {
                         items: [
@@ -1092,6 +1088,110 @@ export default class ItemServices {
         }
     )
 
+    // public static getItemsByCategory = catchAsyncErrors(
+    //     async (req: Request, res: Response, next: NextFunction) => {
+
+    //         const { categoryId } = req.params;
+
+    //         const {
+    //             page = 1,
+    //             limit = 20,
+    //             minPrice,
+    //             maxPrice,
+    //             minRating,
+    //             minDiscount,
+    //             isTrending,
+    //             sortBy = 'createdAt',
+    //             order = 'desc'
+    //         } = req.query;
+
+    //         if (!mongoose.isValidObjectId(categoryId)) {
+    //             return next(new ApiError(400, "Invalid category ID"));
+    //         }
+
+    //         const pageNum = parseInt(page as string) || 1;
+    //         const limitNum = Math.min(100, parseInt(limit as string) || 20);
+    //         const skip = (pageNum - 1) * limitNum;
+
+    //         const filterQuery: any = {
+    //             itemCategory: new mongoose.Types.ObjectId(categoryId),
+    //             deletedAt: { $exists: false }
+    //         };
+
+    //         if (minPrice || maxPrice) {
+    //             filterQuery.itemFinalPrice = {};
+    //             if (minPrice) filterQuery.itemFinalPrice.$gte = +minPrice;
+    //             if (maxPrice) filterQuery.itemFinalPrice.$lte = +maxPrice;
+    //         }
+
+    //         if (minRating) filterQuery.itemRatings = { $gte: +minRating };
+    //         if (minDiscount) filterQuery.itemDiscount = { $gte: +minDiscount };
+    //         if (isTrending === 'true') filterQuery.isTrending = true;
+
+    //         // const cacheKey = `items:${categoryId}:${pageNum}:${limitNum}`;
+
+    //         // const cached = await redis.get(cacheKey);
+    //         // if (cached) {
+    //         //     return handleResponse(req, res, 200, "From cache", JSON.parse(cached));
+    //         // }
+
+    //         const sortOrder = order === 'asc' ? 1 : -1;
+
+    //         const sortConfig: any = {
+    //             [sortBy as string]: sortOrder
+    //         };
+
+    //         const pipeline: any[] = [
+    //             { $match: filterQuery },
+    //             { $sort: sortConfig },
+    //             { $skip: skip },
+    //             { $limit: limitNum },
+    //             {
+    //                 $lookup: {
+    //                     from: 'categories',
+    //                     localField: 'itemCategory',
+    //                     foreignField: '_id',
+    //                     as: 'categoryDetails'
+    //                 }
+    //             },
+    //             { $unwind: { path: '$categoryDetails', preserveNullAndEmptyArrays: true } },
+    //             {
+    //                 $project: {
+    //                     itemName: 1,
+    //                     itemFinalPrice: 1,
+    //                     itemDiscount: 1,
+    //                     itemRatings: 1,
+    //                     views: 1,
+    //                     createdAt: 1,
+    //                     category: {
+    //                         _id: '$categoryDetails._id',
+    //                         name: '$categoryDetails.name'
+    //                     }
+    //                 }
+    //             }
+    //         ];
+
+    //         const [items, totalItems] = await Promise.all([
+    //             ItemModel.aggregate(pipeline),
+    //             ItemModel.countDocuments(filterQuery)
+    //         ]);
+
+    //         const responseData = {
+    //             items,
+    //             pagination: {
+    //                 currentPage: pageNum,
+    //                 totalPages: Math.ceil(totalItems / limitNum),
+    //                 totalItems
+    //             }
+    //         };
+
+    //         // await redis.set(cacheKey, JSON.stringify(responseData), { EX: 3600 });
+
+    //         handleResponse(req, res, 200, "Items fetched", responseData);
+    //     }
+    // );
+
+
     public static getDealsOfTheDay = catchAsyncErrors(
         async (
             req: Request,
@@ -1150,8 +1250,8 @@ export default class ItemServices {
                 const discountPrice = +(deal.itemInitialPrice * (1 - ((deal.itemDiscount ?? 0) / 100))).toFixed(2);
                 const gstAmount = +(discountPrice * (gstRate / 100));
                 const finalPrice = +((discountPrice + gstAmount)).toFixed(2);
-            
-                
+
+
                 return {
                     _id: deal._id,
                     itemName: deal.itemName,
@@ -1181,11 +1281,11 @@ export default class ItemServices {
         }
     )
 
-     /**
-     * Logic:
-     * - If itemId starts with "wishlistitem" → Add to wishlist (LIFO - most recent at top)
-     * - Otherwise → Add to recently viewed (FIFO - maintain last 15)
-     */
+    /**
+    * Logic:
+    * - If itemId starts with "wishlistitem" → Add to wishlist (LIFO - most recent at top)
+    * - Otherwise → Add to recently viewed (FIFO - maintain last 15)
+    */
     public static addToRecentlyViewedItems = catchAsyncErrors(
         async (req: Request, res: Response, next: NextFunction) => {
             const { itemId } = req.body;
@@ -1201,13 +1301,13 @@ export default class ItemServices {
 
 
             const isWishlistOperation = itemId.startsWith('wishlistitem');
-            
+
             let actualItemId: string;
-            
+
             if (isWishlistOperation) {
                 // Extract actual itemId: "wishlistitem64abc..." → "64abc..."
                 actualItemId = itemId.replace(/^wishlistitem/, '');
-                
+
                 if (!mongoose.isValidObjectId(actualItemId)) {
                     return next(new ApiError(400, "Invalid item ID format after wishlistitem prefix"));
                 }
@@ -1231,7 +1331,7 @@ export default class ItemServices {
 
                 // Atomic Operation 2: Add to beginning (index 0) - LIFO
                 await userModel.findByIdAndUpdate(userId, {
-                    $push: { 
+                    $push: {
                         wishlist: {
                             $each: [actualItemId],
                             $position: 0  // Add at index 0 (top of stack)
@@ -1263,11 +1363,11 @@ export default class ItemServices {
                 }
 
                 return handleResponse(
-                    req, 
-                    res, 
-                    200, 
+                    req,
+                    res,
+                    200,
                     "Item added to wishlist successfully (LIFO - at top)",
-                    { 
+                    {
                         operation: "wishlist",
                         itemId: actualItemId,
                         position: "top"
@@ -1276,7 +1376,7 @@ export default class ItemServices {
 
             } else {
                 actualItemId = itemId;
-                
+
                 if (!mongoose.isValidObjectId(actualItemId)) {
                     return next(new ApiError(400, "Invalid item ID format"));
                 }
@@ -1302,7 +1402,7 @@ export default class ItemServices {
                 const viewedItem = await ItemModel.findById(actualItemId)
                     .select('_id itemName itemFinalPrice itemDiscount itemImages')
                     .lean();
-                
+
                 if (viewedItem) {
                     emitRecentlyViewedUpdate(userId.toString(), {
                         _id: viewedItem._id,
@@ -1314,9 +1414,9 @@ export default class ItemServices {
                 }
 
                 return handleResponse(
-                    req, 
-                    res, 
-                    200, 
+                    req,
+                    res,
+                    200,
                     "Item added to recently viewed (FIFO queue)",
                     {
                         operation: "recently_viewed",
@@ -1778,11 +1878,11 @@ export default class ItemServices {
             }
 
             return handleResponse(
-                req, 
-                res, 
-                200, 
+                req,
+                res,
+                200,
                 "Item removed from wishlist successfully",
-                { 
+                {
                     wishlistCount: updateResult.wishlist?.length || 0,
                     itemId
                 }
@@ -1812,10 +1912,10 @@ export default class ItemServices {
             const cachedWishlist = await redis.get(wishlistCacheKey);
             if (cachedWishlist) {
                 return handleResponse(
-                    req, 
-                    res, 
-                    200, 
-                    "Wishlist fetched from cache", 
+                    req,
+                    res,
+                    200,
+                    "Wishlist fetched from cache",
                     JSON.parse(cachedWishlist)
                 );
             }
@@ -1882,12 +1982,12 @@ export default class ItemServices {
                     $project: {
                         items: 1,
                         totalCount: 1,
-                        totalPages: { 
-                            $ceil: { $divide: ["$totalCount", limitNum] } 
+                        totalPages: {
+                            $ceil: { $divide: ["$totalCount", limitNum] }
                         },
                         currentPage: { $literal: pageNum },
-                        hasNextPage: { 
-                            $gt: ["$totalCount", skip + limitNum] 
+                        hasNextPage: {
+                            $gt: ["$totalCount", skip + limitNum]
                         }
                     }
                 }
@@ -1905,10 +2005,10 @@ export default class ItemServices {
             await redis.set(wishlistCacheKey, JSON.stringify(responseData), { EX: 300 });
 
             return handleResponse(
-                req, 
-                res, 
-                200, 
-                "Wishlist fetched successfully", 
+                req,
+                res,
+                200,
+                "Wishlist fetched successfully",
                 responseData
             );
         }
@@ -1938,13 +2038,13 @@ export default class ItemServices {
             const isInWishlist = user?.wishlist?.includes(itemId) || false;
 
             return handleResponse(
-                req, 
-                res, 
-                200, 
-                "Wishlist status checked", 
-                { 
+                req,
+                res,
+                200,
+                "Wishlist status checked",
+                {
                     itemId,
-                    isInWishlist 
+                    isInWishlist
                 }
             );
         }
@@ -1982,9 +2082,9 @@ export default class ItemServices {
             emitWishlistUpdate(userId.toString(), 'removed', null);
 
             return handleResponse(
-                req, 
-                res, 
-                200, 
+                req,
+                res,
+                200,
                 "Wishlist cleared successfully",
                 { wishlistCount: 0 }
             );
@@ -2005,14 +2105,14 @@ export default class ItemServices {
             const skip = (pageNum - 1) * limitNum;
 
             const cacheKey = `similar_products:${itemId}:p${pageNum}:l${limitNum}`;
-            
+
             const cachedData = await redis.get(cacheKey);
             if (cachedData) {
                 return handleResponse(
-                    req, 
-                    res, 
-                    200, 
-                    "Similar products fetched from cache", 
+                    req,
+                    res,
+                    200,
+                    "Similar products fetched from cache",
                     JSON.parse(cachedData)
                 );
             }
@@ -2029,18 +2129,18 @@ export default class ItemServices {
             const priceMin = sourceProduct.itemFinalPrice * 0.7;
             const priceMax = sourceProduct.itemFinalPrice * 1.3;
 
-  
+
             const pipeline: any[] = [
                 // Stage 1: Filter similar products (O(n) with indexes)
                 {
                     $match: {
                         _id: { $ne: new mongoose.Types.ObjectId(itemId) },
-                        itemCategory: sourceProduct.itemCategory, 
-                        itemFinalPrice: { $gte: priceMin, $lte: priceMax }, 
-                        deletedAt: { $exists: false } 
+                        itemCategory: sourceProduct.itemCategory,
+                        itemFinalPrice: { $gte: priceMin, $lte: priceMax },
+                        deletedAt: { $exists: false }
                     }
                 },
-                
+
                 // Stage 2: Calculate similarity score (O(n))
                 {
                     $addFields: {
@@ -2083,16 +2183,16 @@ export default class ItemServices {
                         }
                     }
                 },
-                
+
                 // Stage 3: Sort by similarity score DESC (O(n log n))
                 {
-                    $sort: { 
-                        similarityScore: -1, 
-                        itemRatings: -1, 
-                        views: -1 
+                    $sort: {
+                        similarityScore: -1,
+                        itemRatings: -1,
+                        views: -1
                     }
                 },
-                
+
                 // Stage 4: Pagination (O(1))
                 {
                     $facet: {
@@ -2171,10 +2271,10 @@ export default class ItemServices {
             await redis.set(cacheKey, JSON.stringify(responseData), { EX: 1800 });
 
             return handleResponse(
-                req, 
-                res, 
-                200, 
-                "Similar products fetched successfully", 
+                req,
+                res,
+                200,
+                "Similar products fetched successfully",
                 responseData
             );
         }
@@ -2228,8 +2328,8 @@ export default class ItemServices {
             const cachedSuggestions = await redis.get(cacheKey);
             if (cachedSuggestions) {
                 const parsedCache = JSON.parse(cachedSuggestions);
-                return handleResponse(req, res, 200, 
-                    parsedCache.found ? "Suggestions fetched (cached)" : "No results found (cached)", 
+                return handleResponse(req, res, 200,
+                    parsedCache.found ? "Suggestions fetched (cached)" : "No results found (cached)",
                     {
                         ...parsedCache,
                         cached: true
@@ -2313,7 +2413,7 @@ export default class ItemServices {
             // If no results found, provide helpful alternatives
             if (!found) {
                 responseData.message = `No results found for "${searchQuery}"`;
-                
+
                 // Try to get popular/trending items as alternatives
                 const popularItems = await ItemModel.aggregate([
                     { $match: { deletedAt: { $exists: false } } },
@@ -2343,7 +2443,7 @@ export default class ItemServices {
                     discount: item.itemDiscount || 0,
                     rating: item.itemRatings || 0
                 }));
-                
+
                 responseData.tip = "Try different keywords or check the spelling";
             }
 
@@ -2351,9 +2451,9 @@ export default class ItemServices {
             await redis.set(cacheKey, JSON.stringify(responseData), { EX: 120 });
 
             return handleResponse(
-                req, 
-                res, 
-                200, 
+                req,
+                res,
+                200,
                 found ? "Suggestions fetched successfully" : `No results found for "${searchQuery}"`,
                 {
                     ...responseData,
@@ -2433,7 +2533,7 @@ export default class ItemServices {
 
             // Remove duplicate from Redis if exists
             const existingSearches = await redis.lRange(redisKey, 0, -1);
-            
+
             for (let i = 0; i < existingSearches.length; i++) {
                 try {
                     const searchItem = existingSearches[i];
@@ -2465,23 +2565,23 @@ export default class ItemServices {
 
             // Get current user's recent searches from database
             const user = await userModel.findById(userId).select('recentSearches');
-            
+
             if (user) {
                 let recentSearches = user.recentSearches || [];
-                
+
                 // Remove duplicate if exists
                 recentSearches = recentSearches.filter(
                     (search: any) => search.query !== searchQuery
                 );
-                
+
                 // Add new search at the beginning (bottom to top - latest first)
                 recentSearches.unshift(searchObject);
-                
+
                 // Keep only last 7 items (FIFO - when 8th enters, 1st is removed)
                 if (recentSearches.length > MAX_DB_SEARCHES) {
                     recentSearches = recentSearches.slice(0, MAX_DB_SEARCHES);
                 }
-                
+
                 // Update user document
                 await userModel.findByIdAndUpdate(
                     userId,
@@ -2616,8 +2716,8 @@ export default class ItemServices {
                 }
             }
 
-            return handleResponse(req, res, 200, 
-                deleted ? "Search deleted successfully" : "Search not found", 
+            return handleResponse(req, res, 200,
+                deleted ? "Search deleted successfully" : "Search not found",
                 { deleted, query: searchQuery }
             );
         }
