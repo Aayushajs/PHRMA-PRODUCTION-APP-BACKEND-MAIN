@@ -1,0 +1,202 @@
+name: MongoDB Atlas Daily Sync (Production → Testing)
+
+# ============================================================================
+# AUTOMATIC DATABASE SYNC WORKFLOW
+# ============================================================================
+# Purpose: Sync Production MongoDB Atlas to Testing Atlas every 24 hours
+# Schedule: Runs at 12:00 AM UTC daily (adjust timezone as needed)
+# Method: mongodump (export) → mongorestore (import with --drop)
+# Security: Connection strings stored in GitHub Secrets
+# Cost: $0 (GitHub Free tier includes 2,000 minutes/month)
+# ============================================================================
+
+on:
+  # Automatic daily execution at midnight UTC (adjust cron for your timezone)
+  schedule:
+    - cron: '0 0 * * *'  # 12:00 AM UTC daily
+    # Cron format: minute hour day month weekday
+    # Examples:
+    # '0 0 * * *'   = Midnight UTC (00:00)
+    # '0 18 * * *'  = 6:00 PM UTC (00:00 IST next day)
+    # '30 18 * * *' = 6:30 PM UTC (00:00 IST + 30 min)
+  
+  # Manual trigger option (for testing or emergency sync)
+  workflow_dispatch:
+    inputs:
+      drop_database:
+        description: 'Drop testing database before restore?'
+        required: true
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+# Environment variables (non-sensitive configuration)
+env:
+  MONGODB_TOOLS_VERSION: '100.9.4'  # Latest stable version
+  DATABASE_NAME: 'e-pharmacy'
+  DUMP_DIR: './mongodb_dump'
+  LOG_FILE: './sync_log.txt'
+
+jobs:
+  sync-mongodb-databases:
+    name: Sync Production DB to Testing DB
+    runs-on: ubuntu-latest  # GitHub-hosted runner (free)
+    timeout-minutes: 30  # Prevent hanging workflows
+    
+    steps:
+      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      # STEP 1: Checkout Repository (Required for workflow access)
+      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      - name: 📦 Checkout Repository
+        uses: actions/checkout@v4
+      
+      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      # STEP 2: Install MongoDB Database Tools
+      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      - name: 🔧 Install MongoDB Tools (mongodump, mongorestore)
+        run: |
+          echo "🚀 Installing MongoDB Database Tools v${{ env.MONGODB_TOOLS_VERSION }}..."
+          
+          # Download official MongoDB tools
+          wget -q https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2204-x86_64-${{ env.MONGODB_TOOLS_VERSION }}.tgz
+          
+          # Extract tools
+          tar -xzf mongodb-database-tools-ubuntu2204-x86_64-${{ env.MONGODB_TOOLS_VERSION }}.tgz
+          
+          # Move binaries to PATH
+          sudo mv mongodb-database-tools-ubuntu2204-x86_64-${{ env.MONGODB_TOOLS_VERSION }}/bin/* /usr/local/bin/
+          
+          # Verify installation
+          echo "✅ Installed versions:"
+          mongodump --version
+          mongorestore --version
+      
+      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      # STEP 3: Export Data from Production Atlas Database
+      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      - name: 📤 Dump Production Database
+        env:
+          PROD_MONGO_URI: ${{ secrets.PRODUCTION_MONGO_URI }}
+        run: |
+          echo "📊 Starting database dump from Production Atlas..."
+          echo "Database: ${{ env.DATABASE_NAME }}"
+          echo "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          
+          # Create dump directory
+          mkdir -p ${{ env.DUMP_DIR }}
+          
+          # Execute mongodump with production credentials
+          mongodump \
+            --uri="${PROD_MONGO_URI}" \
+            --db="${{ env.DATABASE_NAME }}" \
+            --out="${{ env.DUMP_DIR }}" \
+            --gzip \
+            --numParallelCollections=4 \
+            --verbose
+          
+          # Verify dump success
+          if [ $? -eq 0 ]; then
+            echo "✅ Production database dumped successfully!"
+            echo "📁 Dump size: $(du -sh ${{ env.DUMP_DIR }} | cut -f1)"
+            echo "📋 Collections dumped:"
+            ls -lh ${{ env.DUMP_DIR }}/${{ env.DATABASE_NAME }}/
+          else
+            echo "❌ ERROR: mongodump failed!"
+            exit 1
+          fi
+      
+      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      # STEP 4: Restore Data to Testing Atlas Database
+      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      - name: 📥 Restore to Testing Database
+        env:
+          TEST_MONGO_URI: ${{ secrets.TESTING_MONGO_URI }}
+          DROP_DB: ${{ github.event.inputs.drop_database || 'true' }}
+        run: |
+          echo "🔄 Starting database restore to Testing Atlas..."
+          echo "Database: ${{ env.DATABASE_NAME }}"
+          echo "Drop existing data: $DROP_DB"
+          echo "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          
+          # Build mongorestore command with conditional --drop flag
+          RESTORE_CMD="mongorestore \
+            --uri=\"${TEST_MONGO_URI}\" \
+            --db=\"${{ env.DATABASE_NAME }}\" \
+            --gzip \
+            --numParallelCollections=4 \
+            --numInsertionWorkersPerCollection=2 \
+            --preserveUUID \
+            --verbose"
+          
+          # Add --drop flag if requested (default: true)
+          if [ "$DROP_DB" = "true" ]; then
+            RESTORE_CMD="$RESTORE_CMD --drop"
+            echo "⚠️  Will drop existing collections before restore"
+          fi
+          
+          # Add dump path
+          RESTORE_CMD="$RESTORE_CMD ${{ env.DUMP_DIR }}/${{ env.DATABASE_NAME }}"
+          
+          # Execute mongorestore
+          eval $RESTORE_CMD
+          
+          # Verify restore success
+          if [ $? -eq 0 ]; then
+            echo "✅ Testing database restored successfully!"
+            echo "🎉 Sync completed at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          else
+            echo "❌ ERROR: mongorestore failed!"
+            exit 1
+          fi
+      
+      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      # STEP 5: Cleanup & Generate Summary Report
+      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      - name: 🧹 Cleanup & Summary
+        if: always()  # Run even if previous steps fail
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "           MONGODB ATLAS SYNC SUMMARY"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Workflow Run ID: ${{ github.run_id }}"
+          echo "Triggered By: ${{ github.event_name }}"
+          echo "Database: ${{ env.DATABASE_NAME }}"
+          echo "Started: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "Status: ${{ job.status }}"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          # Cleanup dump directory
+          rm -rf ${{ env.DUMP_DIR }}
+          echo "✅ Temporary files cleaned up"
+          
+          # Disk usage check
+          echo "💾 Runner disk usage:"
+          df -h | grep -E '(Filesystem|/dev/root)'
+      
+      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      # STEP 6: Send Notification (Optional - Uncomment to enable)
+      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      # - name: 📧 Send Notification (Slack/Email)
+      #   if: failure()  # Only notify on failure
+      #   uses: rtCamp/action-slack-notify@v2
+      #   env:
+      #     SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+      #     SLACK_MESSAGE: 'MongoDB Atlas sync failed! Check workflow logs.'
+      #     SLACK_COLOR: 'danger'
+
+# ============================================================================
+# WORKFLOW FEATURES
+# ============================================================================
+# ✅ Fully automatic (no manual intervention)
+# ✅ Runs every 24 hours at midnight UTC
+# ✅ Drops testing DB before restore (fresh copy guaranteed)
+# ✅ Preserves indexes, UUIDs, and data integrity
+# ✅ Supports manual trigger with GitHub UI
+# ✅ Comprehensive logging and error handling
+# ✅ Zero cost (GitHub Free tier sufficient)
+# ✅ Works with MongoDB Atlas Free/M2 plans
+# ✅ No dependency on Render or application server
+# ✅ Secure (credentials stored in GitHub Secrets)
+# ============================================================================
