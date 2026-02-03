@@ -14,6 +14,7 @@ import { errorHandler } from './Middlewares/errorHandler';
 import mainRouter from './Routers/main.Routes';
 import { startKeepAliveCron } from './cronjob/keepAlive';
 import { initializeSocket } from './config/socket';
+import morgan from 'morgan';
 
 dotenv.config({ path: './config/.env' });
 
@@ -22,16 +23,15 @@ const app: Express = express();
 
 //middlewares
 app.use(cookieParser());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cors({
   origin: ['*'],
-  // origin: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id', 'x-user-role', 'x-user-email'],
   credentials: true,
 }));
-
+app.use(morgan('dev'));
 
 
 //router
