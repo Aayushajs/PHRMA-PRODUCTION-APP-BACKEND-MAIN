@@ -26,14 +26,6 @@ import { emitRecentlyViewedUpdate, emitNewProductAdded, emitWishlistUpdate } fro
 
 
 
-declare global {
-    namespace Express {
-        interface Request {
-            user?: Iuser; // or any, if you don’t have an interface
-        }
-    }
-}
-
 export default class ItemServices {
     //only serching and ganuvan price and mrp 
     public static createItem = catchAsyncErrors(

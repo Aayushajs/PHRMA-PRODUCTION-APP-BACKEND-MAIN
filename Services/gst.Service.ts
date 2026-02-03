@@ -13,15 +13,6 @@ import { gstModel } from "../Databases/Models/gst.Model";
 import { Igst } from "../Databases/Entities/gst.interface";
 import { Iuser } from "../Databases/Entities/user.Interface";
 
-// Extend Request with user object
-declare global {
-    namespace Express {
-        interface Request {
-            user?: Iuser;
-        }
-    }
-}
-
 export default class GSTServices {
     public static createGST = catchAsyncErrors(
         async (req: Request, res: Response, next: NextFunction) => {

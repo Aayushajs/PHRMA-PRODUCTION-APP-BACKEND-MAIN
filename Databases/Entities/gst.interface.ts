@@ -22,8 +22,8 @@ export interface Igst {
     applicableFrom?: Date;
     applicableTo?: Date;
 
-    createdBy?: Types.ObjectId;
-    updatedBy?: Types.ObjectId;
+    createdBy?: Types.ObjectId | string;
+    updatedBy?: Types.ObjectId | string;
 
     createdAt?: Date;
     updatedAt?: Date;
