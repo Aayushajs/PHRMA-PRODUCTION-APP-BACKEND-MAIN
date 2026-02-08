@@ -15,6 +15,8 @@ import units from './Routers/unit.Routes';
 import gstRouter from './Routers/gst.Routes';
 import prescriptionRouter from './Routers/prescription.Routes';
 import notification from "./Routers/notificationLog.Routes";
+import featureFlagRouter from './Routers/featureFlag.Routes';
+import featuresRouter from './Routers/features.Routes';
 const mainRouter = Router();
 
 // Health check endpoint to prevent cold starts
@@ -36,5 +38,9 @@ mainRouter.use('/units', units);
 mainRouter.use('/gsts', gstRouter);
 mainRouter.use('/prescriptions', prescriptionRouter);
 mainRouter.use('/notifications',notification)
+
+// Feature Flag System
+mainRouter.use('/feature-flags', featureFlagRouter); // Admin CRUD
+mainRouter.use('/features', featuresRouter);         // Public user features
 
 export default mainRouter;

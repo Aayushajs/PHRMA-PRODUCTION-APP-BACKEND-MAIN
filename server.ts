@@ -10,7 +10,7 @@ const httpServer = createServer(app);
 initializeSocket(httpServer);
 
 httpServer.listen(PORT, '0.0.0.0', async () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`Server is running on http://0.0.0.0:${PORT}`);
   console.log(`WebSocket server ready on ws://localhost:${PORT}`);
   
   if (process.env.NODE_ENV === 'production') {

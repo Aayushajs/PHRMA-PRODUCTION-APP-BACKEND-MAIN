@@ -1,15 +1,16 @@
 /*
 ┌───────────────────────────────────────────────────────────────────────┐
-│  Roles Enum - Enumeration of user roles (Customer, Admin, etc).       │
+│  FeatureFlag Model - Mongoose model for feature flags.                │
 └───────────────────────────────────────────────────────────────────────┘
 */
 
-enum RoleIndex {
-  CUSTOMER = "CUSTOMER",
-  ADMIN = "ADMIN",
-  PHARMACIST = "PHARMACIST",
-  UNKNOWN = "UNKNOWN", // for googale sign in users
-}
+import mongoose from "mongoose";
+import { featureFlagSchema } from "../Schema/featureFlag.Schema";
+import { IFeatureFlag } from "../Entities/featureFlag.Interface";
 
-export default RoleIndex;
-export type Roles = keyof typeof RoleIndex;
+const FeatureFlagModel = mongoose.model<IFeatureFlag & mongoose.Document>(
+  "FeatureFlag",
+  featureFlagSchema
+);
+
+export default FeatureFlagModel;

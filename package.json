@@ -47,6 +47,7 @@
   "scripts": {
     "start": "bun run server.ts",
     "dev": "bun --watch server.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "seed:flags": "npx ts-node scripts/seedFeatureFlags.ts"
   }
 }

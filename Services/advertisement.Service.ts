@@ -136,8 +136,8 @@ export default class AdvertisementService {
                 endDate: end,
                 isActive,
                 adClickTracking: [],
-                createdBy: (req as any).user?.id || null,
-                updatedBy: (req as any).user?.id || null
+                createdBy: (req as any).user?._id || null,
+                updatedBy: (req as any).user?._id || null
             };
 
             const advertisement = await Advertisement.create(adData);
@@ -243,7 +243,7 @@ export default class AdvertisementService {
 
             // Build update data object
             const updateData: any = {
-                updatedBy: (req as any).user?.id || null,
+                updatedBy: (req as any).user?._id || null,
                 updatedAt: new Date()
             };
 
@@ -680,7 +680,8 @@ export default class AdvertisementService {
     public static trackClick = catchAsyncErrors(
         async (req: Request, res: Response, next: NextFunction) => {
             const { adId } = req.params;
-            const userId = (req as any).user?.id;
+            const userId = (req as any).user?._id;
+            console.log("userId : ",  userId);
             if (!adId || !mongoose.isValidObjectId(adId)) {
                 return next(new ApiError(400, "Invalid advertisement ID"));
             }
@@ -923,7 +924,7 @@ export default class AdvertisementService {
                 endDate: existingAd.endDate,
                 createdAt: existingAd.createdAt,
                 deletedAt: new Date(),
-                deletedBy: (req as any).user?.id || null
+                deletedBy: (req as any).user?._id || null
             };
 
             const deletedAd = await Advertisement.findByIdAndDelete(adId);
@@ -1001,7 +1002,7 @@ export default class AdvertisementService {
                 adId,
                 {
                     isActive: false,
-                    updatedBy: (req as any).user?.id || null,
+                    updatedBy: (req as any).user?._id || null,
                     updatedAt: new Date()
                 },
                 { new: true, runValidators: true }
