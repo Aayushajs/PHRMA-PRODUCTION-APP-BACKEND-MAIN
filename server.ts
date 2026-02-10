@@ -2,6 +2,7 @@ import { createServer } from 'http';
 import app from './App';
 import { initializeSocket } from './config/socket';
 import { startKeepAliveCron } from './cronjob/keepAlive';
+import { queueProcessor } from './cronjob/queueProcessor.js';
 
 const PORT = parseInt(process.env.PORT || '5001', 10);
 
@@ -12,6 +13,9 @@ initializeSocket(httpServer);
 httpServer.listen(PORT, '0.0.0.0', async () => {
   console.log(`Server is running on http://0.0.0.0:${PORT}`);
   console.log(`WebSocket server ready on ws://localhost:${PORT}`);
+  
+  // Start notification queue processor (shared queue with Service 2)
+  await queueProcessor.start();
   
   if (process.env.NODE_ENV === 'production') {
     startKeepAliveCron();

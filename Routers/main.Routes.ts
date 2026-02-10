@@ -15,6 +15,7 @@ import units from './Routers/unit.Routes';
 import gstRouter from './Routers/gst.Routes';
 import prescriptionRouter from './Routers/prescription.Routes';
 import notification from "./Routers/notificationLog.Routes";
+import notificationServiceRouter from "./Routers/notification.Routes";
 import featureFlagRouter from './Routers/featureFlag.Routes';
 import featuresRouter from './Routers/features.Routes';
 const mainRouter = Router();
@@ -38,6 +39,9 @@ mainRouter.use('/units', units);
 mainRouter.use('/gsts', gstRouter);
 mainRouter.use('/prescriptions', prescriptionRouter);
 mainRouter.use('/notifications',notification)
+
+// Internal Notification Service (for inter-service communication)
+mainRouter.use('/notification-service', notificationServiceRouter);
 
 // Feature Flag System
 mainRouter.use('/feature-flags', featureFlagRouter); // Admin CRUD

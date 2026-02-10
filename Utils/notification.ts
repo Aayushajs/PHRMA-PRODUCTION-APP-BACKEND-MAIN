@@ -40,11 +40,11 @@ const FCM_ERROR_CODES = {
 // VALIDATION
 // ============================================================================
 
-const isValidFCMToken = (token: string): boolean => {
-  if (!token || typeof token !== 'string') return false;
-  if (token.trim() === '') return false;
-  if (token.startsWith('ExponentPushToken')) return false; // Reject Expo tokens
-  if (token.length < 100) return false; // FCM tokens are typically 150+ chars
+const isValidFCMToken = (fcmToken: string): boolean => {
+  if (!fcmToken || typeof fcmToken !== 'string') return false;
+  if (fcmToken.trim() === '') return false;
+  if (fcmToken.startsWith('ExponentPushToken')) return false; // Reject Expo tokens
+  if (fcmToken.length < 100) return false; // FCM tokens are typically 150+ chars
   return true;
 };
 
@@ -53,14 +53,14 @@ const isValidFCMToken = (token: string): boolean => {
 // ============================================================================
 
 export const sendPushNotification = async (
-  token: string,
+  fcmToken: string,
   title: string,
   body: string,
   data: Record<string, any> = {}
 ): Promise<NotificationResult> => {
   try {
     // Validate token
-    if (!isValidFCMToken(token)) {
+    if (!isValidFCMToken(fcmToken)) {
       return {
         success: false,
         error: 'Invalid FCM token format',
@@ -79,7 +79,7 @@ export const sendPushNotification = async (
 
     // Build FCM message
     const message: messaging.Message = {
-      token,
+      token: fcmToken,
       notification: {
         title,
         body,
@@ -147,13 +147,13 @@ export const sendPushNotification = async (
 };
 
 export const sendBulkNotifications = async (
-  tokens: string[],
+  fcmTokens: string[],
   title: string,
   body: string,
   data: Record<string, any> = {}
 ): Promise<{ successCount: number; failureCount: number; results: NotificationResult[] }> => {
   const results = await Promise.all(
-    tokens.map(token => sendPushNotification(token, title, body, data))
+    fcmTokens.map(fcmToken => sendPushNotification(fcmToken, title, body, data))
   );
 
   const successCount = results.filter(r => r.success).length;
