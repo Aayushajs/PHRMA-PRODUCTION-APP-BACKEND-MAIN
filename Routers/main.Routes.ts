@@ -18,6 +18,7 @@ import notification from "./Routers/notificationLog.Routes";
 import notificationServiceRouter from "./Routers/notification.Routes";
 import featureFlagRouter from './Routers/featureFlag.Routes';
 import featuresRouter from './Routers/features.Routes';
+import mailServiceRouter from './Routers/mail.Routes';
 const mainRouter = Router();
 
 // Health check endpoint to prevent cold starts
@@ -42,6 +43,9 @@ mainRouter.use('/notifications',notification)
 
 // Internal Notification Service (for inter-service communication)
 mainRouter.use('/notification-service', notificationServiceRouter);
+
+// Internal Mail Service (for inter-service communication)
+mainRouter.use('/mail-service', mailServiceRouter);
 
 // Feature Flag System
 mainRouter.use('/feature-flags', featureFlagRouter); // Admin CRUD
