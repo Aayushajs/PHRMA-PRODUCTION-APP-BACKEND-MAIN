@@ -6,16 +6,16 @@
 */
 
 import { Request, Response, NextFunction } from "express";
-import NotificationLogModel from "../Databases/Models/notificationLog.model";
-import { ApiError } from "../Utils/ApiError";
-import { handleResponse } from "../Utils/handleResponse";
-import { catchAsyncErrors } from "../Utils/catchAsyncErrors";
+import NotificationLogModel from "@models/notificationLog.model";
+import { ApiError } from "@utils/ApiError";
+import { handleResponse } from "@utils/handleResponse";
+import { catchAsyncErrors } from "@utils/catchAsyncErrors";
 import {
   getCache,
   setCache,
   deleteCache,
   deleteCachePattern,
-} from "../Utils/cache";
+} from "@utils/cache";
 import mongoose from "mongoose";
 import crypto from "crypto";
 

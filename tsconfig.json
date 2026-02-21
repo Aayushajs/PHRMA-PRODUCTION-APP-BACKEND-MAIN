@@ -3,6 +3,17 @@
         "target": "ESNext",
         "module": "ESNext",
         "moduleResolution": "Node",
+        "baseUrl": ".",
+        "paths": {
+            "@utils/*": ["Utils/*"],
+            "@models/*": ["Databases/Models/*"],
+            "@services/*": ["Services/*"],
+            "@config/*": ["config/*"],
+            "@middlewares/*": ["Middlewares/*"],
+            "@databases/*": ["Databases/*"],
+            "@routers/*": ["Routers/*"],
+            "@types/*": ["types/*"]
+        },
         "typeRoots": [
             "./types",
             "./node_modules/@types"

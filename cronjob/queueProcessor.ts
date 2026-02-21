@@ -7,7 +7,7 @@
 └───────────────────────────────────────────────────────────────────────┘
 */
 
-import { notificationQueue } from '../Services/notificationQueue.Service.js';
+import { notificationQueue } from '@services/notificationQueue.Service';
 
 // ============================================================================
 // CONFIGURATION

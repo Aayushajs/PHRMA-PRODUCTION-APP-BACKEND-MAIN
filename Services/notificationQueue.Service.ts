@@ -7,8 +7,8 @@
 └───────────────────────────────────────────────────────────────────────┘
 */
 
-import { redis } from '../config/redis.js';
-import { sendPushNotification, sendBulkNotifications } from '../Utils/notification.js';
+import { redis } from '@config/redis';
+import { sendPushNotification, sendBulkNotifications } from '@utils/notification';
 
 // ============================================================================
 // TYPES
@@ -188,7 +188,7 @@ class NotificationQueue {
     }
 
     try {
-      const UserModel = (await import('../Databases/Models/user.Models.js')).default;
+      const UserModel = (await import('@models/user.Models')).default;
       const user = await UserModel.findById(notification.userId).select('fcmToken');
 
       if (!user || !user.fcmToken) {
@@ -220,7 +220,7 @@ class NotificationQueue {
     }
 
     try {
-      const UserModel = (await import('../Databases/Models/user.Models.js')).default;
+      const UserModel = (await import('@models/user.Models')).default;
       const users = await UserModel.find({
         _id: { $in: notification.userIds },
         fcmToken: { $exists: true, $ne: null }

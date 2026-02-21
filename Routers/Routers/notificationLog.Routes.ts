@@ -6,11 +6,11 @@
 */
 
 import { Router, Request, Response } from 'express';
-import NotificationLogService from '../../Services/notificationLog.Service';
-import NotificationService from '../../Middlewares/LogMedillewares/notificationLogger';
-import { authenticatedUserMiddleware } from '../../Middlewares/CheckLoginMiddleware';
-import { handleResponse } from '../../Utils/handleResponse';
-import { ApiError } from '../../Utils/ApiError';
+import NotificationLogService from '@services/notificationLog.Service';
+import NotificationService from '@middlewares/LogMedillewares/notificationLogger';
+import { authenticatedUserMiddleware } from '@middlewares/CheckLoginMiddleware';
+import { handleResponse } from '@utils/handleResponse';
+import { ApiError } from '@utils/ApiError';
 
 const notificationLog = Router();
 

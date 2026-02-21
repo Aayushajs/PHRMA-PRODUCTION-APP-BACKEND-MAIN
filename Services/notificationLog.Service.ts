@@ -6,16 +6,16 @@
 */
 
 import { Request, Response, NextFunction } from "express";
-import NotificationLogModel from "../Databases/Models/notificationLog.model";
-import { ApiError } from "../Utils/ApiError";
-import { handleResponse } from "../Utils/handleResponse";
-import { catchAsyncErrors } from "../Utils/catchAsyncErrors";
+import NotificationLogModel from "@models/notificationLog.model";
+import { ApiError } from "@utils/ApiError";
+import { handleResponse } from "@utils/handleResponse";
+import { catchAsyncErrors } from "@utils/catchAsyncErrors";
 import {
   getCache,
   setCache,
   deleteCache,
   deleteCachePattern,
-} from "../Utils/cache";
+} from "@utils/cache";
 import mongoose from "mongoose";
 import crypto from "crypto";
 
@@ -850,7 +850,7 @@ export default class NotificationLogService {
 
         // Optionally mark them as delivered/received
         if (recentNotifications.length > 0) {
-          const notificationIds = recentNotifications.map(n => n._id);
+          const notificationIds = recentNotifications.map((n: any) => n._id);
           
           // Update to mark as received (you can add a 'receivedAt' field if needed)
           await NotificationLogModel.updateMany(
@@ -902,7 +902,7 @@ export default class NotificationLogService {
       const skip = (pageNum - 1) * limitNum;
 
       try {
-        const NotificationService = (await import('../Middlewares/LogMedillewares/notificationLogger')).default;
+        const NotificationService = (await import('@middlewares/LogMedillewares/notificationLogger')).default;
 
         const query: any = { userId };
         if (type) query.type = type;
