@@ -8,7 +8,7 @@
 
 import {uploadImage} from "../../config/multer";
 import express from "express";
-import ItemServices from "../../Services/item.Service";
+import ItemServices from "../../Services/ItemServices/item.Service";
 import { adminMiddleware, authenticatedUserMiddleware } from "../../Middlewares/CheckLoginMiddleware";
 
 
