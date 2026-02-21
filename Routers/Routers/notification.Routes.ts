@@ -8,7 +8,7 @@
 */
 
 import { Router } from 'express';
-import NotificationService from '@services/notification.Service';
+import NotificationService from '@services/NotificationServices/notification.Service';
 import { authenticatedUserMiddleware } from '@middlewares/CheckLoginMiddleware';
 import { internalServiceAuth } from '@middlewares/internalServiceAuth';
 

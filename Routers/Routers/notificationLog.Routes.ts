@@ -6,7 +6,7 @@
 */
 
 import { Router, Request, Response } from 'express';
-import NotificationLogService from '@services/notificationLog.Service';
+import NotificationLogService from '@services/NotificationServices/notificationLog.Service';
 import NotificationService from '@middlewares/LogMedillewares/notificationLogger';
 import { authenticatedUserMiddleware } from '@middlewares/CheckLoginMiddleware';
 import { handleResponse } from '@utils/handleResponse';
