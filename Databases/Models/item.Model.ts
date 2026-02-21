@@ -7,7 +7,7 @@
 
 import { itemSchema } from "../Schema/items.Schema";
 import { Iitem } from "../Entities/item.Interface";
-import mongoose from "mongoose";
+import mongoose, { Model } from "mongoose";
 
-export const ItemModel = mongoose.models.Item || mongoose.model<Iitem>("Item", itemSchema);
+export const ItemModel = (mongoose.models.Item as Model<Iitem>) || mongoose.model<Iitem>("Item", itemSchema);
 export default ItemModel;

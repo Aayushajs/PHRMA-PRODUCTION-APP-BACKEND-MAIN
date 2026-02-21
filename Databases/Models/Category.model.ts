@@ -7,10 +7,10 @@
 */
 
 import { categorySchema } from "../Schema/Category.Schema";
-import mongoose from "mongoose";
+import mongoose, { Model } from "mongoose";
 import { ICategory } from "../Entities/Category.interface";
 import { CategoryLogger } from "../../Middlewares/LogMedillewares/categoryLogger";
 
 // log middleware
 CategoryLogger(categorySchema);
-export const CategoryModel = mongoose.models.Category || mongoose.model<ICategory>("Category", categorySchema);
+export const CategoryModel = (mongoose.models.Category as Model<ICategory>) || mongoose.model<ICategory>("Category", categorySchema);
