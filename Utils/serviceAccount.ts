@@ -7,8 +7,11 @@ const serviceAccount = JSON.parse(
   Buffer.from(process.env.FIREBASE_STRING!, "base64").toString("utf8")
 );
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
+// Check if Firebase app is already initialized
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+}
 
 export const firebaseAdmin = admin;

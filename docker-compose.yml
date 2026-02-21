@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  # Main Application
+  app:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      # Override Redis URL to use local Redis
+      REDIS_URL: redis://redis:6379
+      # Override MongoDB URL to use local MongoDB (optional)
+      # MONGO_URI: mongodb://mongo:27017/e-pharmacy
+    env_file:
+      - ./config/.env
+    volumes:
+      - ./temp_uploads:/usr/src/app/temp_uploads
+    depends_on:
+      - redis
+      # - mongo  # Uncomment if you want to use local MongoDB
+    restart: unless-stopped
+
+  # Local Redis for testing
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # Local MongoDB (optional - uncomment if needed)
+  # mongo:
+  #   image: mongo:7
+  #   ports:
+  #     - "27017:27017"
+  #   environment:
+  #     MONGO_INITDB_DATABASE: e-pharmacy
+  #   volumes:
+  #     - mongo-data:/data/db
+  #   restart: unless-stopped
+
+volumes:
+  redis-data:
+  # mongo-data:  # Uncomment if using local MongoDB
