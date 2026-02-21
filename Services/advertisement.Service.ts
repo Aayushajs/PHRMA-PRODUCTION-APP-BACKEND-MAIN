@@ -14,9 +14,7 @@ import { ApiError } from '../Utils/ApiError';
 import { handleResponse } from '../Utils/handleResponse';
 import { catchAsyncErrors } from '../Utils/catchAsyncErrors';
 import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
-import { IAdvertisement } from '../Databases/Entities/advertisement.interface';
 import User from '../Databases/Models/user.Models';
-import { sendPushNotification } from '../Utils/notification';
 import { NotificationService } from '../Middlewares/LogMedillewares/notificationLogger';
 
 export default class AdvertisementService {
