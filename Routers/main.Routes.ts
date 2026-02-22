@@ -11,8 +11,6 @@ import featuredRouter from './Routers/featured.Routes';
 import categoryRouter from './Routers/category.Routes';
 import itemsRouter from './Routers/item.Routes';
 import advertisementRouter from './Routers/advertisement.Routes';
-import units from './Routers/unit.Routes';
-import gstRouter from './Routers/gst.Routes';
 import prescriptionRouter from './Routers/prescription.Routes';
 import notification from "./Routers/notificationLog.Routes";
 import notificationServiceRouter from "./Routers/notification.Routes";
@@ -36,8 +34,6 @@ mainRouter.use('/featured-medicines', featuredRouter);
 mainRouter.use('/categories', categoryRouter);
 mainRouter.use('/items', itemsRouter);
 mainRouter.use('/advertisements', advertisementRouter);
-mainRouter.use('/units', units);
-mainRouter.use('/gsts', gstRouter);
 mainRouter.use('/prescriptions', prescriptionRouter);
 mainRouter.use('/notifications',notification)
 

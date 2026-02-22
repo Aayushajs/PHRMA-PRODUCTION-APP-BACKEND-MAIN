@@ -71,26 +71,4 @@ export interface Iitem {
     ingredients?:string[],
     
   };
-
-  mrpVerification?: {
-    status?: 'approved' | 'warning' | 'rejected' | 'pending';
-    systemFinalMRP?: number;
-    userEnteredPrice?: number;
-    maxAllowedPrice?: number;
-    finalScore?: number;
-    reason?: string;
-    difference?: string;
-    stageUsed?: string;
-    needsAdminReview?: boolean;
-    verifiedAt?: Date;
-    realtimeReferences?: Array<{
-      source: string;
-      matchedProduct: string;
-      mrp: number;
-      pack: string;
-      normalizedMRP: number;
-      weightUsed: number;
-      matchScore: number;
-    }>;
-  };
 }

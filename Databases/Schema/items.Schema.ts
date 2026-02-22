@@ -168,31 +168,6 @@ export const itemSchema = new Schema<Iitem & Document>(
             type: Date,
             default: Date.now,
         },
-        mrpVerification: {
-            status: {
-                type: String,
-                enum: ['approved', 'warning', 'rejected', 'pending'],
-                default: 'pending'
-            },
-            systemFinalMRP: { type: Number },
-            userEnteredPrice: { type: Number },
-            maxAllowedPrice: { type: Number },
-            finalScore: { type: Number },
-            reason: { type: String },
-            difference: { type: String },
-            stageUsed: { type: String },
-            needsAdminReview: { type: Boolean, default: false },
-            verifiedAt: { type: Date },
-            realtimeReferences: [{
-                source: String,
-                matchedProduct: String,
-                mrp: Number,
-                pack: String,
-                normalizedMRP: Number,
-                weightUsed: Number,
-                matchScore: Number
-            }]
-        },
         deletedBy: {
             type: Schema.Types.ObjectId,
             ref: "User"
