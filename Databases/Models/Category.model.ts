@@ -14,3 +14,4 @@ import { CategoryLogger } from "../../Middlewares/LogMedillewares/categoryLogger
 // log middleware
 CategoryLogger(categorySchema);
 export const CategoryModel = (mongoose.models.Category as Model<ICategory>) || mongoose.model<ICategory>("Category", categorySchema);
+export default CategoryModel;

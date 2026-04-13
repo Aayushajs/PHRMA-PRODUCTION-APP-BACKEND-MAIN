@@ -8,6 +8,6 @@
 
 import { CategoryLog } from "../Schema/categoryLog.Schema";
 import { ICategoryLog } from "../Entities/categoryLog.interface";
-import { model } from "mongoose";
-const CategoryLogModel = model<ICategoryLog>("CategoryLog", CategoryLog);
+import mongoose, { Model } from "mongoose";
+const CategoryLogModel = (mongoose.models.CategoryLog as Model<ICategoryLog>) || mongoose.model<ICategoryLog>("CategoryLog", CategoryLog);
 export default CategoryLogModel;

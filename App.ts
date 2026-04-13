@@ -7,6 +7,8 @@ import { connectDB } from './Databases/db';
 import { connectRedis } from './config/redis';
 import { errorHandler } from './Middlewares/errorHandler';
 import mainRouter from './Routers/main.Routes';
+// Import all models to ensure they're registered at startup
+import './Databases/Models/index';
 
 dotenv.config({ path: './config/.env' });
 

@@ -8,10 +8,10 @@
 
 import { advertisementSchema } from '../Schema/advertisement.schema';
 import { IAdvertisement } from '../Entities/advertisement.interface';
-import { model } from 'mongoose';
+import mongoose, { Model } from 'mongoose';
 import { attachAdvertisementLogs } from '../../Middlewares/LogMedillewares/advertisementLogger';
 
 attachAdvertisementLogs(advertisementSchema);
 
-const Advertisement = model<IAdvertisement>("Advertisement", advertisementSchema);
+const Advertisement = (mongoose.models.Advertisement as Model<IAdvertisement>) || mongoose.model<IAdvertisement>("Advertisement", advertisementSchema);
 export default Advertisement;

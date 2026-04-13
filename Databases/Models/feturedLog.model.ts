@@ -8,6 +8,6 @@
 
 import { FeaturedMedicineLog } from "../Schema/featuredLog.Schema";
 import { IFeaturedMedicineLog } from "../Entities/featuredLog.Interface";
-import { model } from "mongoose";
-const FeaturedLog = model<IFeaturedMedicineLog>("FeaturedMedicineLog", FeaturedMedicineLog);
+import mongoose, { Model } from "mongoose";
+const FeaturedLog = (mongoose.models.FeaturedMedicineLog as Model<IFeaturedMedicineLog>) || mongoose.model<IFeaturedMedicineLog>("FeaturedMedicineLog", FeaturedMedicineLog);
 export default FeaturedLog;

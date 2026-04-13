@@ -3,6 +3,9 @@ import app from './App';
 import { initializeSocket } from './config/socket';
 import { startKeepAliveCron } from './cronjob/keepAlive';
 import { queueProcessor } from './cronjob/queueProcessor.js';
+import dns from "node:dns";
+
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
 
 const PORT = parseInt(process.env.PORT || '5001', 10);
 

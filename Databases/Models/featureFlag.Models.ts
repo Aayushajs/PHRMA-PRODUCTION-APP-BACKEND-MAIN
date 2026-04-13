@@ -4,11 +4,11 @@
 └───────────────────────────────────────────────────────────────────────┘
 */
 
-import mongoose from "mongoose";
+import mongoose, { Model } from "mongoose";
 import { featureFlagSchema } from "../Schema/featureFlag.Schema";
 import { IFeatureFlag } from "../Entities/featureFlag.Interface";
 
-const FeatureFlagModel = mongoose.model<IFeatureFlag & mongoose.Document>(
+const FeatureFlagModel = (mongoose.models.FeatureFlag as Model<IFeatureFlag & mongoose.Document>) || mongoose.model<IFeatureFlag & mongoose.Document>(
   "FeatureFlag",
   featureFlagSchema
 );

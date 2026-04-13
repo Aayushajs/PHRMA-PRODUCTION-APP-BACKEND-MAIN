@@ -6,9 +6,9 @@
 */
 
 import { IAdvertisementLog } from "../Entities/advertisementLog.interface";
-import { model } from "mongoose";
+import mongoose, { Model } from "mongoose";
 import { advertisementLogSchema } from "../Schema/advertisementLog.Schema";
 
 
-export const AdvertisementLogModel = model<IAdvertisementLog>("AdvertisementLog", advertisementLogSchema);
+export const AdvertisementLogModel = (mongoose.models.AdvertisementLog as Model<IAdvertisementLog>) || mongoose.model<IAdvertisementLog>("AdvertisementLog", advertisementLogSchema);
 export default AdvertisementLogModel;
