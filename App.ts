@@ -4,7 +4,7 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import morgan from 'morgan';
 import { connectDB } from './Databases/db';
-import { connectRedis } from './config/redis';
+import { connectRedis, getRedisHealth, startRedisAutoReconnect } from './config/redis';
 import { errorHandler } from './Middlewares/errorHandler';
 import mainRouter from './Routers/main.Routes';
 // Import all models to ensure they're registered at startup
@@ -26,9 +26,13 @@ app.use(cors({
 app.use(morgan('dev'));
 
 app.get('/health', (req, res) => {
+  const redisHealth = getRedisHealth();
+
   res.status(200).json({
     status: 'OK',
     service: 'Service1',
+    redis: redisHealth,
+    cacheMode: redisHealth.degraded || !redisHealth.enabled ? 'db_fallback' : 'redis_cache',
     timestamp: new Date().toISOString(),
   });
 });
@@ -50,5 +54,6 @@ try {
 connectRedis().catch(err => {
   console.error("Redis initialization failed:", err);
 });
+startRedisAutoReconnect();
 
 export default app;
