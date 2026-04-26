@@ -273,7 +273,7 @@ class NotificationQueue {
 
       return { waiting, processing, failed };
     } catch (error) {
-      console.error('❌ Failed to get queue stats:', error);
+      // console.error('❌ Failed to get queue stats:', error);
       return { waiting: 0, processing: 0, failed: 0 };
     }
   }

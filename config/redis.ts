@@ -25,7 +25,7 @@ export const redis = createClient({
 let isRedisConnected = false;
 
 redis.on("error", (err) => {
-  console.error("Redis Client Error:", err);
+  // console.error("Redis Client Error:", err);
   isRedisConnected = false;
 });
 
@@ -46,7 +46,7 @@ export const connectRedis = async () => {
       isRedisConnected = true;
     }
   } catch (err) {
-    console.error("Failed to connect to Redis:", err);
+    // console.error("Failed to connect to Redis:", err);
     isRedisConnected = false;
   }
 };

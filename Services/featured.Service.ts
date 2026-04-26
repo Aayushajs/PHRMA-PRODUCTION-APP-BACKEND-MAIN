@@ -39,7 +39,8 @@ export default class FeaturedMedicineService {
       } = req.body;
 
       const createdById = (req as any).user?._id ?? createdBy;
-      if (req.file) { const result = await processPrescriptionBuffer((req.file as Express.Multer.File).buffer); return res.json(result); }
+      const userId = req.body?.userId || req.headers['x-user-id'] || (req as any).user?.id || 'anonymous';
+      if (req.file) { const result = await processPrescriptionBuffer((req.file as Express.Multer.File).buffer, userId as string); return res.json(result); }
       if (!title?.trim() || !category || stock == null) {
         return next(new ApiError(400, "Missing or invalid required fields"));
       }

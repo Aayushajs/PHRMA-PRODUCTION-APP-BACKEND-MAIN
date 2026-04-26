@@ -7,7 +7,7 @@
 import { Request, Response, NextFunction } from "express";
 import { catchAsyncErrors } from "../Utils/catchAsyncErrors";
 import { ApiError } from "../Utils/ApiError";
-import { processPrescriptionBuffer, MedicineDetails } from "./ocr.Service";
+import { MedicineDetails, preprocessText, extractMedicinesWithRegex, extractMedicinesFallback } from "./ocr.Service";
 
 interface EnrichedMedicine extends MedicineDetails {
   price: number;
@@ -21,19 +21,33 @@ export default class PrescriptionService {
         return next(new ApiError(400, "No prescription image provided"));
       }
 
-      const result = await processPrescriptionBuffer((req.file as Express.Multer.File).buffer);
+      const ocrError = (req as any).ocrError;
+      if (ocrError) {
+        return next(new ApiError(502, ocrError.message || "Failed to extract text from image"));
+      }
 
-      const enriched: EnrichedMedicine[] = (result.medicines || []).map((m) => ({
+      const ocrResult = (req as any).ocrResult;
+      const rawText = ocrResult?.full_text || "";
+
+      // Post-process the text to extract medicines
+      const preprocessedText = preprocessText(rawText);
+      let extractedMedicines = extractMedicinesWithRegex(preprocessedText);
+      if (extractedMedicines.length === 0) {
+         extractedMedicines = extractMedicinesFallback(preprocessedText);
+      }
+
+
+      const enriched: EnrichedMedicine[] = extractedMedicines.map((m) => ({
         ...m,
         price: inferPrice(m) ?? 99.0,
         availability: true,
       }));
 
       const response = {
-        text: result.text,
+        text: rawText,
         medicines: enriched,
         meta: {
-          detectedCount: result.meta?.detectedCount ?? 0,
+          detectedCount: enriched.length,
           enriched: true,
         },
       };
