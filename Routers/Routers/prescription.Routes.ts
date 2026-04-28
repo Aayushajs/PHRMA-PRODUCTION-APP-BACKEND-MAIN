@@ -4,42 +4,75 @@
 └───────────────────────────────────────────────────────────────────────┘
 */
 
-import { Router } from "express";
-import PrescriptionService from "../../Services/prescription.Service";
+import { Router, Request, Response, NextFunction } from "express";
+import PrescriptionService from "../../Services/PrescriptionService/prescription.Service";
 import { customersMiddleware } from "../../Middlewares/CheckLoginMiddleware";
 import uploadImage from "../../config/multer";
-// @ts-ignore - The package might not have type definitions
-import { ocrMiddleware, ocrStreamHandler } from "@development-team/bg-remover";
+import { ocrMiddleware } from "@development-team/bg-remover";
+import sharp from "sharp";
 
 const prescriptionRouter = Router();
-const OCR_WS_URL = process.env.OCR_WS_URL;
-const OCR_WS_TIMEOUT_MS = Number(process.env.OCR_WS_TIMEOUT_MS || 30000);
-const OCR_WS_DEBUG = String(process.env.OCR_WS_DEBUG || "true").toLowerCase() === "true";
+
+/**
+ * Image optimization middleware — runs Sharp before OCR.
+ * Resizes to max 1200px width and compresses to JPEG 82%.
+ * Smaller image = OCR processes ~50% faster, less data to transfer.
+ */
+const optimizeImageForOcr = async (
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+) => {
+  if (!req.file?.buffer) return next();
+  try {
+    const metadata = await sharp(req.file.buffer).metadata();
+    const width = metadata.width ?? 0;
+
+    // Only resize if image is larger than 1200px
+    const pipeline = sharp(req.file.buffer);
+    if (width > 1200) pipeline.resize({ width: 1200, withoutEnlargement: true });
+
+    req.file.buffer = await pipeline
+      .jpeg({ quality: 82, mozjpeg: true })
+      .toBuffer();
+    req.file.mimetype = "image/jpeg";
+  } catch {
+    // If Sharp fails, proceed with original image
+  }
+  next();
+};
 
 // Standard JSON Upload (Waits for OCR to finish and returns structured medicines)
 prescriptionRouter.post(
   "/upload",
   customersMiddleware,
   uploadImage.single("prescription"),
+  optimizeImageForOcr,
   ocrMiddleware({
-    wsUrl: OCR_WS_URL,
-    timeout: OCR_WS_TIMEOUT_MS,
+    stream: false,
+    timeout: 20000,
     retries: 1,
-    debug: OCR_WS_DEBUG
   }),
-  PrescriptionService.extractFromPrescription
+  PrescriptionService.executeFallbackOcr,
 );
 
-// Live Streaming Upload (Pipes WebSocket real-time updates directly to frontend via SSE)
+// Live Streaming Upload (Pipes real-time updates via SSE + Socket.io)
 prescriptionRouter.post(
   "/upload-stream",
-  // customersMiddleware,
+  customersMiddleware,
   uploadImage.single("prescription"),
-  ocrStreamHandler({
-    wsUrl: OCR_WS_URL,
-    timeout: OCR_WS_TIMEOUT_MS,
-    debug: OCR_WS_DEBUG
-  })
+  optimizeImageForOcr,
+  PrescriptionService.streamInterceptorMiddleware,
+  ocrMiddleware({
+    stream: true,
+    timeout: 30000,
+  }),
+  ocrMiddleware({
+    stream: false,
+    timeout: 20000,
+    retries: 1,
+  }),
+  PrescriptionService.executeFallbackOcr,
 );
 
 export default prescriptionRouter;

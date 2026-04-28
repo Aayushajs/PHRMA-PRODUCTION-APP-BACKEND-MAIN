@@ -16,7 +16,7 @@ import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
 import crypto from "crypto";
 import mongoose from "mongoose";
 import NotificationService from "../Middlewares/LogMedillewares/notificationLogger";
-import { processPrescriptionBuffer } from "./ocr.Service";
+
 import User from "../Databases/Models/user.Models";
 
 const CACHE_KEY = "featuredMedicines";
@@ -40,7 +40,7 @@ export default class FeaturedMedicineService {
 
       const createdById = (req as any).user?._id ?? createdBy;
       const userId = req.body?.userId || req.headers['x-user-id'] || (req as any).user?.id || 'anonymous';
-      if (req.file) { const result = await processPrescriptionBuffer((req.file as Express.Multer.File).buffer, userId as string); return res.json(result); }
+
       if (!title?.trim() || !category || stock == null) {
         return next(new ApiError(400, "Missing or invalid required fields"));
       }
