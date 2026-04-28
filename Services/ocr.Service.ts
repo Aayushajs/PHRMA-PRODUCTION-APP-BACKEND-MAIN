@@ -10,7 +10,6 @@ import WebSocket from "ws";
 import crypto from "crypto";
 import FormData from "form-data";
 import { getIO } from "../config/socket";
-import { text } from "express";
 
 export interface MedicineDetails {
   drugName: string;
@@ -30,6 +29,16 @@ export interface OcrResult {
 const OCR_API_KEYS = (process.env.OCR_API_KEYS || "dummy_key_1,dummy_key_2,dummy_key_3,dummy_key_4,dummy_key_5").split(',');
 console.log("ocr keys : ", OCR_API_KEYS);
 let currentKeyIndex = 0;
+
+const OCR_WS_TIMEOUT_MS = Number(process.env.OCR_WS_TIMEOUT_MS || 30000);
+const OCR_WS_DEBUG = String(process.env.OCR_WS_DEBUG || "true").toLowerCase() === "true";
+
+function createOcrLogger(enabled: boolean, traceId: string) {
+  return (...args: unknown[]) => {
+    if (!enabled) return;
+    console.log(`[backend][ocr][${traceId}]`, ...args);
+  };
+}
 
 // Preprocess text: normalize whitespace and remove extra characters
 export function preprocessText(text: string): string {
@@ -212,10 +221,42 @@ const DEFAULT_OCR_WS_URL = process.env.OCR_WS_URL || 'wss://DevelopmentT-backgro
 
 function runOcrOverWsWithSocketIo(imageBuffer: Buffer, userId: string, timeout = 30000): Promise<OcrResult> {
   return new Promise((resolve, reject) => {
-    const ocrUserId = 'user_' + crypto.randomBytes(4).toString('hex');
-    const wsEndpoint = `${DEFAULT_OCR_WS_URL}/ws/ocr?user_id=${ocrUserId}`;
+    const traceId = `ocr_${crypto.randomBytes(4).toString('hex')}`;
+    const log = createOcrLogger(OCR_WS_DEBUG, traceId);
+    // Use the provided userId when available so the OCR server logs match our user rooms.
+    // Fall back to a random user_xxx id only if none is supplied.
+    const safeUserId = userId && String(userId).trim().length > 0
+      ? `user_${String(userId).replace(/[^a-zA-Z0-9_\-:.@]/g, '')}`
+      : 'user_' + crypto.randomBytes(4).toString('hex');
+
+    const wsEndpoint = `${DEFAULT_OCR_WS_URL}/ws/ocr?user_id=${encodeURIComponent(safeUserId)}`;
     const ws = new WebSocket(wsEndpoint);
     const chunks: any[] = [];
+    let settled = false;
+
+    const safeResolve = (payload: OcrResult) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      log('Resolved OCR result', { detectedCount: payload.meta.detectedCount });
+      resolve(payload);
+    };
+
+    const safeReject = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      log('Rejected OCR request', { message: error.message });
+      reject(error);
+    };
+
+    log('Opening OCR websocket', {
+      wsEndpoint,
+      roomUserId: userId,
+      imageBytes: imageBuffer.length,
+      timeout
+    });
+
     let io: ReturnType<typeof getIO> | null = null;
     try {
        io = getIO();
@@ -223,14 +264,17 @@ function runOcrOverWsWithSocketIo(imageBuffer: Buffer, userId: string, timeout =
        console.warn("Socket.io not initialized. Client will not receive live updates.");
     }
     const room = `user:${userId}`;
+    console.log('[backend][ocr] mapping websocket user_id -> room', { wsUserId: safeUserId, room });
 
     const timer = setTimeout(() => {
+      log('OCR websocket timed out; terminating connection');
       ws.terminate();
       if (io) io.to(room).emit('ocr:error', { message: 'OCR connection timed out' });
-      reject(new Error('OCR WebSocket connection timed out'));
+      safeReject(new Error('OCR WebSocket connection timed out'));
     }, timeout);
 
     ws.on('open', () => {
+      log('OCR websocket open; sending image payload');
       if (io) io.to(room).emit('ocr:status', { message: 'Connected to OCR server, sending image...' });
       ws.send(imageBuffer);
     });
@@ -238,13 +282,13 @@ function runOcrOverWsWithSocketIo(imageBuffer: Buffer, userId: string, timeout =
     ws.on('message', (data) => {
       try {
         const parsed = JSON.parse(data.toString());
+        log('OCR websocket event received', { event: parsed.event || 'unknown' });
         
         if (io) io.to(room).emit('ocr:update', parsed);
         
         if (parsed.event === 'ocr_chunk') {
           chunks.push({ text: parsed.text, confidence: parsed.confidence });
         } else if (parsed.event === 'ocr_complete') {
-          clearTimeout(timer);
           ws.close();
           
           const preprocessedText = preprocessText(parsed.full_text || '');
@@ -254,25 +298,34 @@ function runOcrOverWsWithSocketIo(imageBuffer: Buffer, userId: string, timeout =
             medicines = extractMedicinesFallback(preprocessedText);
           }
           
-          resolve({
+          safeResolve({
             text: preprocessedText,
             medicines,
             meta: { detectedCount: medicines.length }
           });
         } else if (parsed.event === 'error') {
-          clearTimeout(timer);
           ws.close();
-          reject(new Error(parsed.message || 'OCR server returned an error'));
+          safeReject(new Error(parsed.message || 'OCR server returned an error'));
         }
       } catch (e) {
-        // ignore malformed messages
+        log('Malformed OCR websocket message', { raw: data.toString() });
       }
     });
 
     ws.on('error', (err) => {
-      clearTimeout(timer);
+      log('OCR websocket error', { message: err.message });
       if (io) io.to(room).emit('ocr:error', { message: err.message });
-      reject(err);
+      safeReject(err as Error);
+    });
+
+    ws.on('close', (code, reason) => {
+      log('OCR websocket closed', {
+        code,
+        reason: reason ? reason.toString() : ''
+      });
+      if (!settled && code !== 1000) {
+        safeReject(new Error(`OCR WebSocket closed unexpectedly (code: ${code})`));
+      }
     });
   });
 }
@@ -283,6 +336,15 @@ export async function processPrescriptionBuffer(buffer: Buffer, userId: string):
      io = getIO();
   } catch (e) {}
 
+  if (OCR_WS_DEBUG) {
+    console.log('[backend][ocr] Starting prescription OCR flow', {
+      userId,
+      imageBytes: buffer.length,
+      wsUrl: DEFAULT_OCR_WS_URL,
+      wsTimeoutMs: OCR_WS_TIMEOUT_MS
+    });
+  }
+
   try {
     if (io) io.to(`user:${userId}`).emit('ocr:status', { message: 'Attempting OCR via API keys...' });
     return await tryApiExtraction(buffer);
@@ -290,6 +352,6 @@ export async function processPrescriptionBuffer(buffer: Buffer, userId: string):
     console.log("All API keys failed, falling back to websocket OCR package...");
     if (io) io.to(`user:${userId}`).emit('ocr:status', { message: 'API keys failed. Falling back to real-time websocket OCR...' });
     
-    return await runOcrOverWsWithSocketIo(buffer, userId);
+    return await runOcrOverWsWithSocketIo(buffer, userId, OCR_WS_TIMEOUT_MS);
   }
 }

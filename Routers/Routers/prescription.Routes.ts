@@ -12,13 +12,21 @@ import uploadImage from "../../config/multer";
 import { ocrMiddleware, ocrStreamHandler } from "@development-team/bg-remover";
 
 const prescriptionRouter = Router();
+const OCR_WS_URL = process.env.OCR_WS_URL;
+const OCR_WS_TIMEOUT_MS = Number(process.env.OCR_WS_TIMEOUT_MS || 30000);
+const OCR_WS_DEBUG = String(process.env.OCR_WS_DEBUG || "true").toLowerCase() === "true";
 
 // Standard JSON Upload (Waits for OCR to finish and returns structured medicines)
 prescriptionRouter.post(
   "/upload",
   customersMiddleware,
   uploadImage.single("prescription"),
-  ocrMiddleware({ retries: 1 }),
+  ocrMiddleware({
+    wsUrl: OCR_WS_URL,
+    timeout: OCR_WS_TIMEOUT_MS,
+    retries: 1,
+    debug: OCR_WS_DEBUG
+  }),
   PrescriptionService.extractFromPrescription
 );
 
@@ -27,7 +35,11 @@ prescriptionRouter.post(
   "/upload-stream",
   // customersMiddleware,
   uploadImage.single("prescription"),
-  ocrStreamHandler({ retries: 1 })
+  ocrStreamHandler({
+    wsUrl: OCR_WS_URL,
+    timeout: OCR_WS_TIMEOUT_MS,
+    debug: OCR_WS_DEBUG
+  })
 );
 
 export default prescriptionRouter;
