@@ -17,7 +17,7 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "@development-team/bg-remover": "^1.1.0",
+    "@development-team/bg-remover": "^1.2.0",
     "@sendgrid/mail": "^8.1.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/socket.io": "^3.0.1",
@@ -31,8 +31,10 @@
     "express": "^5.1.0",
     "figlet": "^1.9.3",
     "firebase-admin": "^13.6.0",
+    "fuse.js": "^7.3.0",
     "google-auth-library": "^10.4.0",
     "jsonwebtoken": "^9.0.2",
+    "lru-cache": "^11.3.5",
     "mongoose": "^8.18.1",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
@@ -49,6 +51,8 @@
     "start": "bun run server.ts",
     "dev": "bun --watch server.ts",
     "build": "tsc",
-    "seed:flags": "npx ts-node scripts/seedFeatureFlags.ts"
+    "seed:flags": "npx ts-node scripts/seedFeatureFlags.ts",
+    "docker:build": "docker build -t e-pharmacy-backend .",
+    "docker:run": "docker run -p 5000:5000 --env-file .env e-pharmacy-backend"
   }
 }
