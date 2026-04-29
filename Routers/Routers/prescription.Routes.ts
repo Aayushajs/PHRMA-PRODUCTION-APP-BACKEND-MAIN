@@ -35,6 +35,10 @@ prescriptionRouter.post(
   "/upload-stream",
   // customersMiddleware,
   uploadImage.single("prescription"),
+  (req, res, next) => {
+    console.log("FILE:", req.file);
+    next();
+  },
   ocrStreamHandler({
     wsUrl: OCR_WS_URL,
     timeout: OCR_WS_TIMEOUT_MS,
