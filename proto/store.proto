@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+service StoreService {
+  rpc GetStoreAvailability (StoreRequest) returns (StoreResponse);
+}
+
+message StoreRequest {
+  repeated string medicines = 1;
+  double latitude = 2;
+  double longitude = 3;
+  double radiusKm = 4;
+}
+
+message Store {
+  string storeId = 1;
+  string storeName = 2;
+  string medicineName = 3;
+  double price = 4;
+  bool availability = 5;
+  double distance = 6;
+}
+
+message StoreResponse {
+  repeated Store stores = 1;
+}

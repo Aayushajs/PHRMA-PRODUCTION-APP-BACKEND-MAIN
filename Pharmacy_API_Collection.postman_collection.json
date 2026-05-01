@@ -1,0 +1,768 @@
+{
+  "info": {
+    "name": "Pharmacy Microservices API",
+    "description": "Complete API testing collection for OCR prescriptions, search, bucket, and store management",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "gateway_url",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "ocr_service_url",
+      "value": "http://localhost:5000"
+    },
+    {
+      "key": "store_service_url",
+      "value": "http://localhost:5000"
+    },
+    {
+      "key": "auth_token",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI1MDdmMWY3N2JjZjg2Y2Q3OTk0MzkwMTEiLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJyb2xlIjoiY3VzdG9tZXIiLCJpYXQiOjE3MDQwNjcyMDAsImV4cCI6MTg1MTc1MzYwMH0.signature"
+    },
+    {
+      "key": "user_id",
+      "value": "507f1f77bcf86cd799439011"
+    },
+    {
+      "key": "prescription_id",
+      "value": "507f191e810c19729de860ea"
+    },
+    {
+      "key": "store_id",
+      "value": "507f1f77bcf86cd799439012"
+    },
+    {
+      "key": "medicine_id",
+      "value": "507f191e810c19729de860e1"
+    }
+  ],
+  "item": [
+    {
+      "name": "📄 Prescription APIs",
+      "item": [
+        {
+          "name": "Upload Single Prescription Image",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "prescription",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/prescription/upload",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "prescription",
+                "upload"
+              ]
+            },
+            "description": "Upload a single prescription image for OCR processing.\n\n**Headers:**\n- `Authorization: Bearer {{auth_token}}`\n\n**Response Time:** 15-25 seconds"
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Prescription with Stream (Real-time)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "prescription",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/prescription/upload-stream",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "prescription",
+                "upload-stream"
+              ]
+            },
+            "description": "Upload prescription with real-time streaming updates via Server-Sent Events (SSE).\n\n**Note:** Use EventSource in browser or enable streaming in Postman.\n\n**Response Format:** SSE with progress events"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🔍 Search APIs",
+      "item": [
+        {
+          "name": "Search Medicines by Prescription (Filtered)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prescriptionId\": \"{{prescription_id}}\",\n  \"userLocation\": {\n    \"latitude\": 19.0760,\n    \"longitude\": 72.8777\n  },\n  \"filters\": {\n    \"maxPrice\": 500,\n    \"maxDistance\": 5,\n    \"availability\": \"in_stock\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/search",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ]
+            },
+            "description": "Search medicines from a prescription with optional filters for price, distance, and availability.\n\n**Required Body:**\n- `prescriptionId` (string)\n\n**Optional Filters:**\n- `maxPrice` (number)\n- `maxDistance` (number, km)\n- `availability` (string: in_stock, out_of_stock)\n\n**Response:** Medicine-view and store-view aggregated data"
+          },
+          "response": []
+        },
+        {
+          "name": "Global Medicine Search",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_url}}/api/search/global?q=aspirin&lat=19.0760&lng=72.8777&limit=20",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "search",
+                "global"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "aspirin",
+                  "description": "Search query (medicine name)"
+                },
+                {
+                  "key": "lat",
+                  "value": "19.0760",
+                  "description": "Latitude (optional)"
+                },
+                {
+                  "key": "lng",
+                  "value": "72.8777",
+                  "description": "Longitude (optional)"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Results limit (default: 10)"
+                }
+              ]
+            },
+            "description": "Search medicines globally across all stores.\n\n**Query Parameters:**\n- `q` (required): Medicine name\n- `lat`, `lng` (optional): For distance calculation\n- `limit` (optional): Max results (default 10)\n\n**Note:** No authentication required"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🛒 Bucket/Cart APIs",
+      "item": [
+        {
+          "name": "Get User Bucket",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_url}}/api/bucket?prescriptionId={{prescription_id}}",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "bucket"
+              ],
+              "query": [
+                {
+                  "key": "prescriptionId",
+                  "value": "{{prescription_id}}",
+                  "description": "Prescription ID (optional)"
+                }
+              ]
+            },
+            "description": "Retrieve user's bucket with all items from different stores.\n\n**Query Parameters:**\n- `prescriptionId` (optional): Filter by prescription\n\n**Response:** Bucket collections grouped by store"
+          },
+          "response": []
+        },
+        {
+          "name": "Add Medicine to Bucket",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prescriptionId\": \"{{prescription_id}}\",\n  \"store\": {\n    \"storeId\": \"{{store_id}}\",\n    \"storeName\": \"City Pharmacy\",\n    \"storeLocation\": {\n      \"latitude\": 19.0765,\n      \"longitude\": 72.8765\n    },\n    \"medicines\": [\n      {\n        \"medicineId\": \"{{medicine_id}}\",\n        \"medicineName\": \"Aspirin\",\n        \"dosage\": \"500mg\",\n        \"price\": 45,\n        \"quantity\": 2\n      }\n    ]\n  }\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/bucket/add",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "bucket",
+                "add"
+              ]
+            },
+            "description": "Add medicines from a store to user's bucket.\n\n**Required Fields:**\n- `prescriptionId`: Related prescription\n- `store`: Store object with medicines array"
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Medicine from Bucket",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prescriptionId\": \"{{prescription_id}}\",\n  \"storeId\": \"{{store_id}}\",\n  \"medicineId\": \"{{medicine_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/bucket/remove",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "bucket",
+                "remove"
+              ]
+            },
+            "description": "Remove a specific medicine or entire store from user's bucket.\n\n**Required Fields:**\n- `prescriptionId`\n- `storeId`\n- `medicineId` (optional, if omitted removes entire store)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🏪 Medicine Store APIs",
+      "item": [
+        {
+          "name": "Get All Stores",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_url}}/v2/medicine-store/all?latitude=19.0760&longitude=72.8777&radius=10",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "v2",
+                "medicine-store",
+                "all"
+              ],
+              "query": [
+                {
+                  "key": "latitude",
+                  "value": "19.0760",
+                  "description": "Latitude for distance calculation (optional)"
+                },
+                {
+                  "key": "longitude",
+                  "value": "72.8777",
+                  "description": "Longitude for distance calculation (optional)"
+                },
+                {
+                  "key": "radius",
+                  "value": "10",
+                  "description": "Search radius in km (optional)"
+                }
+              ]
+            },
+            "description": "Get all registered medicine stores with optional location-based filtering.\n\n**Note:** No authentication required"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Store Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_url}}/v2/medicine-store/{{store_id}}",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "v2",
+                "medicine-store",
+                "{{store_id}}"
+              ]
+            },
+            "description": "Get detailed information about a specific store.\n\n**Path Parameters:**\n- `storeId`: Store ID\n\n**Response:** Full store profile with hours, contact, rating"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Store Items/Medicines",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_url}}/v2/medicine-store/{{store_id}}/items?category=pain-relief&inStock=true&limit=20&offset=0",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "v2",
+                "medicine-store",
+                "{{store_id}}",
+                "items"
+              ],
+              "query": [
+                {
+                  "key": "category",
+                  "value": "pain-relief",
+                  "description": "Filter by category (optional)"
+                },
+                {
+                  "key": "inStock",
+                  "value": "true",
+                  "description": "Filter by stock status (optional)"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Results limit (default 20)"
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": "Pagination offset (default 0)"
+                },
+                {
+                  "key": "search",
+                  "value": "aspirin",
+                  "description": "Search medicine name (optional)"
+                }
+              ]
+            },
+            "description": "Get medicines/items available in a specific store with filters.\n\n**Authentication:** Required"
+          },
+          "response": []
+        },
+        {
+          "name": "Search Medicines in Store",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_url}}/v2/medicine-store/{{store_id}}/items/search?q=aspirin&maxPrice=100",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "v2",
+                "medicine-store",
+                "{{store_id}}",
+                "items",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "aspirin",
+                  "description": "Search query (medicine name)"
+                },
+                {
+                  "key": "maxPrice",
+                  "value": "100",
+                  "description": "Max price filter (optional)"
+                }
+              ]
+            },
+            "description": "Search for specific medicines within a store.\n\n**Authentication:** Required"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Store Review Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_url}}/v2/medicine-store/{{store_id}}/review-stats",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "v2",
+                "medicine-store",
+                "{{store_id}}",
+                "review-stats"
+              ]
+            },
+            "description": "Get store ratings and review statistics.\n\n**Note:** No authentication required"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Available Medicines",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_url}}/v2/medicine-store/{{store_id}}/items/available",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "v2",
+                "medicine-store",
+                "{{store_id}}",
+                "items",
+                "available"
+              ]
+            },
+            "description": "Get list of medicines currently in stock at the store.\n\n**Authentication:** Required"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Store Opening Hours",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_url}}/v2/medicine-store/{{store_id}}/hours",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "v2",
+                "medicine-store",
+                "{{store_id}}",
+                "hours"
+              ]
+            },
+            "description": "Get store operating hours and current status.\n\n**Note:** No authentication required"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Store Inventory Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_url}}/v2/medicine-store/{{store_id}}/inventory-status",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "v2",
+                "medicine-store",
+                "{{store_id}}",
+                "inventory-status"
+              ]
+            },
+            "description": "Get detailed inventory statistics for the store.\n\n**Note:** No authentication required"
+          },
+          "response": []
+        },
+        {
+          "name": "Give Store Review",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 5,\n  \"comment\": \"Excellent service and quality medicines\",\n  \"prescriptionOrderId\": \"{{prescription_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/v2/medicine-store/{{store_id}}/review",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "v2",
+                "medicine-store",
+                "{{store_id}}",
+                "review"
+              ]
+            },
+            "description": "Submit a review and rating for a store.\n\n**Authentication:** Required\n\n**Body Fields:**\n- `rating` (1-5): Star rating\n- `comment`: Review text\n- `prescriptionOrderId`: Related prescription (optional)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🧪 Test Flow Examples",
+      "item": [
+        {
+          "name": "1. Upload Prescription",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "prescription",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/prescription/upload",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "prescription",
+                "upload"
+              ]
+            },
+            "description": "Step 1: Upload a prescription image. Save the returned prescriptionId to {{prescription_id}} variable."
+          },
+          "response": []
+        },
+        {
+          "name": "2. Search Medicines from Prescription",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prescriptionId\": \"{{prescription_id}}\",\n  \"userLocation\": {\n    \"latitude\": 19.0760,\n    \"longitude\": 72.8777\n  },\n  \"filters\": {\n    \"maxPrice\": 500,\n    \"maxDistance\": 10,\n    \"availability\": \"in_stock\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/search",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ]
+            },
+            "description": "Step 2: Search for medicines from the prescription with location and price filters."
+          },
+          "response": []
+        },
+        {
+          "name": "3. Add Medicines to Bucket",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prescriptionId\": \"{{prescription_id}}\",\n  \"store\": {\n    \"storeId\": \"{{store_id}}\",\n    \"storeName\": \"City Pharmacy\",\n    \"storeLocation\": {\n      \"latitude\": 19.0765,\n      \"longitude\": 72.8765\n    },\n    \"medicines\": [\n      {\n        \"medicineId\": \"507f191e810c19729de860e1\",\n        \"medicineName\": \"Aspirin\",\n        \"dosage\": \"500mg\",\n        \"price\": 45,\n        \"quantity\": 2\n      }\n    ]\n  }\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/bucket/add",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "bucket",
+                "add"
+              ]
+            },
+            "description": "Step 3: Select a store and add medicines to your bucket."
+          },
+          "response": []
+        },
+        {
+          "name": "4. View Bucket",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_url}}/api/bucket?prescriptionId={{prescription_id}}",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "bucket"
+              ],
+              "query": [
+                {
+                  "key": "prescriptionId",
+                  "value": "{{prescription_id}}"
+                }
+              ]
+            },
+            "description": "Step 4: View your bucket with all added items grouped by store."
+          },
+          "response": []
+        },
+        {
+          "name": "5. Give Store Review",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 5,\n  \"comment\": \"Great quality medicines and fast service!\",\n  \"prescriptionOrderId\": \"{{prescription_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/v2/medicine-store/{{store_id}}/review",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "v2",
+                "medicine-store",
+                "{{store_id}}",
+                "review"
+              ]
+            },
+            "description": "Step 5: Submit a review for the store."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

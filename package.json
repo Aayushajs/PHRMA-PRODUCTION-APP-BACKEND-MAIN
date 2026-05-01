@@ -18,6 +18,8 @@
   },
   "dependencies": {
     "@development-team/bg-remover": "^1.2.0",
+    "@grpc/grpc-js": "^1.14.3",
+    "@grpc/proto-loader": "^0.8.0",
     "@sendgrid/mail": "^8.1.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/socket.io": "^3.0.1",
