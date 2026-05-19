@@ -134,11 +134,16 @@ export default class PrescriptionService {
             if (uid) {
               const user = await User.findById(uid).select("fcmToken name");
               if (user && user.fcmToken) {
-                const message = `Status: medicines_found. Extracted ${allEnriched.length} medicines from the prescription.`;
+                const medicinePlural = allEnriched.length === 1 ? "medicine" : "medicines";
+                const title = " Prescription Ready";
+                const message = allEnriched.length > 0 
+                  ? `We found ${allEnriched.length} ${medicinePlural} in your prescription. Review and order now.`
+                  : `Your prescription has been processed. No medicines were detected.`;
+                
                 await NotificationService.sendNotificationWithLog(
                   user._id,
                   user.fcmToken,
-                  "Prescription Processing Complete",
+                  title,
                   message,
                   {
                     type: "SYSTEM",
@@ -169,8 +174,8 @@ export default class PrescriptionService {
                 await NotificationService.sendNotificationWithLog(
                   user._id,
                   user.fcmToken,
-                  "Prescription Processing Failed",
-                  `Status: error. ${errorMsg}`,
+                  " Prescription Processing Failed",
+                  `We couldn't process your prescription. Please upload a clear image and try again.`,
                   { type: "SYSTEM", payload: { event: "error", error: errorMsg } },
                 );
               }
@@ -205,8 +210,8 @@ export default class PrescriptionService {
               await NotificationService.sendNotificationWithLog(
                 user._id,
                 user.fcmToken,
-                "Prescription Processing Failed",
-                `Status: error. ${errorMsg}`,
+                "❌ Prescription Processing Failed",
+                `We couldn't process your prescription. Please upload a clear image and try again.`,
                 {
                   type: "SYSTEM",
                   payload: { event: "error", error: errorMsg },
@@ -265,11 +270,16 @@ export default class PrescriptionService {
         if (userId) {
           const user = await User.findById(userId).select("fcmToken name");
           if (user && user.fcmToken) {
-            const message = `Status: medicines_found. Extracted ${enriched.length} medicines from the prescription.`;
+            const medicinePlural = enriched.length === 1 ? "medicine" : "medicines";
+            const title = "✅ Prescription Ready";
+            const message = enriched.length > 0
+              ? `We found ${enriched.length} ${medicinePlural} in your prescription. Review and order now.`
+              : `Your prescription has been processed. No medicines were detected.`;
+            
             await NotificationService.sendNotificationWithLog(
               user._id,
               user.fcmToken,
-              "Prescription Processing Complete",
+              title,
               message,
               {
                 type: "SYSTEM",
@@ -286,7 +296,7 @@ export default class PrescriptionService {
       }
 
       // Since we are falling back from SSE, output SSE-like formatting if interceptor is in place
-      if (req.headers.accept === "text/event-stream") {
+      if (req.headers.accept?.includes("text/event-stream")) {
         res.setHeader("Content-Type", "text/event-stream");
         res.setHeader("Cache-Control", "no-cache");
         res.setHeader("Connection", "keep-alive");

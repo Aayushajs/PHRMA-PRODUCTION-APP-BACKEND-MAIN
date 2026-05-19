@@ -11,10 +11,13 @@
     "@types/multer": "^2.0.0",
     "@types/node": "^24.5.2",
     "@types/nodemailer": "^7.0.1",
+    "@typescript-eslint/eslint-plugin": "^8.59.4",
+    "@typescript-eslint/parser": "^8.59.4",
+    "eslint": "^10.4.0",
     "tsx": "^4.21.0"
   },
   "peerDependencies": {
-    "typescript": "^5"
+    "typescript": "^6.0.3"
   },
   "dependencies": {
     "@development-team/bg-remover": "^1.2.0",
@@ -52,7 +55,13 @@
     "dev": "bun --watch server.ts",
     "build": "tsc",
     "seed:flags": "npx ts-node scripts/seedFeatureFlags.ts",
+    "format": "prettier --write .",
     "docker:build": "docker build -t e-pharmacy-backend .",
-    "docker:run": "docker run -p 5000:5000 --env-file .env e-pharmacy-backend"
+    "docker:run": "docker run -p 5000:5000 --env-file .env e-pharmacy-backend",
+    "docker:up": "docker compose -f docker-compose.yml up -d",
+    "docker:down": "docker compose -f docker-compose.yml down",
+    "docker:logs": "docker compose -f docker-compose.yml logs -f",
+    "db:up": "docker compose -f docker-compose.yml up -d redis",
+    "test": "bun test"
   }
 }
