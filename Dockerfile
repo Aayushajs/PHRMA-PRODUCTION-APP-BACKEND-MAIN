@@ -14,36 +14,21 @@ WORKDIR /usr/src/app
 # ------------- COPY DEPENDENCY FILES ONLY (for caching) -----------
 COPY package.json bun.lock ./
 
-# Install dependencies (including devDeps for TypeScript build)
-RUN bun install --frozen-lockfile
+# Install production deps only — Bun runs TypeScript natively, no tsc build step.
+# This also avoids TS path-alias resolution issues that broke `dist/*.js`.
+RUN bun install --frozen-lockfile --production
 
 # ------------- COPY SOURCE CODE (excludes tests via .dockerignore) -----
 COPY . .
 
-# ------------- BUILD TYPESCRIPT (excludes test files via tsconfig) -----
-RUN bun run build:prod
-
 # Create necessary folders
 RUN mkdir -p /usr/src/app/temp_uploads
 
-# Remove development dependencies to reduce image size
-RUN bun install --production --no-save
+# Drop test sources from the image (kept tiny). All other .ts files are needed
+# because Bun runs them directly at runtime — DO NOT delete them.
+RUN rm -rf tests/
 
-# Remove source files, keep only compiled JavaScript
-RUN rm -rf \
-    server.ts \
-    *.ts \
-    Services/ \
-    Middlewares/ \
-    Routers/ \
-    Databases/ \
-    Utils/ \
-    config/ \
-    tests/ \
-    types/ \
-    scripts/
-
-# Fix ownership (optional)
+# Fix ownership
 RUN chown -R bun:bun /usr/src/app
 
 EXPOSE 5000
@@ -52,4 +37,6 @@ EXPOSE 5000
 USER bun
 
 # ------------- START APPLICATION -------------
-CMD ["bun", "run", "dist/server.js"]
+# Run TypeScript directly with Bun. Bun resolves tsconfig "paths" natively,
+# so we never end up with unresolved "@services/..." imports in production.
+CMD ["bun", "run", "server.ts"]

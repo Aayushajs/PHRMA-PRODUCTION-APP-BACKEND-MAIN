@@ -476,6 +476,14 @@ export default class CategoryService {
         return next(new ApiError(400, "Category ID is required"));
       }
 
+      // BUGFIX: aggregation $match does NOT auto-cast string → ObjectId
+      // (unlike findById). Without this guard, the pipeline silently matched
+      // nothing for any valid id, returning empty results.
+      if (!mongoose.isValidObjectId(id)) {
+        return next(new ApiError(400, "Invalid Category ID"));
+      }
+      const matchId = new mongoose.Types.ObjectId(id);
+
       const cacheKey = `${CACHE_PREFIX}:single:${id}`;
       const cachedData = await getCache(cacheKey);
 
@@ -490,7 +498,7 @@ export default class CategoryService {
       }
 
       const pipeline: any[] = [
-        { $match: { _id: id } },
+        { $match: { _id: matchId } },
         {
           $addFields: {
             imageCount: { $size: { $ifNull: ["$imageUrl", []] } },

@@ -8,9 +8,9 @@
 */
 
 import { Router } from 'express';
-import NotificationService from '@services/NotificationServices/notification.Service';
-import { authenticatedUserMiddleware } from '@middlewares/CheckLoginMiddleware';
-import { internalServiceAuth } from '@middlewares/internalServiceAuth';
+import NotificationService from '../../Services/NotificationServices/notification.Service';
+import { authenticatedUserMiddleware } from '../../Middlewares/CheckLoginMiddleware';
+import { internalServiceAuth } from '../../Middlewares/internalServiceAuth';
 
 const notificationRouter = Router();
 

@@ -62,6 +62,9 @@ export default class UserService {
 
   public static signup = catchAsyncErrors(
     async (req: Request, res: Response, next: NextFunction) => {
+      // SECURITY: `role` is intentionally NOT destructured from req.body.
+      // Self-signup must always create CUSTOMER accounts. Privilege
+      // changes are admin-only and live on a separate endpoint.
       const {
         name,
         email,
@@ -69,7 +72,6 @@ export default class UserService {
         phone,
         age,
         dob,
-        role,
         fcmToken,
         address
       } = req.body;
@@ -121,7 +123,9 @@ export default class UserService {
         phone: phone.trim(),
         age: age || undefined,
         dob: dob || undefined,
-        role: role || RoleIndex.CUSTOMER,
+        // SECURITY: role is FORCED to CUSTOMER for self-signup (F-06).
+        // Do NOT honor any role value from the request body.
+        role: RoleIndex.CUSTOMER,
         lastLogin: new Date(),
         fcmToken: fcmToken || "",
       };
@@ -456,11 +460,21 @@ export default class UserService {
         return next(new ApiError(400, "Email and password are required"));
       }
 
-      if (password.length < 4) {
-        return next(new ApiError(400, "Password must be at least 4 characters"));
+      // SECURITY (F-03): require a stronger password. Previous floor of 4
+      // chars allowed near-trivial passwords. 8 is the OWASP minimum.
+      if (password.length < 8) {
+        return next(new ApiError(400, "Password must be at least 8 characters"));
       }
 
       const normalizedEmail = email.toLowerCase().trim();
+
+      // SECURITY (F-03): the body `email` MUST match the authenticated user's
+      // email. Without this, a logged-in attacker could reset *any* user's
+      // password by submitting that user's email after brute-forcing OTP.
+      const authEmail = req.user?.email?.toLowerCase().trim();
+      if (!authEmail || authEmail !== normalizedEmail) {
+        return next(new ApiError(403, "Forbidden: cannot reset another user's password"));
+      }
 
       const user = await UserModel.findOne({ email: normalizedEmail }).select("+password");
 

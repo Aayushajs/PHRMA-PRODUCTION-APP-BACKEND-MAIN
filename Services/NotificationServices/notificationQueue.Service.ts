@@ -7,8 +7,8 @@
 └───────────────────────────────────────────────────────────────────────┘
 */
 
-import { redis } from '@config/redis';
-import { sendPushNotification } from '@utils/notification';
+import { redis } from '../../config/redis';
+import { sendPushNotification } from '../../Utils/notification';
 // allow injection of a redis-like client for tests
 let redisClient: typeof redis = redis;
 
@@ -188,7 +188,7 @@ class NotificationQueue {
     }
 
     try {
-      const { sendPushNotification } = await import('@utils/notification');
+      const { sendPushNotification } = await import('../../Utils/notification');
       const result = await sendPushNotification(
         notification.fcmToken,
         notification.title,
@@ -213,11 +213,11 @@ class NotificationQueue {
     }
 
     try {
-      const UserModel = (await import('@models/user.Models')).default;
+      const UserModel = (await import('../../Databases/Models/user.Models')).default;
       const user = await UserModel.findById(notification.userId).select('fcmToken');
 
       if (!user || !user.fcmToken) {
-        console.error(`❌ User ${notification.userId} not found or has no FCM token`);
+        console.error(` User ${notification.userId} not found or has no FCM token`);
         return false;
       }
 
@@ -245,7 +245,7 @@ class NotificationQueue {
     }
 
     try {
-      const UserModel = (await import('@models/user.Models')).default;
+      const UserModel = (await import('../../Databases/Models/user.Models')).default;
       const users = await UserModel.find({
         _id: { $in: notification.userIds },
         fcmToken: { $exists: true, $ne: null }
@@ -258,7 +258,7 @@ class NotificationQueue {
 
       const fcmTokens = users.map(user => user.fcmToken as string);
       try {
-        const { sendBulkNotifications } = await import('@utils/notification');
+        const { sendBulkNotifications } = await import('../../Utils/notification');
         const result = await sendBulkNotifications(
           fcmTokens,
           notification.title,

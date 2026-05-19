@@ -35,10 +35,18 @@ if (!corsOriginsEnv) {
   );
 }
 
+// SECURITY (F-01 / F-02): identity headers (`x-user-id`, `x-user-role`,
+// `x-user-email`) and `x-internal-api-key` are NEVER set by browsers —
+// they are set by the API gateway during service-to-service calls.
+// Exposing them via CORS allowedHeaders lets a browser client *try* to
+// send them, which (combined with a leaked internal key) becomes full
+// identity spoofing. We drop them from the browser-visible list.
+// Gateway → service traffic doesn't go through browser CORS, so it is
+// unaffected.
 app.use(cors({
   origin: corsOrigin,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id', 'x-user-role', 'x-user-email', 'x-internal-api-key'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 }));
 app.use(morgan('dev'));
