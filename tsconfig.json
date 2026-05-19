@@ -19,7 +19,6 @@
             "./types",
             "./node_modules/@types"
         ],
-        "types": ["bun"],
         "lib": [
             "ESNext"
         ],
