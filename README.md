@@ -2,7 +2,7 @@
 
 Enterprise-grade pharmacy management system backend with prescription OCR, inventory management, and real-time notifications.
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### Prerequisites
 - **Node.js** 18+ or **Bun** 1.0+
@@ -40,7 +40,7 @@ Enterprise-grade pharmacy management system backend with prescription OCR, inven
 
 ---
 
-## 📦 Docker Commands
+##  Docker Commands
 
 ### Build Docker Image
 ```bash
@@ -74,7 +74,7 @@ npm run db:up
 
 ---
 
-## 📝 Available Scripts
+##  Available Scripts
 
 | Command | Description |
 |---------|-------------|
@@ -87,7 +87,7 @@ npm run db:up
 
 ---
 
-## 🏗️ Project Structure
+##  Project Structure
 
 ```
 Service1 backend/
@@ -116,7 +116,7 @@ Service1 backend/
 
 ---
 
-## 🐳 Docker Compose Services
+##  Docker Compose Services
 
 ### app (E-Pharmacy Backend)
 - **Port**: 5000
@@ -133,7 +133,7 @@ Service1 backend/
 
 ---
 
-## 🔌 API Endpoints
+##  API Endpoints
 
 ### Prescriptions
 - `POST /prescriptions/upload` - Upload prescription image for OCR
@@ -154,7 +154,7 @@ Service1 backend/
 
 ---
 
-## 🔐 Environment Variables
+##  Environment Variables
 
 ```env
 # Server
@@ -186,7 +186,7 @@ SENDGRID_API_KEY=your_sendgrid_key
 
 ---
 
-## 🧪 Testing
+##  Testing
 
 ### Run All Tests
 ```bash
@@ -205,7 +205,7 @@ bun test --watch
 
 ---
 
-## 📊 Database Schemas
+##  Database Schemas
 
 ### User
 - Email, name, phone
@@ -245,7 +245,7 @@ bun test --watch
 
 ---
 
-## 🚨 Error Handling
+##  Error Handling
 
 All endpoints return standardized responses:
 
@@ -269,7 +269,7 @@ All endpoints return standardized responses:
 
 ---
 
-## 🧹 Code Quality
+##  Code Quality
 
 ### Format Code
 ```bash
@@ -288,7 +288,7 @@ npm run lint
 
 ---
 
-## 🐛 Troubleshooting
+##  Troubleshooting
 
 ### Redis Connection Failed
 ```bash

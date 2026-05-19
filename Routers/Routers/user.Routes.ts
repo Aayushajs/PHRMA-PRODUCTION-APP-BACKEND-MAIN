@@ -22,6 +22,11 @@ r.get('/verify-token', userMiddleware, (req, res) => {
 });
 r.post('/signup', uploadImage.single('profileImage'), UserService.signup);
 r.post('/login', UserService.login);
+// Refresh endpoint — no auth middleware; the refresh cookie/body IS the credential.
+r.post('/refresh-token', UserService.refreshToken);
+// Logout — userMiddleware so we can identify the caller, but the handler
+// is idempotent even if no refresh token is presented.
+r.post('/logout', userMiddleware, UserService.logout);
 r.post('/forgot-password', UserService.forgotPassword);
 r.post('/verify-otp', UserService.verifyOtp);
 r.post('/reset-password', userMiddleware, UserService.ResetPassword);

@@ -9,9 +9,16 @@ import { Response, Request, NextFunction } from "express";
 import { catchAsyncErrors } from "../Utils/catchAsyncErrors";
 import { ApiError } from "../Utils/ApiError";
 import UserModel from "../Databases/Models/user.Models";
+import RefreshTokenModel from "../Databases/Models/refreshToken.Model";
 import bcrypt from "bcryptjs";
 import { handleResponse } from "../Utils/handleResponse";
-import { generateUserToken } from "../Utils/jwtToken";
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  hashRefreshToken,
+  REFRESH_TOKEN_TTL_DAYS,
+} from "../Utils/jwtToken";
+import { setAuthCookies, clearAuthCookies } from "../Utils/authCookies";
 import { generateOtp } from "../Utils/OtpGenerator";
 import { redis } from "../config/redis";
 import { sendEmail } from "../Utils/mailer";
@@ -21,6 +28,38 @@ import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
 import { sendPushNotification } from "../Utils/notification";
 
 export default class UserService {
+  /**
+   * Mint a fresh access + refresh token pair for a user and persist the
+   * refresh token (hashed) so it can be revoked / rotated. Returns the
+   * RAW tokens — caller is responsible for transport (cookies + body).
+   */
+  private static async issueTokensForUser(
+    user: { _id: any; email: string; role: string },
+    req: Request
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    const accessToken = generateAccessToken({
+      _id: user._id,
+      email: user.email,
+      role: user.role,
+    });
+
+    const refreshToken = generateRefreshToken();
+    const tokenHash = hashRefreshToken(refreshToken);
+    const expiresAt = new Date(
+      Date.now() + REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000
+    );
+
+    await RefreshTokenModel.create({
+      userId: user._id,
+      tokenHash,
+      expiresAt,
+      userAgent: (req.headers["user-agent"] as string) || "",
+      ipAddress: req.ip || "",
+    });
+
+    return { accessToken, refreshToken };
+  }
+
   public static signup = catchAsyncErrors(
     async (req: Request, res: Response, next: NextFunction) => {
       const {
@@ -192,11 +231,10 @@ export default class UserService {
 
       const userObj = userExist.toObject();
 
-      const userToken = generateUserToken({
-        _id: userObj._id,
-        email: userObj.email,
-        role: userObj.role,
-      });
+      const { accessToken, refreshToken } = await UserService.issueTokensForUser(
+        { _id: userObj._id, email: userObj.email, role: userObj.role },
+        req
+      );
 
       const userData = {
         _id: userObj._id,
@@ -212,12 +250,7 @@ export default class UserService {
         updatedAt: userObj.updatedAt,
       };
 
-      res.cookie("userToken", userToken, {
-        httpOnly: true,
-        secure: false,
-        sameSite: "lax",
-        maxAge: 14 * 24 * 60 * 60 * 1000,
-      });
+      setAuthCookies(res, accessToken, refreshToken);
 
       if (userExist.fcmToken) {
         try {
@@ -232,9 +265,13 @@ export default class UserService {
         }
       }
 
+      // Response is ADDITIVE — `token` stays for backward compat
+      // (= accessToken) so existing clients keep working.
       return handleResponse(req, res, 200, "Login Successful", {
         user: userData,
-        token: userToken,
+        token: accessToken,
+        accessToken,
+        refreshToken,
       });
     }
   );
@@ -242,14 +279,105 @@ export default class UserService {
   //logout
   public static logout = catchAsyncErrors(
     async (req: Request, res: Response, next: NextFunction) => {
-      res.cookie("userToken", null, {
-        httpOnly: true,
-        secure: false,
-        sameSite: "lax",
-        maxAge: 14 * 24 * 60 * 60 * 1000,
-      });
+      // Best-effort revocation: if a refresh token was supplied (cookie
+      // OR body), mark it as revoked so it can't be reused. Idempotent.
+      const presentedRefresh: string | undefined =
+        req.cookies?.refreshToken || req.body?.refreshToken;
+
+      if (presentedRefresh) {
+        try {
+          const tokenHash = hashRefreshToken(presentedRefresh);
+          await RefreshTokenModel.updateOne(
+            { tokenHash, revokedAt: null },
+            { $set: { revokedAt: new Date() } }
+          );
+        } catch (err) {
+          // Logout must remain idempotent even if DB write fails.
+          console.error("Failed to revoke refresh token on logout:", err);
+        }
+      }
+
+      clearAuthCookies(res);
 
       return handleResponse(req, res, 200, "Logout Successful");
+    }
+  );
+
+  /**
+   * Refresh token endpoint — exchanges a valid refresh token for a new
+   * access + refresh token pair (rotation). Detects reuse of an already-
+   * revoked token and treats it as theft: revokes the entire chain.
+   *
+   * No auth middleware — the refresh token IS the credential.
+   */
+  public static refreshToken = catchAsyncErrors(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const presented: string | undefined =
+        req.cookies?.refreshToken || req.body?.refreshToken;
+
+      if (!presented) {
+        return next(new ApiError(401, "Refresh token missing"));
+      }
+
+      const tokenHash = hashRefreshToken(presented);
+      const stored = await RefreshTokenModel.findOne({ tokenHash });
+
+      if (!stored) {
+        return next(new ApiError(401, "Invalid refresh token"));
+      }
+
+      // Reuse detection: token was already rotated/revoked → theft.
+      if (stored.revokedAt) {
+        await RefreshTokenModel.updateMany(
+          { userId: stored.userId, revokedAt: null },
+          { $set: { revokedAt: new Date() } }
+        );
+        clearAuthCookies(res);
+        return next(new ApiError(401, "Session invalidated"));
+      }
+
+      if (stored.expiresAt.getTime() <= Date.now()) {
+        return next(new ApiError(401, "Refresh token expired"));
+      }
+
+      const user = await UserModel.findById(stored.userId).lean();
+      if (!user) {
+        return next(new ApiError(401, "User no longer exists"));
+      }
+
+      // Issue new pair, then link the chain (replacedByHash) and revoke old.
+      const { accessToken, refreshToken: newRefresh } =
+        await UserService.issueTokensForUser(
+          { _id: user._id, email: user.email, role: user.role },
+          req
+        );
+
+      stored.revokedAt = new Date();
+      stored.replacedByHash = hashRefreshToken(newRefresh);
+      await stored.save();
+
+      const userData = {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        fcmToken: user.fcmToken,
+        lastLogin: user.lastLogin,
+        address: user.address,
+        role: user.role,
+        ProfileImage: user.ProfileImage || [],
+        createdAt: (user as any).createdAt,
+        updatedAt: (user as any).updatedAt,
+      };
+
+      setAuthCookies(res, accessToken, newRefresh);
+
+      return handleResponse(req, res, 200, "Token refreshed", {
+        user: userData,
+        token: accessToken,
+        accessToken,
+        refreshToken: newRefresh,
+      });
     }
   );
 
@@ -480,20 +608,20 @@ export default class UserService {
           // console.log('✅ Existing user updated with Google Sign-In:', email);
         }
 
-        // console.log('🔑 Generating JWT token...');
-        const jwtToken = generateUserToken(user.toObject());;
+        // console.log('🔑 Generating tokens...');
+        const { accessToken, refreshToken } = await UserService.issueTokensForUser(
+          { _id: user._id, email: user.email, role: user.role },
+          req
+        );
 
-        res.cookie("userToken", jwtToken, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: "lax",
-          maxAge: 14 * 24 * 60 * 60 * 1000,
-        });
+        setAuthCookies(res, accessToken, refreshToken);
 
         // console.log('✅ Google authentication complete');
         return handleResponse(req, res, 200, "Google Login Successful", {
           user: user,
-          token: jwtToken,
+          token: accessToken,
+          accessToken,
+          refreshToken,
         });
       } catch (error: any) {
         // console.error('❌ Google authentication error:', error);

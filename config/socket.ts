@@ -6,6 +6,10 @@
 
 import { Server as SocketIOServer } from 'socket.io';
 import { Server as HTTPServer } from 'http';
+import jwt from 'jsonwebtoken';
+import dotenv from 'dotenv';
+
+dotenv.config({ path: './config/.env' });
 
 let io: SocketIOServer | null = null;
 
@@ -20,27 +24,63 @@ export const initializeSocket = (httpServer: HTTPServer) => {
     pingInterval: 25000
   });
 
-  io.on('connection', (socket) => {
-    console.log(`✅ Client connected: ${socket.id}`);
+  // Authenticate socket connection using JWT provided in handshake
+  io.use((socket, next) => {
+    try {
+      const auth = (socket.handshake.auth as any) || {};
+      const headers = (socket.handshake.headers as any) || {};
+      let token: string | undefined = undefined;
 
-    // Join user-specific room for personalized updates
+      if (typeof auth.token === 'string') token = auth.token;
+      if (!token && typeof headers.authorization === 'string') token = headers.authorization;
+      if (!token) return next(new Error('Authentication token required'));
+
+      token = token.replace(/^Bearer\s+/i, '');
+      const secret = process.env.USER_SECRET_KEY as string;
+      if (!secret) return next(new Error('Server misconfigured: missing USER_SECRET_KEY'));
+
+      const decoded = jwt.verify(token, secret) as any;
+      socket.data.user = {
+        id: decoded?.id || decoded?.userId || decoded?.sub,
+        role: decoded?.role,
+        email: decoded?.email,
+      };
+
+      return next();
+    } catch (err) {
+      return next(new Error('Invalid authentication token'));
+    }
+  });
+
+  io.on('connection', (socket) => {
+    console.log(`✅ Authenticated client connected: ${socket.id} user=${socket.data.user?.id}`);
+
+    // Join user-specific room for personalized updates (only same user or admin)
     socket.on('join:user', (userId: string) => {
-      socket.join(`user:${userId}`);
-      console.log(`User ${userId} joined their room`);
+      if (!socket.data.user) { socket.emit('error', 'unauthorized'); return; }
+      if (socket.data.user.id === userId || socket.data.user.role === 'admin') {
+        socket.join(`user:${userId}`);
+        console.log(`User ${userId} joined their room`);
+      } else {
+        socket.emit('error', 'forbidden');
+      }
     });
 
-    // Join category room for category-specific updates
+    // Join category room for category-specific updates (authenticated users allowed)
     socket.on('join:category', (categoryId: string) => {
+      if (!socket.data.user) { socket.emit('error', 'unauthorized'); return; }
       socket.join(`category:${categoryId}`);
-      console.log(`Joined category room: ${categoryId}`);
+      console.log(`Joined category room: ${categoryId} by user ${socket.data.user.id}`);
     });
 
     // Leave rooms
     socket.on('leave:user', (userId: string) => {
+      if (!socket.data.user) { socket.emit('error', 'unauthorized'); return; }
       socket.leave(`user:${userId}`);
     });
 
     socket.on('leave:category', (categoryId: string) => {
+      if (!socket.data.user) { socket.emit('error', 'unauthorized'); return; }
       socket.leave(`category:${categoryId}`);
     });
 

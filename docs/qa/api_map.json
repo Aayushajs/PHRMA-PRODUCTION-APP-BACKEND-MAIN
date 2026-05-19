@@ -1,0 +1,159 @@
+{
+  "base_path": "/api/v1",
+  "routes": [
+    {
+      "prefix": "/users",
+      "endpoints": [
+        { "method": "GET", "path": "/verify-token", "middleware": ["userMiddleware"], "handler": "UserService.verifyToken (inline)" },
+        { "method": "POST", "path": "/signup", "middleware": ["uploadImage.single('profileImage')"], "handler": "UserService.signup" },
+        { "method": "POST", "path": "/login", "middleware": [], "handler": "UserService.login" },
+        { "method": "POST", "path": "/forgot-password", "middleware": [], "handler": "UserService.forgotPassword" },
+        { "method": "POST", "path": "/verify-otp", "middleware": [], "handler": "UserService.verifyOtp" },
+        { "method": "POST", "path": "/reset-password", "middleware": ["userMiddleware"], "handler": "UserService.ResetPassword" },
+        { "method": "POST", "path": "/google-login", "middleware": [], "handler": "UserService.googleAuthLogin" },
+        { "method": "GET", "path": "/profile", "middleware": ["userMiddleware"], "handler": "UserService.getUserProfile" },
+        { "method": "PUT", "path": "/update/profile", "middleware": ["userMiddleware","uploadImage.single('profileImage')"], "handler": "UserService.updateUserProfile" }
+      ]
+    },
+    {
+      "prefix": "/featured-medicines",
+      "endpoints": [
+        { "method": "POST", "path": "/create", "middleware": ["adminMiddleware","uploadImage.single('imageUrl')"], "handler": "FeaturedMedicineService.createFeaturedMedicine" },
+        { "method": "GET", "path": "/", "middleware": [], "handler": "FeaturedMedicineService.getFeaturedMedicines" },
+        { "method": "PUT", "path": "/:id", "middleware": ["adminMiddleware","uploadImage.single('imageUrl')"], "handler": "FeaturedMedicineService.updateFeaturedMedicine" },
+        { "method": "DELETE", "path": "/:id", "middleware": ["adminMiddleware"], "handler": "FeaturedMedicineService.deleteFeaturedMedicine" },
+        { "method": "GET", "path": "/logs", "middleware": ["adminMiddleware"], "handler": "FeaturedMedicineLogService.getAllLogs" },
+        { "method": "GET", "path": "/logs/stats", "middleware": ["adminMiddleware"], "handler": "FeaturedMedicineLogService.getLogStats" },
+        { "method": "GET", "path": "/logs/date-range", "middleware": ["adminMiddleware"], "handler": "FeaturedMedicineLogService.getLogsByDateRange" },
+        { "method": "GET", "path": "/logs/:id", "middleware": ["adminMiddleware"], "handler": "FeaturedMedicineLogService.getLogById" }
+      ]
+    },
+    {
+      "prefix": "/categories",
+      "endpoints": [
+        { "method": "POST", "path": "/create", "middleware": ["adminMiddleware","uploadImage.fields(...)"], "handler": "CategoryService.createCategory" },
+        { "method": "GET", "path": "/", "middleware": [], "handler": "CategoryService.getAllCategory" },
+        { "method": "GET", "path": "/list", "middleware": [], "handler": "CategoryService.getCategoriesSimple" },
+        { "method": "GET", "path": "/logs/debug", "middleware": [], "handler": "CategoryLogService.getDebugInfo" },
+        { "method": "GET", "path": "/logs", "middleware": [], "handler": "CategoryLogService.getAllLogs" },
+        { "method": "GET", "path": "/logs/stats", "middleware": [], "handler": "CategoryLogService.getLogStats" },
+        { "method": "GET", "path": "/logs/date-range", "middleware": [], "handler": "CategoryLogService.getLogsByDateRange" },
+        { "method": "GET", "path": "/logs/:id", "middleware": [], "handler": "CategoryLogService.getLogById" },
+        { "method": "GET", "path": "/RecentlyViewed", "middleware": ["authenticatedUserMiddleware"], "handler": "CategoryService.getRecentlyViewedCategories" },
+        { "method": "GET", "path": "/:id", "middleware": [], "handler": "CategoryService.getCategoryById" },
+        { "method": "PUT", "path": "/:id", "middleware": ["adminMiddleware","uploadImage.fields(...)"], "handler": "CategoryService.updateCategory" },
+        { "method": "POST", "path": "/recently-viewed/:categoryId", "middleware": ["authenticatedUserMiddleware"], "handler": "CategoryService.addToRecentlyViewedCategories" },
+        { "method": "DELETE", "path": "/:id", "middleware": ["adminMiddleware"], "handler": "CategoryService.ActiovationCategory" },
+        { "method": "PATCH", "path": "/bulk/toggle-active", "middleware": ["adminMiddleware"], "handler": "CategoryService.bulkToggleActive" }
+      ]
+    },
+    {
+      "prefix": "/items",
+      "endpoints": [
+        { "method": "GET", "path": "/", "middleware": [], "handler": "ItemServices.getAllItems" },
+        { "method": "GET", "path": "/category/:categoryId", "middleware": [], "handler": "ItemServices.getItemsByCategory" },
+        { "method": "GET", "path": "/search/suggestions", "middleware": [], "handler": "ItemServices.getSearchSuggestions" },
+        { "method": "GET", "path": "/search/popular-terms", "middleware": [], "handler": "ItemServices.getPopularSearchTerms" },
+        { "method": "POST", "path": "/search/recent", "middleware": ["authenticatedUserMiddleware"], "handler": "ItemServices.saveRecentSearch" },
+        { "method": "GET", "path": "/search/get-recent", "middleware": ["authenticatedUserMiddleware"], "handler": "ItemServices.getRecentSearches" },
+        { "method": "DELETE", "path": "/search/recent/clear", "middleware": ["authenticatedUserMiddleware"], "handler": "ItemServices.clearRecentSearches" },
+        { "method": "DELETE", "path": "/search/recent/:query", "middleware": ["authenticatedUserMiddleware"], "handler": "ItemServices.deleteRecentSearch" },
+        { "method": "GET", "path": "/deals-of-the-day", "middleware": [], "handler": "ItemServices.getDealsOfTheDay" },
+        { "method": "GET", "path": "/details/:itemId", "middleware": [], "handler": "ItemServices.getItemDetails" },
+        { "method": "GET", "path": "/trending/AiPersonalized", "middleware": [], "handler": "ItemServices.getAITrendingProducts" },
+        { "method": "GET", "path": "/GetItemFeed", "middleware": ["authenticatedUserMiddleware"], "handler": "ItemServices.getDynamicFeed" },
+        { "method": "GET", "path": "/similar/:itemId", "middleware": [], "handler": "ItemServices.getSimilarProducts" },
+        { "method": "GET", "path": "/GetRecentlyViewedItems", "middleware": ["authenticatedUserMiddleware"], "handler": "ItemServices.getRecentlyViewedItems" },
+        { "method": "POST", "path": "/AddToRecentlyViewedItems", "middleware": ["authenticatedUserMiddleware"], "handler": "ItemServices.addToRecentlyViewedItems" },
+        { "method": "DELETE", "path": "/wishlist/remove/:itemId", "middleware": ["authenticatedUserMiddleware"], "handler": "ItemServices.removeFromWishlist" },
+        { "method": "GET", "path": "/wishlist", "middleware": ["authenticatedUserMiddleware"], "handler": "ItemServices.getWishlist" },
+        { "method": "GET", "path": "/wishlist/check/:itemId", "middleware": ["authenticatedUserMiddleware"], "handler": "ItemServices.checkWishlistStatus" },
+        { "method": "DELETE", "path": "/wishlist/clear", "middleware": ["authenticatedUserMiddleware"], "handler": "ItemServices.clearWishlist" }
+      ]
+    },
+    {
+      "prefix": "/advertisements",
+      "endpoints": [
+        { "method": "GET", "path": "/debug", "middleware": [], "handler": "AdvertisementService.getDebugInfo" },
+        { "method": "POST", "path": "/create", "middleware": ["adminMiddleware","uploadImage.single('imageUrl')"], "handler": "AdvertisementService.createAd" },
+        { "method": "PUT", "path": "/update/:adId", "middleware": ["adminMiddleware","uploadImage.single('imageUrl')"], "handler": "AdvertisementService.updateAd" },
+        { "method": "DELETE", "path": "/delete/:adId", "middleware": ["adminMiddleware"], "handler": "AdvertisementService.deleteAd" },
+        { "method": "PATCH", "path": "/deactivate/:adId", "middleware": ["adminMiddleware"], "handler": "AdvertisementService.softDeleteAd" },
+        { "method": "GET", "path": "/currently-running", "middleware": [], "handler": "AdvertisementService.getCurrentlyRunningAds" },
+        { "method": "GET", "path": "/active", "middleware": [], "handler": "AdvertisementService.getActiveAds" },
+        { "method": "POST", "path": "/track-click/:adId", "middleware": ["userMiddleware"], "handler": "AdvertisementService.trackClick" },
+        { "method": "GET", "path": "/analytics", "middleware": ["adminMiddleware"], "handler": "AdvertisementService.getAnalytics" },
+        { "method": "GET", "path": "/logs", "middleware": ["adminMiddleware"], "handler": "AdvertisementLogService.getAllLogs" },
+        { "method": "GET", "path": "/logs/stats", "middleware": ["adminMiddleware"], "handler": "AdvertisementLogService.getLogStats" },
+        { "method": "GET", "path": "/logs/date-range", "middleware": ["adminMiddleware"], "handler": "AdvertisementLogService.getLogsByDateRange" },
+        { "method": "GET", "path": "/logs/:id", "middleware": ["adminMiddleware"], "handler": "AdvertisementLogService.getLogById" },
+        { "method": "GET", "path": "/logs/advertisement/:advertisementId", "middleware": ["adminMiddleware"], "handler": "AdvertisementLogService.getLogsByAdvertisement" }
+      ]
+    },
+    {
+      "prefix": "/prescriptions",
+      "endpoints": [
+        { "method": "POST", "path": "/upload", "middleware": ["customersMiddleware","uploadImage.single('prescription')","optimizeImageForOcr","ocrMiddleware(stream=false)","PrescriptionService.executeFallbackOcr"], "handler": "PrescriptionService.executeFallbackOcr" },
+        { "method": "POST", "path": "/upload-stream", "middleware": ["customersMiddleware","uploadImage.single('prescription')","optimizeImageForOcr","PrescriptionService.streamInterceptorMiddleware","ocrMiddleware(stream=true)","ocrMiddleware(stream=false)","PrescriptionService.executeFallbackOcr"], "handler": "PrescriptionService.executeFallbackOcr" }
+      ]
+    },
+    {
+      "prefix": "/notifications",
+      "endpoints": [
+        { "method": "GET", "path": "/active-logs", "middleware": ["authenticatedUserMiddleware"], "handler": "NotificationLogService.getActiveLogs" },
+        { "method": "GET", "path": "/myNotification", "middleware": ["authenticatedUserMiddleware"], "handler": "NotificationLogService.getUserLogs" },
+        { "method": "GET", "path": "/received", "middleware": ["authenticatedUserMiddleware"], "handler": "NotificationLogService.getReceivedNotifications" },
+        { "method": "GET", "path": "/log/:id", "middleware": ["authenticatedUserMiddleware"], "handler": "NotificationLogService.getLogById" },
+        { "method": "GET", "path": "/stats", "middleware": ["authenticatedUserMiddleware"], "handler": "NotificationLogService.getUserStats" },
+        { "method": "PATCH", "path": "/mark-read/:id", "middleware": ["authenticatedUserMiddleware"], "handler": "NotificationLogService.markAsRead" },
+        { "method": "POST", "path": "/receive", "middleware": ["authenticatedUserMiddleware"], "handler": "NotificationLogService.receiveNotification" },
+        { "method": "PATCH", "path": "/mark-multiple-read", "middleware": ["authenticatedUserMiddleware"], "handler": "NotificationService.markMultipleAsRead (inline)" },
+        { "method": "POST", "path": "/register-token", "middleware": ["authenticatedUserMiddleware"], "handler": "NotificationLogService.registerToken (inline)" },
+        { "method": "POST", "path": "/send-test", "middleware": ["authenticatedUserMiddleware"], "handler": "NotificationService.sendNotificationWithLog (inline)" }
+      ]
+    },
+    {
+      "prefix": "/notification-service",
+      "endpoints": [
+        { "method": "GET", "path": "/health", "middleware": [], "handler": "NotificationService.health" },
+        { "method": "GET", "path": "/queue-stats", "middleware": [], "handler": "NotificationService.queueStats" },
+        { "method": "POST", "path": "/sendToUser", "middleware": ["authenticatedUserMiddleware"], "handler": "NotificationService.sendToUser" },
+        { "method": "POST", "path": "/send", "middleware": ["internalServiceAuth"], "handler": "NotificationService.send" },
+        { "method": "POST", "path": "/send-to-user", "middleware": ["internalServiceAuth"], "handler": "NotificationService.sendToUsers" },
+        { "method": "POST", "path": "/sendToUsers", "middleware": ["internalServiceAuth"], "handler": "NotificationService.sendToUsers" },
+        { "method": "POST", "path": "/send-to-users", "middleware": ["internalServiceAuth"], "handler": "NotificationService.sendToUsers" },
+        { "method": "POST", "path": "/sendBulk", "middleware": ["internalServiceAuth"], "handler": "NotificationService.sendBulk" },
+        { "method": "POST", "path": "/send-bulk", "middleware": ["internalServiceAuth"], "handler": "NotificationService.sendBulk" }
+      ]
+    },
+    {
+      "prefix": "/feature-flags",
+      "endpoints": [
+        { "method": "POST", "path": "/create", "middleware": ["adminMiddleware"], "handler": "FeatureFlagService.createFeatureFlag" },
+        { "method": "GET", "path": "/", "middleware": ["adminMiddleware"], "handler": "FeatureFlagService.getAllFeatureFlags" },
+        { "method": "GET", "path": "/:key", "middleware": ["adminMiddleware"], "handler": "FeatureFlagService.getFeatureFlagByKey" },
+        { "method": "PUT", "path": "/:key", "middleware": ["adminMiddleware"], "handler": "FeatureFlagService.updateFeatureFlag" },
+        { "method": "DELETE", "path": "/:key", "middleware": ["adminMiddleware"], "handler": "FeatureFlagService.deleteFeatureFlag" },
+        { "method": "POST", "path": "/bulk-update", "middleware": ["adminMiddleware"], "handler": "FeatureFlagService.bulkUpdateFeatureFlags" },
+        { "method": "DELETE", "path": "/cache/clear", "middleware": ["adminMiddleware"], "handler": "FeatureFlagService.clearCache" }
+      ]
+    },
+    {
+      "prefix": "/features",
+      "endpoints": [
+        { "method": "GET", "path": "/", "middleware": ["authenticatedUserMiddleware"], "handler": "FeatureFlagService.getUserFeatures" }
+      ]
+    },
+    {
+      "prefix": "/mail-service",
+      "endpoints": [
+        { "method": "POST", "path": "/send-otp", "middleware": ["internalServiceAuth (router.use)"] , "handler": "MailService.sendOTP" },
+        { "method": "POST", "path": "/send-welcome", "middleware": ["internalServiceAuth (router.use)"] , "handler": "MailService.sendWelcome" },
+        { "method": "POST", "path": "/send-password-reset-confirmation", "middleware": ["internalServiceAuth (router.use)"] , "handler": "MailService.sendPasswordResetConfirmation" },
+        { "method": "POST", "path": "/send-notification", "middleware": ["internalServiceAuth (router.use)"] , "handler": "MailService.sendNotification" },
+        { "method": "POST", "path": "/send-bulk-notification", "middleware": ["internalServiceAuth (router.use)"] , "handler": "MailService.sendBulkNotification" },
+        { "method": "GET", "path": "/health", "middleware": ["internalServiceAuth (router.use)"] , "handler": "MailService.healthCheck" }
+      ]
+    }
+  ]
+}

@@ -17,8 +17,26 @@ const app: Express = express();
 app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// CORS origin is env-driven so ops can tighten it in production.
+// If CORS_ORIGINS is unset we keep the legacy wildcard for backward
+// compatibility, but warn — `credentials: true` + wildcard origin is
+// ignored by browsers, so cookie-based auth will NOT work cross-origin
+// until a specific origin list is configured.
+const corsOriginsEnv = process.env.CORS_ORIGINS;
+const corsOrigin: string[] = corsOriginsEnv
+  ? corsOriginsEnv.split(',').map(o => o.trim()).filter(Boolean)
+  : ['*'];
+
+if (!corsOriginsEnv) {
+  console.warn(
+    "[cors] CORS_ORIGINS env var is not set — falling back to '*'. " +
+    "Cross-origin cookies will NOT work until specific origins are configured."
+  );
+}
+
 app.use(cors({
-  origin: ['*'],
+  origin: corsOrigin,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id', 'x-user-role', 'x-user-email', 'x-internal-api-key'],
   credentials: true,

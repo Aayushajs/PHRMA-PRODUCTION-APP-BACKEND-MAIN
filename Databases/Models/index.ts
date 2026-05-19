@@ -19,6 +19,7 @@ import AdvertisementLogModel from './advertisementLog.model';
 import CategoryLogModel from './categoryLog.model';
 import FeaturedLogModel from './feturedLog.model';
 import NotificationLogModel from './notificationLog.model';
+import RefreshTokenModel from './refreshToken.Model';
 
 // Export all models for convenience
 export {
@@ -33,4 +34,5 @@ export {
   CategoryLogModel,
   FeaturedLogModel,
   NotificationLogModel,
+  RefreshTokenModel,
 };

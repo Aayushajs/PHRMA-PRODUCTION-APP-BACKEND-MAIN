@@ -8,7 +8,17 @@
 */
 
 import { redis } from '@config/redis';
-import { sendPushNotification, sendBulkNotifications } from '@utils/notification';
+import { sendPushNotification } from '@utils/notification';
+// allow injection of a redis-like client for tests
+let redisClient: typeof redis = redis;
+
+export const __test_setRedisClient = (client: any) => {
+  // used by tests to inject a mock redis implementation
+  redisClient = client as any;
+};
+// `sendPushNotification` and `sendBulkNotifications` are imported dynamically
+// inside methods to avoid initializing Firebase / external clients at module
+// import time (helps unit tests that don't provide credentials).
 
 // ============================================================================
 // TYPES
@@ -40,6 +50,7 @@ class NotificationQueue {
   private readonly PROCESSING_KEY = 'notification:processing';
   private readonly FAILED_KEY = 'notification:failed';
   private readonly MAX_RETRY_ATTEMPTS = 3;
+  private readonly IDS_SET = 'notification:ids';
   private isProcessing = false;
 
   /**
@@ -55,7 +66,13 @@ class NotificationQueue {
         createdAt: new Date().toISOString(),
       };
 
-      await redis.rPush(this.QUEUE_KEY, JSON.stringify(queuedNotification));
+      await redisClient.rPush(this.QUEUE_KEY, JSON.stringify(queuedNotification));
+      // Track id to avoid duplicate re-queues across services
+      try {
+        await redisClient.sAdd(this.IDS_SET, queuedNotification.id);
+      } catch (e) {
+        // non-fatal
+      }
       console.log(`📥 Notification queued: ${queuedNotification.id} (type: ${queuedNotification.type})`);
 
       return queuedNotification.id;
@@ -81,7 +98,7 @@ class NotificationQueue {
     try {
       while (true) {
         // Move notification from queue to processing
-        const item = await redis.lMove(
+        const item = await (redisClient as any).lMove(
           this.QUEUE_KEY,
           this.PROCESSING_KEY,
           'LEFT',
@@ -101,7 +118,8 @@ class NotificationQueue {
 
         if (success) {
           // Remove from processing queue on success
-          await redis.lRem(this.PROCESSING_KEY, 1, item);
+          await redisClient.lRem(this.PROCESSING_KEY, 1, item);
+          try { await redisClient.sRem(this.IDS_SET, notification.id); } catch(e){}
           console.log(`✅ Notification ${notification.id} sent successfully`);
         } else {
           // Handle failure
@@ -113,11 +131,12 @@ class NotificationQueue {
 
           if (notification.attempts >= notification.maxAttempts) {
             // Max retries exceeded, move to failed queue
-            await redis.rPush(this.FAILED_KEY, JSON.stringify(notification));
+            await redisClient.rPush(this.FAILED_KEY, JSON.stringify(notification));
+            // keep id in IDS_SET so retry logic can detect
             console.error(`❌ Notification ${notification.id} failed after ${notification.maxAttempts} attempts`);
           } else {
             // Re-queue for retry
-            await redis.rPush(this.QUEUE_KEY, JSON.stringify(notification));
+            await redisClient.rPush(this.QUEUE_KEY, JSON.stringify(notification));
             console.log(`🔄 Notification ${notification.id} re-queued for retry (attempt ${notification.attempts}/${notification.maxAttempts})`);
           }
         }
@@ -168,14 +187,20 @@ class NotificationQueue {
       return false;
     }
 
-    const result = await sendPushNotification(
-      notification.fcmToken,
-      notification.title,
-      notification.body,
-      notification.data || {}
-    );
+    try {
+      const { sendPushNotification } = await import('@utils/notification');
+      const result = await sendPushNotification(
+        notification.fcmToken,
+        notification.title,
+        notification.body,
+        notification.data || {}
+      );
 
-    return result.success;
+      return result.success;
+    } catch (e) {
+      console.error(' Failed to send push notification helper import:', e);
+      return false;
+    }
   }
 
   /**
@@ -183,7 +208,7 @@ class NotificationQueue {
    */
   private async processUserNotification(notification: QueuedNotification): Promise<boolean> {
     if (!notification.userId) {
-      console.error('❌ Missing userId for user notification');
+      console.error(' Missing userId for user notification');
       return false;
     }
 
@@ -205,7 +230,7 @@ class NotificationQueue {
 
       return result.success;
     } catch (error) {
-      console.error(`❌ Error fetching user ${notification.userId}:`, error);
+      console.error(` Error fetching user ${notification.userId}:`, error);
       return false;
     }
   }
@@ -232,17 +257,21 @@ class NotificationQueue {
       }
 
       const fcmTokens = users.map(user => user.fcmToken as string);
-      const result = await sendBulkNotifications(
-        fcmTokens,
-        notification.title,
-        notification.body,
-        notification.data || {}
-      );
+      try {
+        const { sendBulkNotifications } = await import('@utils/notification');
+        const result = await sendBulkNotifications(
+          fcmTokens,
+          notification.title,
+          notification.body,
+          notification.data || {}
+        );
 
-      console.log(`📊 Bulk sent: ${result.successCount} success, ${result.failureCount} failed`);
-      
-      // Consider it successful if at least one notification was sent
-      return result.successCount > 0;
+        console.log(`📊 Bulk sent: ${result.successCount} success, ${result.failureCount} failed`);
+        return result.successCount > 0;
+      } catch (e) {
+        console.error('❌ Failed to import bulk notification helper:', e);
+        return false;
+      }
     } catch (error) {
       console.error('❌ Error fetching users:', error);
       return false;
@@ -266,9 +295,9 @@ class NotificationQueue {
   }> {
     try {
       const [waiting, processing, failed] = await Promise.all([
-        redis.lLen(this.QUEUE_KEY),
-        redis.lLen(this.PROCESSING_KEY),
-        redis.lLen(this.FAILED_KEY),
+        redisClient.lLen(this.QUEUE_KEY),
+        redisClient.lLen(this.PROCESSING_KEY),
+        redisClient.lLen(this.FAILED_KEY),
       ]);
 
       return { waiting, processing, failed };
@@ -285,12 +314,21 @@ class NotificationQueue {
     try {
       let retried = 0;
       for (let i = 0; i < limit; i++) {
-        const item = await redis.lMove(this.FAILED_KEY, this.QUEUE_KEY, 'LEFT', 'RIGHT');
+        const item = await redisClient.lPop(this.FAILED_KEY);
         if (!item) break;
-        
+
         const notification: QueuedNotification = JSON.parse(item);
         notification.attempts = 0; // Reset attempts
-        await redis.rPush(this.QUEUE_KEY, JSON.stringify(notification));
+
+        // Deduplicate: only re-queue if id not already tracked
+        const exists = await redisClient.sIsMember(this.IDS_SET, notification.id);
+        if (exists) {
+          // Another worker has enqueued it; skip
+          continue;
+        }
+
+        await redisClient.rPush(this.QUEUE_KEY, JSON.stringify(notification));
+        await redisClient.sAdd(this.IDS_SET, notification.id);
         retried++;
       }
       
@@ -298,6 +336,43 @@ class NotificationQueue {
       return retried;
     } catch (error) {
       console.error('❌ Failed to retry notifications:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Move stuck items from processing back to queue if older than threshold (minutes)
+   */
+  async recoverStuckProcessing(thresholdMinutes = 5, limit = 100): Promise<number> {
+    try {
+      const now = Date.now();
+      const thresholdMs = thresholdMinutes * 60 * 1000;
+      const items = await redisClient.lRange(this.PROCESSING_KEY, 0, limit - 1);
+      let recovered = 0;
+
+      for (const raw of items) {
+        try {
+          const n: QueuedNotification = JSON.parse(raw);
+          const last = n.lastAttemptAt ? new Date(n.lastAttemptAt).getTime() : new Date(n.createdAt).getTime();
+          if (now - last > thresholdMs) {
+            // Attempt to remove from processing and requeue
+            const removed = await redisClient.lRem(this.PROCESSING_KEY, 1, raw);
+            if (removed > 0) {
+              const exists = await redisClient.sIsMember(this.IDS_SET, n.id);
+              if (!exists) await redisClient.sAdd(this.IDS_SET, n.id);
+              await redisClient.rPush(this.QUEUE_KEY, JSON.stringify(n));
+              recovered++;
+            }
+          }
+        } catch (e) {
+          // ignore parse errors for safety
+        }
+      }
+
+      if (recovered > 0) console.log(`♻️  Recovered ${recovered} stuck processing items`);
+      return recovered;
+    } catch (error) {
+      console.error('❌ Failed to recover stuck processing items:', error);
       return 0;
     }
   }
