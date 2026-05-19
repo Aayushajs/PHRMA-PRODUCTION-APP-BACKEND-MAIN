@@ -1,3 +1,4 @@
+/// <reference types="bun" />
 import { describe, it, beforeEach, spyOn, mock } from "bun:test";
 import assert from "node:assert/strict";
 import { Request, Response } from "express";
@@ -6,6 +7,7 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || "testsecret";
 process.env.DB_URI = process.env.DB_URI || "mongodb://localhost:27017/test";
 process.env.REDIS_HOST = process.env.REDIS_HOST || "localhost";
 process.env.REDIS_PORT = process.env.REDIS_PORT || "6379";
+process.env.FIREBASE_STRING = process.env.FIREBASE_STRING || Buffer.from(JSON.stringify({ "type": "service_account" })).toString("base64");
 
 import { CategoryModel } from "../Databases/Models/Category.model";
 import * as cloudinaryUpload from "../Utils/cloudinaryUpload";
@@ -60,18 +62,18 @@ describe("Category Service", () => {
     spyOn(cache, "getCache").mockImplementation(async () => null);
     spyOn(cache, "setCache").mockImplementation(async () => {});
     
-    spyOn(CategoryModel, "aggregate").mockImplementation(async () => 
+    spyOn(CategoryModel, "aggregate").mockImplementation((async () => 
       Promise.resolve([{
          categories: [{ _id: "cat123", name: "Vits", imageUrl: "fake" }],
          totalItems: 1
       }])
-    );
+    ) as any);
     
     spyOn(User, "findById").mockImplementation((() => ({
       select: async () => Promise.resolve({ viewedCategories: [] })
     })) as any);
 
-    spyOn(CategoryModel, "countDocuments").mockImplementation(async () => 1);
+    spyOn(CategoryModel, "countDocuments").mockImplementation((async () => 1) as any);
     
     await CategoryService.getCategoriesSimple(req, res, next as any);
 
@@ -88,9 +90,9 @@ describe("Category Service", () => {
     const CategoryLogModel = (await import("../Databases/Models/categoryLog.model")).default;
     
     // Mock countDocuments
-    spyOn(CategoryLogModel, "countDocuments").mockImplementation(async () => 
+    spyOn(CategoryLogModel, "countDocuments").mockImplementation((async () => 
       Promise.resolve(5)
-    );
+    ) as any);
     
     // Mock find().limit().lean()
     spyOn(CategoryLogModel, "find").mockImplementation((() => ({
@@ -111,8 +113,32 @@ describe("Category Service", () => {
       configurable: true
     });
     
-    await CategoryLogService.getDebugInfo(req, res, (() => {}) as any);
+    spyOn(CategoryLogModel, "find").mockImplementation((() => ({
+      limit: () => ({
+        lean: async () => Promise.resolve([
+          { action: "CREATE", performedBy: "user123" }
+        ])
+      })
+    })) as any);
     
+    // We need to delay checking the response because catchAsyncErrors returns a normal function that sets up a Promise chain, 
+    // but the test finishes before the promise resolves if we don't await the handler itself carefully 
+    // Actually, catchAsyncErrors wraps it and it doesn't return the promise, it calls next() on error.
+    // In our test, we pass `next`, so we can mock the inner action manually, or we wrap in a promise.
+    await new Promise<void>((resolve, reject) => {
+        const next = (err?: any) => {
+            if (err) reject(err);
+            else resolve();
+        };
+        const currentJson = res.json;
+        res.json = (data: any) => {
+            currentJson(data);
+            resolve();
+            return res;
+        };
+        CategoryLogService.getDebugInfo(req, res, next as any);
+    });
+
     assert.equal(res.statusArgs[0], 200);
     assert.equal(res.jsonArgs[0].data.totalLogs, 5);
   });
