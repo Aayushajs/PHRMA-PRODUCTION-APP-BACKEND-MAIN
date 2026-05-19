@@ -4,6 +4,7 @@
         "module": "ESNext",
         "moduleResolution": "Node",
         "baseUrl": ".",
+        "ignoreDeprecations": "6.0",
         "paths": {
             "@utils/*": ["Utils/*"],
             "@models/*": ["Databases/Models/*"],
@@ -18,6 +19,7 @@
             "./types",
             "./node_modules/@types"
         ],
+        "types": ["bun"],
         "lib": [
             "ESNext"
         ],
@@ -41,5 +43,11 @@
         "Routers/**/*",
         "Services/**/*",
         "Utils/**/*"
+    ],
+    "exclude": [
+        "node_modules",
+        "dist",
+        "tests/**/*",
+        "**/*.test.ts"
     ]
 }

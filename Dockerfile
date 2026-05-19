@@ -11,20 +11,37 @@ RUN apt-get update && \
 
 WORKDIR /usr/src/app
 
-# ------------- COPY DEPENDENCY FILES -------------
+# ------------- COPY DEPENDENCY FILES ONLY (for caching) -----------
 COPY package.json bun.lock ./
 
-# Install all dependencies (including devDeps for build)
-RUN bun install
+# Install dependencies (including devDeps for TypeScript build)
+RUN bun install --frozen-lockfile
 
-# ------------- COPY SOURCE CODE -------------
+# ------------- COPY SOURCE CODE (excludes tests via .dockerignore) -----
 COPY . .
 
-# ------------- BUILD TYPESCRIPT -------------
-RUN bun run build   # must generate dist/
+# ------------- BUILD TYPESCRIPT (excludes test files via tsconfig) -----
+RUN bun run build:prod
 
-# Create necessary folder
+# Create necessary folders
 RUN mkdir -p /usr/src/app/temp_uploads
+
+# Remove development dependencies to reduce image size
+RUN bun install --production --no-save
+
+# Remove source files, keep only compiled JavaScript
+RUN rm -rf \
+    server.ts \
+    *.ts \
+    Services/ \
+    Middlewares/ \
+    Routers/ \
+    Databases/ \
+    Utils/ \
+    config/ \
+    tests/ \
+    types/ \
+    scripts/
 
 # Fix ownership (optional)
 RUN chown -R bun:bun /usr/src/app
