@@ -158,16 +158,14 @@ export const sendBulkNotifications = async (
   body: string,
   data: Record<string, any> = {}
 ): Promise<{ successCount: number; failureCount: number; results: NotificationResult[] }> => {
-  const results: NotificationResult[] = new Array(fcmTokens.length);
+  const results: NotificationResult[] = [];
 
   for (let i = 0; i < fcmTokens.length; i += BULK_CONCURRENCY) {
     const chunk = fcmTokens.slice(i, i + BULK_CONCURRENCY);
     const chunkResults = await Promise.all(
       chunk.map(fcmToken => sendPushNotification(fcmToken, title, body, data))
     );
-    for (let j = 0; j < chunkResults.length; j++) {
-      results[i + j] = chunkResults[j];
-    }
+    results.push(...chunkResults);
   }
 
   const successCount = results.filter(r => r.success).length;
