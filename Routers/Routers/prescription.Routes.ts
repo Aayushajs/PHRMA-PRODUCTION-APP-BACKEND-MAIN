@@ -10,6 +10,8 @@ import { customersMiddleware } from "../../Middlewares/CheckLoginMiddleware";
 import uploadImage from "../../config/multer";
 import { ocrMiddleware } from "@development-team/bg-remover";
 import sharp from "sharp";
+import { validateRequest } from "../../Middlewares/validateRequest";
+import { uploadPrescriptionBodySchema } from "../../Validators/prescription.Validator";
 
 const prescriptionRouter = Router();
 
@@ -47,6 +49,7 @@ prescriptionRouter.post(
   "/upload",
   customersMiddleware,
   uploadImage.single("prescription"),
+  validateRequest({ body: uploadPrescriptionBodySchema }),
   optimizeImageForOcr,
   ocrMiddleware({
     stream: false,
@@ -61,6 +64,7 @@ prescriptionRouter.post(
   "/upload-stream",
   customersMiddleware,
   uploadImage.single("prescription"),
+  validateRequest({ body: uploadPrescriptionBodySchema }),
   optimizeImageForOcr,
   PrescriptionService.streamInterceptorMiddleware,
   ocrMiddleware({
