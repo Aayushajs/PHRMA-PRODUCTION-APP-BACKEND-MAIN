@@ -1,7 +1,10 @@
 # PERF-AUDIT-2026-05: 10.2 — pin Bun to a specific minor for reproducible
 # builds and stable cold-start performance instead of floating `:latest`.
+# IMPORTANT: this minor MUST match the Bun version used to generate bun.lock
+# locally — Bun lockfile format changed across minors. Local dev currently
+# runs Bun 1.3 (see `bun --version`), so we pin to 1.3 here too.
 # ------------- BASE IMAGE WITH BUN + UBUNTU -------------
-FROM oven/bun:1.1-debian
+FROM oven/bun:1.3-debian
 
 # ------------- INSTALL TESSERACT -------------
 USER root
