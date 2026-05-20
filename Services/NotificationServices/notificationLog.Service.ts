@@ -92,34 +92,44 @@ export default class NotificationLogService {
         const sortOrder = order === "asc" ? 1 : -1;
         const sortObj = { [sortBy as string]: sortOrder } as any;
 
+        // PERF-AUDIT-2026-05: 4.6 — push per-type isActive/featured filter
+        // INTO each $lookup sub-pipeline using `let`+`$expr`. This keeps the
+        // joined sets minimal and lets the engine use the new compound
+        // indexes on `categories`/`advertisements`/`featuredmedicines`.
         const pipeline: any[] = [
           { $match: matchStage },
 
           {
             $lookup: {
               from: "categories",
-              localField: "relatedEntityId",
-              foreignField: "_id",
+              let: { rid: "$relatedEntityId" },
+              pipeline: [
+                { $match: { $expr: { $eq: ["$_id", "$$rid"] }, isActive: true } },
+                { $project: { _id: 1, name: 1, isActive: 1 } },
+              ],
               as: "categoryDetails",
-              pipeline: [{ $project: { _id: 1, name: 1, isActive: 1 } }],
             },
           },
           {
             $lookup: {
               from: "advertisements",
-              localField: "relatedEntityId",
-              foreignField: "_id",
+              let: { rid: "$relatedEntityId" },
+              pipeline: [
+                { $match: { $expr: { $eq: ["$_id", "$$rid"] }, isActive: true } },
+                { $project: { _id: 1, title: 1, isActive: 1 } },
+              ],
               as: "advertisementDetails",
-              pipeline: [{ $project: { _id: 1, title: 1, isActive: 1 } }],
             },
           },
           {
             $lookup: {
               from: "featuredmedicines",
-              localField: "relatedEntityId",
-              foreignField: "_id",
+              let: { rid: "$relatedEntityId" },
+              pipeline: [
+                { $match: { $expr: { $eq: ["$_id", "$$rid"] } } },
+                { $project: { _id: 1, title: 1, featured: 1 } },
+              ],
               as: "medicineDetails",
-              pipeline: [{ $project: { _id: 1, title: 1, featured: 1 } }],
             },
           },
           {
@@ -293,6 +303,7 @@ export default class NotificationLogService {
         endDate,
         sortBy = "sentAt",
         order = "desc",
+        cursor, // PERF-AUDIT-2026-05: 8.1 — optional keyset cursor (ISO sentAt)
       } = req.query;
 
       if (!userId || !mongoose.isValidObjectId(userId)) {
@@ -302,6 +313,17 @@ export default class NotificationLogService {
       const pageNum = parseInt(page as string) || 1;
       const limitNum = Math.min(100, parseInt(limit as string) || 20);
       const skip = (pageNum - 1) * limitNum;
+      // Backward-compatible cursor: when provided AND sort is the default
+      // descending sentAt, switch to keyset pagination (skip is ignored).
+      const cursorDate =
+        typeof cursor === "string" && cursor.length > 0
+          ? new Date(cursor)
+          : null;
+      const useKeyset =
+        cursorDate !== null &&
+        !isNaN(cursorDate.getTime()) &&
+        sortBy === "sentAt" &&
+        order === "desc";
 
       const cacheKey = `${CACHE_PREFIX}:user:${userId}:${crypto
         .createHash("md5")
@@ -345,37 +367,50 @@ export default class NotificationLogService {
           if (endDate) matchStage.sentAt.$lte = new Date(endDate as string);
         }
 
+        // PERF-AUDIT-2026-05: 8.1 — keyset pagination uses the existing
+        // {userId:1, sentAt:-1} index for constant-time deep pagination.
+        if (useKeyset) {
+          matchStage.sentAt = { ...(matchStage.sentAt || {}), $lt: cursorDate };
+        }
+
         const sortOrder = order === "asc" ? 1 : -1;
         const sortObj = { [sortBy as string]: sortOrder } as any;
 
+        // PERF-AUDIT-2026-05: 4.6 — push isActive filter inside the lookup.
         const pipeline: any[] = [
           { $match: matchStage },
 
           {
             $lookup: {
               from: "categories",
-              localField: "relatedEntityId",
-              foreignField: "_id",
+              let: { rid: "$relatedEntityId" },
+              pipeline: [
+                { $match: { $expr: { $eq: ["$_id", "$$rid"] }, isActive: true } },
+                { $project: { _id: 1, name: 1, isActive: 1 } },
+              ],
               as: "categoryDetails",
-              pipeline: [{ $project: { _id: 1, name: 1, isActive: 1 } }],
             },
           },
           {
             $lookup: {
               from: "advertisements",
-              localField: "relatedEntityId",
-              foreignField: "_id",
+              let: { rid: "$relatedEntityId" },
+              pipeline: [
+                { $match: { $expr: { $eq: ["$_id", "$$rid"] }, isActive: true } },
+                { $project: { _id: 1, title: 1, isActive: 1 } },
+              ],
               as: "advertisementDetails",
-              pipeline: [{ $project: { _id: 1, title: 1, isActive: 1 } }],
             },
           },
           {
             $lookup: {
               from: "featuredmedicines",
-              localField: "relatedEntityId",
-              foreignField: "_id",
+              let: { rid: "$relatedEntityId" },
+              pipeline: [
+                { $match: { $expr: { $eq: ["$_id", "$$rid"] } } },
+                { $project: { _id: 1, title: 1 } },
+              ],
               as: "medicineDetails",
-              pipeline: [{ $project: { _id: 1, title: 1 } }],
             },
           },
 
@@ -463,7 +498,11 @@ export default class NotificationLogService {
 
           {
             $facet: {
-              logs: [{ $skip: skip }, { $limit: limitNum }],
+              // PERF-AUDIT-2026-05: 8.1 — skip is 0 when cursor is in use.
+              logs: [
+                { $skip: useKeyset ? 0 : skip },
+                { $limit: limitNum },
+              ],
               totalCount: [{ $count: "count" }],
               unreadCount: [{ $match: { isRead: false } }, { $count: "count" }],
             },
@@ -476,6 +515,11 @@ export default class NotificationLogService {
         const unreadLogs = result?.unreadCount[0]?.count || 0;
         const logs = result?.logs || [];
 
+        const nextCursor =
+          useKeyset && logs.length === limitNum
+            ? new Date(logs[logs.length - 1].sentAt).toISOString()
+            : null;
+
         const responseData = {
           logs,
           pagination: {
@@ -485,6 +529,8 @@ export default class NotificationLogService {
             itemsPerPage: limitNum,
             hasNextPage: pageNum < Math.ceil(totalLogs / limitNum),
             hasPrevPage: pageNum > 1,
+            // PERF-AUDIT-2026-05: 8.1 — additive cursor; null when unused.
+            nextCursor,
           },
           stats: {
             totalLogs,

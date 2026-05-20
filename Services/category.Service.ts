@@ -30,6 +30,8 @@ import {
 import User from "../Databases/Models/user.Models";
 import { emitCategoryViewUpdate } from "../Utils/socketEmitters";
 import NotificationService from "../Middlewares/LogMedillewares/notificationLogger";
+// PERF-AUDIT-2026-05: 4.9 / 6.3 — broadcast fan-out helper (cursor-streamed).
+import { broadcastToAllUsersWithLog } from "../Utils/broadcastNotifications";
 
 const {
   CACHE_PREFIX,
@@ -134,33 +136,19 @@ export default class CategoryService {
             }
           );
 
-          // Send notification after image upload is complete
-          const users = await User.find({ fcmToken: { $ne: null } }).select(
-            "_id name fcmToken"
-          );
-
+          // PERF-AUDIT-2026-05: 4.9 / 6.3 — cursor-streamed broadcast.
           const notificationTitle = "New Category Added!";
           const body = `${category.title} has been added to the store.`;
 
-          await NotificationService.sendNotificationToMultipleUsers(
-            users.filter(u => u.fcmToken).map(u => ({
-              _id: u._id.toString(),
-              fcmToken: u.fcmToken as string,
-              name: u.name
-            })),
-            notificationTitle,
-            body,
-            {
-              type: "CATEGORY_CREATED",
-              relatedEntityId: category._id.toString(),
-              relatedEntityType: "Category",
-              payload: {
-                categoryId: category._id,
-                image: imageResults.length > 0 ? imageResults[0].secure_url : null
-              },
-
-            }
-          );
+          await broadcastToAllUsersWithLog(notificationTitle, body, {
+            type: "CATEGORY_CREATED",
+            relatedEntityId: category._id.toString(),
+            relatedEntityType: "Category",
+            payload: {
+              categoryId: category._id,
+              image: imageResults.length > 0 ? imageResults[0].secure_url : null,
+            },
+          });
         } catch (err) {
           console.error("Upload error:", err);
         }
@@ -664,40 +652,25 @@ export default class CategoryService {
         deleteCachePattern(`${CACHE_PREFIX}:simple:*`),
       ]);
 
-      // Fire-and-forget: notify users about category update (similar to createCategory)
+      // PERF-AUDIT-2026-05: 4.9 / 6.3 — cursor-streamed broadcast.
       process.nextTick(async () => {
         try {
-          const users = await User.find({ fcmToken: { $ne: null } }).select(
-            "_id name fcmToken"
-          );
-
-          if (!users || users.length === 0) return;
-
           const actorName = (req as any).user?.name || 'Admin';
           const updatedTitle = (updatedCategory as any)?.title || (updatedCategory as any)?.name || existingCategory.name;
           const notificationTitle = "Category Updated";
           const body = `${actorName} updated category: "${updatedTitle}"`;
 
-          await NotificationService.sendNotificationToMultipleUsers(
-            users.filter(u => u.fcmToken).map(u => ({
-              _id: u._id.toString(),
-              fcmToken: u.fcmToken as string,
-              name: u.name
-            })),
-            notificationTitle,
-            body,
-            {
-              type: "CATEGORY_UPDATED",
-              relatedEntityId: id,
-              relatedEntityType: "Category",
-              payload: {
-                categoryId: id,
-                updatedBy: actorName,
-                timestamp: new Date().toISOString(),
-                image: (updatedCategory as any)?.imageUrl?.length > 0 ? (updatedCategory as any)?.imageUrl[0] : null
-              }
-            }
-          );
+          await broadcastToAllUsersWithLog(notificationTitle, body, {
+            type: "CATEGORY_UPDATED",
+            relatedEntityId: id,
+            relatedEntityType: "Category",
+            payload: {
+              categoryId: id,
+              updatedBy: actorName,
+              timestamp: new Date().toISOString(),
+              image: (updatedCategory as any)?.imageUrl?.length > 0 ? (updatedCategory as any)?.imageUrl[0] : null,
+            },
+          });
         } catch (err) {
           console.error("Notification (updateCategory) error:", err);
         }

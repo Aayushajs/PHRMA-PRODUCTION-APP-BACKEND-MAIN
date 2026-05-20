@@ -73,7 +73,7 @@ class NotificationQueue {
       } catch (e) {
         // non-fatal
       }
-      console.log(`📥 Notification queued: ${queuedNotification.id} (type: ${queuedNotification.type})`);
+      console.log(` Notification queued: ${queuedNotification.id} (type: ${queuedNotification.type})`);
 
       return queuedNotification.id;
     } catch (error) {
@@ -120,7 +120,7 @@ class NotificationQueue {
           // Remove from processing queue on success
           await redisClient.lRem(this.PROCESSING_KEY, 1, item);
           try { await redisClient.sRem(this.IDS_SET, notification.id); } catch(e){}
-          console.log(`✅ Notification ${notification.id} sent successfully`);
+          console.log(` Notification ${notification.id} sent successfully`);
         } else {
           // Handle failure
           notification.attempts += 1;
@@ -133,21 +133,21 @@ class NotificationQueue {
             // Max retries exceeded, move to failed queue
             await redisClient.rPush(this.FAILED_KEY, JSON.stringify(notification));
             // keep id in IDS_SET so retry logic can detect
-            console.error(`❌ Notification ${notification.id} failed after ${notification.maxAttempts} attempts`);
+            console.error(` Notification ${notification.id} failed after ${notification.maxAttempts} attempts`);
           } else {
             // Re-queue for retry
             await redisClient.rPush(this.QUEUE_KEY, JSON.stringify(notification));
-            console.log(`🔄 Notification ${notification.id} re-queued for retry (attempt ${notification.attempts}/${notification.maxAttempts})`);
+            console.log(` Notification ${notification.id} re-queued for retry (attempt ${notification.attempts}/${notification.maxAttempts})`);
           }
         }
 
-        // Small delay between processing to prevent overwhelming Firebase
-        await this.sleep(100);
+        // PERF-AUDIT-2026-05: 7.3 — removed per-item sleep(100) that capped
+        // throughput at ~10/s. Firebase batching + bulk semantics already throttle.
       }
 
-      console.log('✅ Queue processing complete');
+      console.log(' Queue processing complete');
     } catch (error) {
-      console.error('❌ Queue processing error:', error);
+      console.error(' Queue processing error:', error);
     } finally {
       this.isProcessing = false;
     }
@@ -246,10 +246,11 @@ class NotificationQueue {
 
     try {
       const UserModel = (await import('../../Databases/Models/user.Models')).default;
+      // PERF-AUDIT-2026-05: 4.8 — add .lean() to skip hydration overhead
       const users = await UserModel.find({
         _id: { $in: notification.userIds },
         fcmToken: { $exists: true, $ne: null }
-      }).select('fcmToken');
+      }).select('fcmToken').lean();
 
       if (users.length === 0) {
         console.error('❌ No users found with valid FCM tokens');
