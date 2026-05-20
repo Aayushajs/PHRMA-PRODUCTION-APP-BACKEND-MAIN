@@ -73,6 +73,10 @@ export interface IAggregatedResult {
   };
   buildStatus?: "building" | "ready" | "failed";
   cacheKey?: string;
+  cacheStatus?: "fresh" | "stale" | "expired";
+  cacheExpiresAt?: Date;
+  lastRefreshedAt?: Date;
+  ttl?: number;
   createdAt?: Date;
   updatedAt?: Date;
 }

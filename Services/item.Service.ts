@@ -438,7 +438,7 @@ export default class ItemServices {
                                     itemRatings: 1,
                                     views: 1,
                                     isTrending: 1,
-                                    formula: 1,
+                                       formula: 1,
                                     HSNCode: 1,
                                     weight: 1,
                                     itemMfgDate: 1,

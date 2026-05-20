@@ -132,6 +132,25 @@ export const aggregatedResultSchema = new Schema<IAggregatedResult & Document>(
       type: String,
       index: true,
     },
+    cacheStatus: {
+      type: String,
+      enum: ["fresh", "stale", "expired"],
+      default: "fresh",
+      index: true,
+    },
+    cacheExpiresAt: {
+      type: Date,
+      index: true,
+    },
+    lastRefreshedAt: {
+      type: Date,
+      default: () => new Date(),
+    },
+    ttl: {
+      type: Number,
+      default: 1800, // 30 minutes in seconds
+      description: "Time-to-live for aggregation cache",
+    },
   },
   { timestamps: true }
 );

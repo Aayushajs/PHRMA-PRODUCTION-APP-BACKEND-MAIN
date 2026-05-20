@@ -340,25 +340,41 @@ export default class PrescriptionService {
 
       }
 
-      const aggregationResult = savedPrescription && userId
-        ? await AggregationService.buildAggregation({
-          userId: new mongoose.Types.ObjectId(String(userId)),
-          prescriptionId: savedPrescription._id,
-          medicines: enriched.map((medicine) => ({
-            name: medicine.drugName,
-            quantity: 1,
-            dosage: medicine.dosage,
-          })),
-          prescriptionHash: medicinesHash,
-          geoLocation: {
-            latitude: Number((req.body as any)?.latitude || 0),
-            longitude: Number((req.body as any)?.longitude || 0),
-          },
-          radiusKm: Number((req.body as any)?.radiusKm || 10),
-        })
-        : null;
+      // Use the new getOrRefreshAggregation for TTL-aware caching
+      let aggregationResult = null;
+      let aggregationMeta = null;
 
-      // console.log("ocr extracted medicines : ", enriched);
+      if (savedPrescription && userId) {
+        try {
+          const aggregationResponse = await AggregationService.getOrRefreshAggregation(
+            {
+              userId: new mongoose.Types.ObjectId(String(userId)),
+              prescriptionId: savedPrescription._id,
+              medicines: enriched.map((medicine) => ({
+                name: medicine.drugName,
+                quantity: 1,
+                dosage: medicine.dosage,
+              })),
+              prescriptionHash: medicinesHash,
+              geoLocation: {
+                latitude: Number((req.body as any)?.latitude || 0),
+                longitude: Number((req.body as any)?.longitude || 0),
+              },
+              radiusKm: Number((req.body as any)?.radiusKm || 10),
+            },
+            { asyncRefresh: false }
+          );
+
+          aggregationResult = aggregationResponse.data;
+          aggregationMeta = aggregationResponse.meta;
+        } catch (error) {
+          console.error("[executeFallbackOcr] Aggregation failed:", error);
+          aggregationResult = null;
+          aggregationMeta = { fromCache: false, refreshed: false, cacheStatus: "failed" };
+        }
+      }
+
+      console.log("ocr extracted medicines : ", enriched);
       const response = {
         event: "medicines_found",
         searchResults: aggregationResult,
@@ -368,6 +384,11 @@ export default class PrescriptionService {
           aggregationQueued: Boolean(savedPrescription),
           aggregationReady: Boolean(aggregationResult),
           prescriptionId: savedPrescription?._id || null,
+          cache: aggregationMeta || {
+            fromCache: false,
+            refreshed: Boolean(aggregationResult),
+            cacheStatus: aggregationResult ? "fresh" : "none",
+          },
         },
       };
 

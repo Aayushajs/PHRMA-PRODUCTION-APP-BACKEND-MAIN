@@ -7,6 +7,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import PrescriptionService from "../../Services/PrescriptionService/prescription.Service";
 import { customersMiddleware } from "../../Middlewares/CheckLoginMiddleware";
+import { ocrValidationMiddleware } from "../../Middlewares/ocrValidation.middleware";
 import uploadImage from "../../config/multer";
 import { ocrMiddleware } from "@development-team/bg-remover";
 import sharp from "sharp";
@@ -53,6 +54,7 @@ prescriptionRouter.post(
     timeout: 20000,
     retries: 1,
   }),
+  ocrValidationMiddleware,
   PrescriptionService.executeFallbackOcr,
 );
 
@@ -72,6 +74,7 @@ prescriptionRouter.post(
     timeout: 20000,
     retries: 1,
   }),
+  ocrValidationMiddleware,
   PrescriptionService.executeFallbackOcr,
 );
 
