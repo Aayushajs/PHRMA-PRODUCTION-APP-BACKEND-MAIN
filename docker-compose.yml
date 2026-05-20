@@ -1,5 +1,13 @@
 version: '3.8'
 
+# ─────────────────────────────────────────────────────────────────────────
+# LOCAL DEV ONLY.
+# This compose file spins up a Redis instance solely for local development
+# and smoke tests. It is NEVER used in production. Production uses a managed
+# global Redis whose URL/auth lives in the deployed environment — see
+# config/.env.example and docs/REDIS_OPS.md.
+# ─────────────────────────────────────────────────────────────────────────
+
 services:
   # Main Application
   app:
@@ -7,8 +15,11 @@ services:
     ports:
       - "5000:5000"
     environment:
-      # Override Redis URL to use local Redis
+      # Override Redis URL to use local Redis (NOT production)
       REDIS_URL: redis://redis:6379
+      # Prefix isolates local dev keys so they can't collide with prod data
+      # if someone accidentally points this stack at a shared Redis.
+      REDIS_KEY_PREFIX: "svc1:local:"
       # Override MongoDB URL to use local MongoDB (optional)
       # MONGO_URI: mongodb://mongo:27017/e-pharmacy
     env_file:
@@ -16,19 +27,33 @@ services:
     volumes:
       - ./temp_uploads:/usr/src/app/temp_uploads
     depends_on:
-      - redis
-      # - mongo  # Uncomment if you want to use local MongoDB
+      redis:
+        condition: service_healthy
+      # mongo:
+      #   condition: service_started
     restart: unless-stopped
 
-  # Local Redis for testing
+  # Local Redis for testing — DO NOT use in production.
   redis:
-    image: redis:7-alpine
+    # Pinned minor — avoid surprise upgrades on `docker compose pull`.
+    image: redis:7.4-alpine
     ports:
       - "6379:6379"
-    volumes:
-      - redis-data:/data
+    # No volume mount → no persistence in local dev. We explicitly disable
+    # RDB snapshots too. Local data is disposable; this matches "dev = ephemeral".
     restart: unless-stopped
-    command: redis-server --appendonly yes
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save ""
+      --appendonly no
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 2s
 
   # Local MongoDB (optional - uncomment if needed)
   # mongo:
@@ -41,6 +66,6 @@ services:
   #     - mongo-data:/data/db
   #   restart: unless-stopped
 
-volumes:
-  redis-data:
-  # mongo-data:  # Uncomment if using local MongoDB
+# No redis-data volume — local Redis is intentionally ephemeral.
+# volumes:
+#   mongo-data:

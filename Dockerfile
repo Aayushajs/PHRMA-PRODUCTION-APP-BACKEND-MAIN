@@ -1,5 +1,10 @@
+# PERF-AUDIT-2026-05: 10.2 — pin Bun to a specific minor for reproducible
+# builds and stable cold-start performance instead of floating `:latest`.
+# IMPORTANT: this minor MUST match the Bun version used to generate bun.lock
+# locally — Bun lockfile format changed across minors. Local dev currently
+# runs Bun 1.3 (see `bun --version`), so we pin to 1.3 here too.
 # ------------- BASE IMAGE WITH BUN + UBUNTU -------------
-FROM oven/bun:latest
+FROM oven/bun:1.3-debian
 
 # ------------- INSTALL TESSERACT -------------
 USER root
@@ -11,28 +16,41 @@ RUN apt-get update && \
 
 WORKDIR /usr/src/app
 
-# ------------- COPY DEPENDENCY FILES -------------
+# ------------- COPY DEPENDENCY FILES ONLY (for caching) -----------
 COPY package.json bun.lock ./
 
-# Install all dependencies (including devDeps for build)
-RUN bun install
+# Install production deps only — Bun runs TypeScript natively, no tsc build step.
+# This also avoids TS path-alias resolution issues that broke `dist/*.js`.
+RUN bun install --frozen-lockfile --production
 
-# ------------- COPY SOURCE CODE -------------
+# ------------- COPY SOURCE CODE (excludes tests via .dockerignore) -----
 COPY . .
 
-# ------------- BUILD TYPESCRIPT -------------
-RUN bun run build   # must generate dist/
-
-# Create necessary folder
+# Create necessary folders
 RUN mkdir -p /usr/src/app/temp_uploads
 
-# Fix ownership (optional)
+# Drop test sources from the image (kept tiny). All other .ts files are needed
+# because Bun runs them directly at runtime — DO NOT delete them.
+RUN rm -rf tests/
+
+# Fix ownership
 RUN chown -R bun:bun /usr/src/app
 
-EXPOSE 5000
+# PERF-AUDIT-2026-05: 10.3 — align EXPOSE with the actual listen port
+# (server.ts defaults to 5001). Container orchestrators (compose, k8s) now
+# advertise the correct port.
+EXPOSE 5001
 
 # Switch user
 USER bun
 
+# Lightweight container healthcheck — verifies the HTTP server is up.
+# Backend keeps serving requests even when Redis is down (graceful degrade),
+# so this intentionally does NOT depend on Redis connectivity.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD bun -e "fetch('http://127.0.0.1:5001/').then(r => process.exit(r.ok || r.status < 500 ? 0 : 1)).catch(() => process.exit(1))"
+
 # ------------- START APPLICATION -------------
-CMD ["bun", "run", "dist/server.js"]
+# Run TypeScript directly with Bun. Bun resolves tsconfig "paths" natively,
+# so we never end up with unresolved "@services/..." imports in production.
+CMD ["bun", "run", "server.ts"]

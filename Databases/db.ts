@@ -28,8 +28,13 @@ export const connectDB = async (): Promise<void> => {
     if (isAtlas || uri.includes('ssl=true') || uri.includes('tls=true')) {
       connectionOptions.ssl = true;
       connectionOptions.tls = true;
-      connectionOptions.tlsAllowInvalidCertificates = true;
-      connectionOptions.tlsAllowInvalidHostnames = true;
+      // SECURITY (F-09): TLS certificate validation must be ENABLED for any
+      // public Atlas / TLS-enabled cluster. Setting the two flags below to
+      // `true` silently disables MITM protection. Only allow override via
+      // explicit env (e.g. for self-signed local clusters during testing).
+      const allowInvalidCerts = process.env.MONGO_TLS_ALLOW_INVALID === 'true';
+      connectionOptions.tlsAllowInvalidCertificates = allowInvalidCerts;
+      connectionOptions.tlsAllowInvalidHostnames = allowInvalidCerts;
     }
 
     if (isLocal) {

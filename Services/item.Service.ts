@@ -182,18 +182,13 @@ export default class ItemServices {
             }
 
 
+            // PERF-AUDIT-2026-05: 3.2 — defer $lookup until after $skip/$limit
+            // so the join runs on at most `limitNum` docs instead of the entire
+            // filtered set. Sort, skip and limit now happen on the bare `items`
+            // collection (and benefit from the new compound indexes), and the
+            // category join is done in the facet's `items` sub-pipeline.
             const pipeline: any[] = [
                 { $match: filterQuery },
-
-                {
-                    $lookup: {
-                        from: 'categories',
-                        localField: 'itemCategory',
-                        foreignField: '_id',
-                        as: 'categoryDetails'
-                    }
-                },
-                { $unwind: { path: '$categoryDetails', preserveNullAndEmptyArrays: true } },
 
                 { $sort: sortConfig },
 
@@ -202,6 +197,15 @@ export default class ItemServices {
                         items: [
                             { $skip: skip },
                             { $limit: limitNum },
+                            {
+                                $lookup: {
+                                    from: 'categories',
+                                    localField: 'itemCategory',
+                                    foreignField: '_id',
+                                    as: 'categoryDetails'
+                                }
+                            },
+                            { $unwind: { path: '$categoryDetails', preserveNullAndEmptyArrays: true } },
                             {
                                 $project: {
                                     _id: 1,
@@ -497,108 +501,8 @@ export default class ItemServices {
         }
     )
 
-    // public static getItemsByCategory = catchAsyncErrors(
-    //     async (req: Request, res: Response, next: NextFunction) => {
-
-    //         const { categoryId } = req.params;
-
-    //         const {
-    //             page = 1,
-    //             limit = 20,
-    //             minPrice,
-    //             maxPrice,
-    //             minRating,
-    //             minDiscount,
-    //             isTrending,
-    //             sortBy = 'createdAt',
-    //             order = 'desc'
-    //         } = req.query;
-
-    //         if (!mongoose.isValidObjectId(categoryId)) {
-    //             return next(new ApiError(400, "Invalid category ID"));
-    //         }
-
-    //         const pageNum = parseInt(page as string) || 1;
-    //         const limitNum = Math.min(100, parseInt(limit as string) || 20);
-    //         const skip = (pageNum - 1) * limitNum;
-
-    //         const filterQuery: any = {
-    //             itemCategory: new mongoose.Types.ObjectId(categoryId),
-    //             deletedAt: { $exists: false }
-    //         };
-
-    //         if (minPrice || maxPrice) {
-    //             filterQuery.itemFinalPrice = {};
-    //             if (minPrice) filterQuery.itemFinalPrice.$gte = +minPrice;
-    //             if (maxPrice) filterQuery.itemFinalPrice.$lte = +maxPrice;
-    //         }
-
-    //         if (minRating) filterQuery.itemRatings = { $gte: +minRating };
-    //         if (minDiscount) filterQuery.itemDiscount = { $gte: +minDiscount };
-    //         if (isTrending === 'true') filterQuery.isTrending = true;
-
-    //         // const cacheKey = `items:${categoryId}:${pageNum}:${limitNum}`;
-
-    //         // const cached = await redis.get(cacheKey);
-    //         // if (cached) {
-    //         //     return handleResponse(req, res, 200, "From cache", JSON.parse(cached));
-    //         // }
-
-    //         const sortOrder = order === 'asc' ? 1 : -1;
-
-    //         const sortConfig: any = {
-    //             [sortBy as string]: sortOrder
-    //         };
-
-    //         const pipeline: any[] = [
-    //             { $match: filterQuery },
-    //             { $sort: sortConfig },
-    //             { $skip: skip },
-    //             { $limit: limitNum },
-    //             {
-    //                 $lookup: {
-    //                     from: 'categories',
-    //                     localField: 'itemCategory',
-    //                     foreignField: '_id',
-    //                     as: 'categoryDetails'
-    //                 }
-    //             },
-    //             { $unwind: { path: '$categoryDetails', preserveNullAndEmptyArrays: true } },
-    //             {
-    //                 $project: {
-    //                     itemName: 1,
-    //                     itemFinalPrice: 1,
-    //                     itemDiscount: 1,
-    //                     itemRatings: 1,
-    //                     views: 1,
-    //                     createdAt: 1,
-    //                     category: {
-    //                         _id: '$categoryDetails._id',
-    //                         name: '$categoryDetails.name'
-    //                     }
-    //                 }
-    //             }
-    //         ];
-
-    //         const [items, totalItems] = await Promise.all([
-    //             ItemModel.aggregate(pipeline),
-    //             ItemModel.countDocuments(filterQuery)
-    //         ]);
-
-    //         const responseData = {
-    //             items,
-    //             pagination: {
-    //                 currentPage: pageNum,
-    //                 totalPages: Math.ceil(totalItems / limitNum),
-    //                 totalItems
-    //             }
-    //         };
-
-    //         // await redis.set(cacheKey, JSON.stringify(responseData), { EX: 3600 });
-
-    //         handleResponse(req, res, 200, "Items fetched", responseData);
-    //     }
-    // );
+    // PERF-AUDIT-2026-05: Section 13 — removed commented-out alternate
+    // `getItemsByCategory` implementation (SAFE per audit).
 
 
     public static getDealsOfTheDay = catchAsyncErrors(
@@ -613,31 +517,19 @@ export default class ItemServices {
             const cacheKey = `deals:of-the-day`;
             const cachedDeals = await redis.get(cacheKey);
 
-            redis.del(cacheKey);
+            // PERF-AUDIT-2026-05: 3.1 — removed the unconditional `redis.del(cacheKey)`
+            // that was purging the cache before every read (effectively disabling it).
+            // Restored cache-hit short-circuit; reference to Min_Discount kept for
+            // future stale-check work but no longer issues a DB query on cache hit.
             if (cachedDeals) {
-                //Check if newer deals exist in DB
-                const latestDeal = await ItemModel.findOne({ itemDiscount: { $gte: Min_Discount } })
-                    .sort({ updatedAt: -1 })
-                    .select("updatedAt")
-                    .lean();
-
-                // console.log("Latest deal in DB updated at:", latestDeal?.updatedAt);
-                // const cacheMeta = JSON.parse(cachedDeals)?.[0]?.updatedAt;
-
-                //     console.log("Cached deals updated at:", cacheMeta); 
-
-                //     if (latestDeal && cacheMeta && new Date(latestDeal.updatedAt ?? 0) > new Date(cacheMeta)) {
-                //         console.log("Newer deals found — refreshing cache...");
-                //         await redis.del(cacheKey); // Clear old cache
-                //     } else {
-                //         console.log("Serving deals from cache");
-                //         return handleResponse(req, res, 200, "Deals retrieved successfully (cached)", JSON.parse(cachedDeals));
-                //     }
+                try {
+                    return handleResponse(req, res, 200, "Deals retrieved successfully (cached)", JSON.parse(cachedDeals));
+                } catch {
+                    // Corrupt cache entry — fall through to rebuild and overwrite.
+                    await redis.del(cacheKey);
+                }
             }
-
-            // if (cachedDeals) {
-            //     return handleResponse(req, res, 200, "Deals retrieved successfully", JSON.parse(cachedDeals));
-            // }
+            void Min_Discount; // retained for parity with original constant; intentional no-op
 
             // Get total count of all deals available
             const totalDeals = await ItemModel.countDocuments({ itemDiscount: { $gte: 40 } });
@@ -733,26 +625,45 @@ export default class ItemServices {
                     await redis.set(itemCacheKey, itemExists, { EX: 3600 });
                 }
 
-                // Atomic Operation 1: Remove if already exists (for re-positioning)
-                await userModel.findByIdAndUpdate(userId, {
-                    $pull: { wishlist: actualItemId }
-                });
+                // PERF-AUDIT-2026-05: 3.4 — collapse the previous two sequential
+                // findByIdAndUpdate ($pull then $push) into a single update using
+                // an aggregation pipeline. Removes the race window between the two
+                // ops, halves DB latency, and caps wishlist size to 500 (4.12).
+                await userModel.updateOne(
+                    { _id: userId },
+                    [
+                        {
+                            $set: {
+                                wishlist: {
+                                    $let: {
+                                        vars: {
+                                            filtered: {
+                                                $filter: {
+                                                    input: { $ifNull: ["$wishlist", []] },
+                                                    as: "w",
+                                                    cond: { $ne: ["$$w", actualItemId] },
+                                                },
+                                            },
+                                        },
+                                        in: {
+                                            $slice: [
+                                                { $concatArrays: [[actualItemId], "$$filtered"] },
+                                                500,
+                                            ],
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    ]
+                );
 
-                // Atomic Operation 2: Add to beginning (index 0) - LIFO
-                await userModel.findByIdAndUpdate(userId, {
-                    $push: {
-                        wishlist: {
-                            $each: [actualItemId],
-                            $position: 0  // Add at index 0 (top of stack)
-                        }
-                    }
-                });
-
-                // Invalidate wishlist caches
+                // PERF-AUDIT-2026-05: 5.3 — invalidate wishlist caches with a
+                // single variadic redis.del instead of N round-trips.
                 const wishlistPattern = `user:wishlist:${userId}*`;
                 const keys = await redis.keys(wishlistPattern);
                 if (keys.length > 0) {
-                    await Promise.all(keys.map(key => redis.del(key)));
+                    await redis.del(keys);
                 }
 
                 // Get item details for WebSocket event
@@ -790,19 +701,37 @@ export default class ItemServices {
                     return next(new ApiError(400, "Invalid item ID format"));
                 }
 
-                await userModel.findByIdAndUpdate(userId, {
-                    $pull: { viewedItems: actualItemId }
-                });
-
-                // Step 2: Enqueue - Add at the end and maintain queue size of 15
-                await userModel.findByIdAndUpdate(userId, {
-                    $push: {
-                        viewedItems: {
-                            $each: [actualItemId],
-                            $slice: -15  // Keep last 15 items (FIFO queue)
-                        }
-                    }
-                });
+                // PERF-AUDIT-2026-05: 3.4 — combine $pull + $push into one
+                // atomic update via aggregation pipeline. Preserves FIFO/most-recent
+                // semantics, caps at last 15.
+                await userModel.updateOne(
+                    { _id: userId },
+                    [
+                        {
+                            $set: {
+                                viewedItems: {
+                                    $let: {
+                                        vars: {
+                                            filtered: {
+                                                $filter: {
+                                                    input: { $ifNull: ["$viewedItems", []] },
+                                                    as: "v",
+                                                    cond: { $ne: ["$$v", actualItemId] },
+                                                },
+                                            },
+                                        },
+                                        in: {
+                                            $slice: [
+                                                { $concatArrays: ["$$filtered", [actualItemId]] },
+                                                -15,
+                                            ],
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    ]
+                );
 
                 // Invalidate cache
                 await redis.del(`recently-viewed:${userId}`);
@@ -1489,11 +1418,12 @@ export default class ItemServices {
                 return next(new ApiError(404, "User not found"));
             }
 
-            // Clear all wishlist caches for this user
+            // PERF-AUDIT-2026-05: 5.3 — variadic redis.del replaces
+            // Promise.all(N round-trips).
             const pattern = `user:wishlist:${userId}*`;
             const keys = await redis.keys(pattern);
             if (keys.length > 0) {
-                await Promise.all(keys.map(key => redis.del(key)));
+                await redis.del(keys);
             }
 
             // Emit real-time WebSocket event

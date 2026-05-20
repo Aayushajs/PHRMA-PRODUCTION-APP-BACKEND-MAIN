@@ -123,3 +123,18 @@ export const userSchema = new Schema<Iuser & Document>(
     timestamps: true,
   }
 );
+
+// PERF-AUDIT-2026-05: Section 4.2 — users collection indexes
+// `email` already has unique index via field-level `unique: true`.
+// `phone` already has a sparse index via field-level `sparse: true`; we do
+// NOT redeclare it here (Mongoose 8 warns on duplicate index declarations).
+userSchema.index(
+  { fcmToken: 1 },
+  {
+    partialFilterExpression: { fcmToken: { $exists: true, $type: "string" } },
+    name: "users_fcmToken_partial",
+  }
+); // 4.2 #2 — partial index excludes null/missing tokens (fan-out queries)
+userSchema.index({ provider: 1, email: 1 });                         // 4.2 #3
+userSchema.index({ role: 1, createdAt: -1 });                        // role-based admin lists
+

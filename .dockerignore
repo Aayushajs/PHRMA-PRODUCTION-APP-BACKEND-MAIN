@@ -7,3 +7,10 @@ dist
 .env.example
 temp_uploads
 *.log
+tests/
+**/*.test.ts
+**/*.spec.ts
+jest.config.js
+vitest.config.js
+.nyc_output/
+coverage/

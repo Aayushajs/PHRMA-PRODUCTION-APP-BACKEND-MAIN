@@ -80,3 +80,9 @@ export const featuredMedicineSchema = new Schema<IFeaturedMedicine & Document>(
     timestamps: true,
   }
 );
+
+// PERF-AUDIT-2026-05: Section 4.5 — featuredmedicines collection indexes
+featuredMedicineSchema.index({ featured: 1, createdAt: -1 }); // 4.5 #1
+featuredMedicineSchema.index({ category: 1 });                // 4.5 #2
+featuredMedicineSchema.index({ title: 1 });                   // 4.5 #3 — uniqueness check
+

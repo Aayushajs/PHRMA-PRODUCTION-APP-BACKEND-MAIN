@@ -10,6 +10,20 @@ import CategoryService, { CategoryLogService } from "../../Services/category.Ser
 import uploadImage from "../../config/multer";
 import { adminMiddleware, authenticatedUserMiddleware } from "../../Middlewares/CheckLoginMiddleware";
 import { CATEGORY_CONSTANTS } from "../../types/Category";
+import { validateRequest } from "../../Middlewares/validateRequest";
+import {
+  createCategorySchema,
+  updateCategoryBodySchema,
+  updateCategoryParamsSchema,
+  getCategoryByIdParamsSchema,
+  deleteCategoryParamsSchema,
+  deleteCategoryQuerySchema,
+  bulkToggleActiveSchema,
+  recentlyViewedParamsSchema,
+  listCategoriesQuerySchema,
+  categoryLogIdParamsSchema,
+  categoryLogsQuerySchema,
+} from "../../Validators/category.Validator";
 
 
 const router = express.Router();
@@ -22,20 +36,21 @@ r.post(
     { name: "imageUrl", maxCount: CATEGORY_CONSTANTS.MAX_IMAGES },
     { name: "bannerUrl", maxCount: CATEGORY_CONSTANTS.MAX_BANNERS },
   ]),
+  validateRequest({ body: createCategorySchema }),
   CategoryService.createCategory
 );
-r.get("/", CategoryService.getAllCategory);
+r.get("/", validateRequest({ query: listCategoriesQuerySchema }), CategoryService.getAllCategory);
 
-r.get("/list", CategoryService.getCategoriesSimple);
+r.get("/list", validateRequest({ query: listCategoriesQuerySchema }), CategoryService.getCategoriesSimple);
 
 r.get("/logs/debug", CategoryLogService.getDebugInfo);
-r.get("/logs", CategoryLogService.getAllLogs);
-r.get("/logs/stats", CategoryLogService.getLogStats);
-r.get("/logs/date-range", CategoryLogService.getLogsByDateRange);
-r.get("/logs/:id", CategoryLogService.getLogById);
+r.get("/logs", validateRequest({ query: categoryLogsQuerySchema }), CategoryLogService.getAllLogs);
+r.get("/logs/stats", validateRequest({ query: categoryLogsQuerySchema }), CategoryLogService.getLogStats);
+r.get("/logs/date-range", validateRequest({ query: categoryLogsQuerySchema }), CategoryLogService.getLogsByDateRange);
+r.get("/logs/:id", validateRequest({ params: categoryLogIdParamsSchema }), CategoryLogService.getLogById);
 
 r.get("/RecentlyViewed",authenticatedUserMiddleware, CategoryService.getRecentlyViewedCategories);
-r.get("/:id", CategoryService.getCategoryById);
+r.get("/:id", validateRequest({ params: getCategoryByIdParamsSchema }), CategoryService.getCategoryById);
 
 r.put(
   "/:id",
@@ -44,15 +59,16 @@ r.put(
     { name: "imageUrl", maxCount: CATEGORY_CONSTANTS.MAX_IMAGES },
     { name: "bannerUrl", maxCount: CATEGORY_CONSTANTS.MAX_BANNERS },
   ]),
+  validateRequest({ params: updateCategoryParamsSchema, body: updateCategoryBodySchema }),
   CategoryService.updateCategory
 );
 
-r.post("/recently-viewed/:categoryId", authenticatedUserMiddleware, CategoryService.addToRecentlyViewedCategories);
+r.post("/recently-viewed/:categoryId", authenticatedUserMiddleware, validateRequest({ params: recentlyViewedParamsSchema }), CategoryService.addToRecentlyViewedCategories);
 
-r.delete("/:id", adminMiddleware, CategoryService.ActiovationCategory);
+r.delete("/:id", adminMiddleware, validateRequest({ params: deleteCategoryParamsSchema, query: deleteCategoryQuerySchema }), CategoryService.ActiovationCategory);
 
 r.patch(
-  "/bulk/toggle-active", adminMiddleware, CategoryService.bulkToggleActive
+  "/bulk/toggle-active", adminMiddleware, validateRequest({ body: bulkToggleActiveSchema }), CategoryService.bulkToggleActive
 );
 
 

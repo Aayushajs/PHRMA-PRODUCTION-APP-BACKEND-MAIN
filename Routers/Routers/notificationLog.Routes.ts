@@ -6,28 +6,36 @@
 */
 
 import { Router, Request, Response } from 'express';
-import NotificationLogService from '@services/NotificationServices/notificationLog.Service';
-import NotificationService from '@middlewares/LogMedillewares/notificationLogger';
-import { authenticatedUserMiddleware } from '@middlewares/CheckLoginMiddleware';
-import { handleResponse } from '@utils/handleResponse';
-import { ApiError } from '@utils/ApiError';
+import NotificationLogService from '../../Services/NotificationServices/notificationLog.Service';
+import NotificationService from '../../Middlewares/LogMedillewares/notificationLogger';
+import { authenticatedUserMiddleware } from '../../Middlewares/CheckLoginMiddleware';
+import { handleResponse } from '../../Utils/handleResponse';
+import { ApiError } from '../../Utils/ApiError';
+import { validateRequest } from '../../Middlewares/validateRequest';
+import {
+  logListQuerySchema,
+  logIdParamsSchema,
+  markMultipleReadSchema,
+  registerTokenSchema,
+  sendTestSchema,
+} from '../../Validators/notificationLog.Validator';
 
 const notificationLog = Router();
 
 // ============================================================================
 // NOTIFICATION LOG ENDPOINTS
 // ============================================================================
-notificationLog.get('/active-logs', authenticatedUserMiddleware, NotificationLogService.getActiveLogs);
-notificationLog.get('/myNotification', authenticatedUserMiddleware, NotificationLogService.getUserLogs);
-notificationLog.get('/received', authenticatedUserMiddleware, NotificationLogService.getReceivedNotifications);
-notificationLog.get('/log/:id', authenticatedUserMiddleware, NotificationLogService.getLogById);
-notificationLog.get('/stats', authenticatedUserMiddleware, NotificationLogService.getUserStats);
-notificationLog.patch('/mark-read/:id', authenticatedUserMiddleware, NotificationLogService.markAsRead);
+notificationLog.get('/active-logs', authenticatedUserMiddleware, validateRequest({ query: logListQuerySchema }), NotificationLogService.getActiveLogs);
+notificationLog.get('/myNotification', authenticatedUserMiddleware, validateRequest({ query: logListQuerySchema }), NotificationLogService.getUserLogs);
+notificationLog.get('/received', authenticatedUserMiddleware, validateRequest({ query: logListQuerySchema }), NotificationLogService.getReceivedNotifications);
+notificationLog.get('/log/:id', authenticatedUserMiddleware, validateRequest({ params: logIdParamsSchema }), NotificationLogService.getLogById);
+notificationLog.get('/stats', authenticatedUserMiddleware, validateRequest({ query: logListQuerySchema }), NotificationLogService.getUserStats);
+notificationLog.patch('/mark-read/:id', authenticatedUserMiddleware, validateRequest({ params: logIdParamsSchema }), NotificationLogService.markAsRead);
 
 notificationLog.post('/receive', authenticatedUserMiddleware, NotificationLogService.receiveNotification);
 
 
-notificationLog.patch('/mark-multiple-read', authenticatedUserMiddleware, async (req: Request, res: Response) => {
+notificationLog.patch('/mark-multiple-read', authenticatedUserMiddleware, validateRequest({ body: markMultipleReadSchema }), async (req: Request, res: Response) => {
   try {
     const { logIds } = req.body;
     const userId = (req as any).user?._id;
@@ -59,7 +67,7 @@ notificationLog.patch('/mark-multiple-read', authenticatedUserMiddleware, async 
 // FCM TOKEN MANAGEMENT
 // ============================================================================
 
-notificationLog.post('/register-token', authenticatedUserMiddleware, async (req: Request, res: Response) => {
+notificationLog.post('/register-token', authenticatedUserMiddleware, validateRequest({ body: registerTokenSchema }), async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?._id;
     const { token } = req.body;
@@ -103,7 +111,7 @@ notificationLog.post('/register-token', authenticatedUserMiddleware, async (req:
 // TESTING ENDPOINT (Development/Testing only)
 // ============================================================================
 
-notificationLog.post('/send-test', authenticatedUserMiddleware, async (req: Request, res: Response) => {
+notificationLog.post('/send-test', authenticatedUserMiddleware, validateRequest({ body: sendTestSchema }), async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?._id;
     const fcmToken = (req as any).user?.fcmToken;

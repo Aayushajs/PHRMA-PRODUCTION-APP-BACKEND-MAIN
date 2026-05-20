@@ -86,8 +86,8 @@ export function startKeepAliveCron() {
   return intervalId;
 }
 
-// Auto-start if this file is run directly
-if (require.main === module) {
+// Auto-start if this file is run directly (ES module compatible)
+if (process.argv[1].includes('keepAlive')) {
   startKeepAliveCron();
   console.log('✅ Keep-Alive service started successfully');
 }

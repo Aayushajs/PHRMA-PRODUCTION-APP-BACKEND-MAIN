@@ -1,6 +1,11 @@
 version: '3.8'
 
-# Full local development setup with Redis AND MongoDB
+# ─────────────────────────────────────────────────────────────────────────
+# LOCAL DEV ONLY — full stack (Redis + MongoDB).
+# Same caveats as docker-compose.yml: this Redis is ephemeral and is
+# NEVER used in production. See docs/REDIS_OPS.md.
+# ─────────────────────────────────────────────────────────────────────────
+
 services:
   # Main Application
   app:
@@ -9,25 +14,37 @@ services:
       - "5000:5000"
     environment:
       REDIS_URL: redis://redis:6379
+      REDIS_KEY_PREFIX: "svc1:local:"
       MONGO_URI: mongodb://mongo:27017/e-pharmacy
     env_file:
       - ./config/.env
     volumes:
       - ./temp_uploads:/usr/src/app/temp_uploads
     depends_on:
-      - redis
-      - mongo
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_started
     restart: unless-stopped
 
-  # Local Redis
+  # Local Redis — pinned, capped, ephemeral.
   redis:
-    image: redis:7-alpine
+    image: redis:7.4-alpine
     ports:
       - "6379:6379"
-    volumes:
-      - redis-data:/data
     restart: unless-stopped
-    command: redis-server --appendonly yes
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save ""
+      --appendonly no
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 2s
 
   # Local MongoDB
   mongo:
@@ -41,5 +58,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  redis-data:
   mongo-data:

@@ -18,6 +18,8 @@ import mongoose from "mongoose";
 import NotificationService from "../Middlewares/LogMedillewares/notificationLogger";
 
 import User from "../Databases/Models/user.Models";
+// PERF-AUDIT-2026-05: 4.9 / 6.3 — broadcast fan-out helper (cursor-streamed).
+import { broadcastToAllUsersWithLog } from "../Utils/broadcastNotifications";
 
 const CACHE_KEY = "featuredMedicines";
 const CACHE_TTL = 3000;
@@ -97,36 +99,21 @@ export default class FeaturedMedicineService {
 
       await deleteCache(CACHE_KEY).catch(() => null);
 
-      // Fire-and-forget: notify users about new featured medicine with a friendly, high-conversion message
+      // PERF-AUDIT-2026-05: 4.9 / 6.3 — cursor-streamed broadcast.
       process.nextTick(async () => {
         try {
-          const users = await User.find({ fcmToken: { $ne: null } }).select(
-            "_id name fcmToken"
-          );
-
-          if (!users || users.length === 0) return;
-
           const title = `Just Arrived: ${newMedicine.title}!`;
           const body = `Grab ${newMedicine.title} now — limited stock available. Enjoy exclusive savings and fast delivery. Tap to view and order before it's gone!`;
 
-          await NotificationService.sendNotificationToMultipleUsers(
-            users.filter(u => u.fcmToken).map(u => ({
-              _id: u._id.toString(),
-              fcmToken: u.fcmToken as string,
-              name: u.name
-            })),
-            title,
-            body,
-            {
-              type: "FEATURED_CREATED",
-              relatedEntityId: newMedicine._id.toString(),
-              relatedEntityType: "FeaturedMedicine",
-              payload: { 
-                medicineId: newMedicine._id,
-                image: newMedicine.imageUrl || null
-              }
-            }
-          );
+          await broadcastToAllUsersWithLog(title, body, {
+            type: "FEATURED_CREATED",
+            relatedEntityId: newMedicine._id.toString(),
+            relatedEntityType: "FeaturedMedicine",
+            payload: {
+              medicineId: newMedicine._id,
+              image: newMedicine.imageUrl || null,
+            },
+          });
         } catch (err) {
           console.error("Notification (createFeaturedMedicine) error:", err);
         }
@@ -292,37 +279,22 @@ export default class FeaturedMedicineService {
 
       await deleteCache(CACHE_KEY).catch(() => null);
 
-      // Fire-and-forget: notify users about featured medicine update with an engaging message
+      // PERF-AUDIT-2026-05: 4.9 / 6.3 — cursor-streamed broadcast.
       process.nextTick(async () => {
         try {
-          const users = await User.find({ fcmToken: { $ne: null } }).select(
-            "_id name fcmToken"
-          );
-
-          if (!users || users.length === 0) return;
-
           const titleText = (updatedMedicine as any).title || "An item";
           const title = `Update: ${titleText} just got better!`;
           const body = `Good news! ${titleText} has been updated — improved details, availability or savings may await. Tap to check the latest offer and secure yours.`;
 
-          await NotificationService.sendNotificationToMultipleUsers(
-            users.filter(u => u.fcmToken).map(u => ({
-              _id: u._id.toString(),
-              fcmToken: u.fcmToken as string,
-              name: u.name
-            })),
-            title,
-            body,
-            {
-              type: "FEATURED_UPDATED",
-              relatedEntityId: updatedMedicine._id.toString(),
-              relatedEntityType: "FeaturedMedicine",
-              payload: { 
-                medicineId: updatedMedicine._id,
-                image: (updatedMedicine as any).imageUrl || null
-              }
-            }
-          );
+          await broadcastToAllUsersWithLog(title, body, {
+            type: "FEATURED_UPDATED",
+            relatedEntityId: updatedMedicine._id.toString(),
+            relatedEntityType: "FeaturedMedicine",
+            payload: {
+              medicineId: updatedMedicine._id,
+              image: (updatedMedicine as any).imageUrl || null,
+            },
+          });
         } catch (err) {
           console.error("Notification (updateFeaturedMedicine) error:", err);
         }

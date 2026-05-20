@@ -22,6 +22,7 @@ import NotificationLogModel from './notificationLog.model';
 import OcrHistoryModel from './ocrHistory.Model';
 import PrescriptionModel from './prescription.Model';
 import AggregatedResultModel from './aggregatedResult.Model';
+import RefreshTokenModel from './refreshToken.Model';
 
 // Export all models for convenience
 export {
@@ -39,4 +40,5 @@ export {
   OcrHistoryModel,
   PrescriptionModel,
   AggregatedResultModel,
+  RefreshTokenModel,
 };

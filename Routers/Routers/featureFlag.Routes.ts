@@ -9,6 +9,13 @@ import { Router } from "express";
 import FeatureFlagService from "../../Services/featureFlag.Service";
 import { adminMiddleware } from "../../Middlewares/CheckLoginMiddleware";
 import { catchAsyncErrors } from "../../Utils/catchAsyncErrors";
+import { validateRequest } from "../../Middlewares/validateRequest";
+import {
+  createFeatureFlagSchema,
+  updateFeatureFlagBodySchema,
+  featureFlagKeyParamsSchema,
+  bulkUpdateFeatureFlagsSchema,
+} from "../../Validators/featureFlag.Validator";
 
 const featureFlagRouter = Router();
 
@@ -24,6 +31,7 @@ const featureFlagRouter = Router();
 featureFlagRouter.post(
   "/create",
   adminMiddleware,
+  validateRequest({ body: createFeatureFlagSchema }),
   FeatureFlagService.createFeatureFlag
 );
 
@@ -46,6 +54,7 @@ featureFlagRouter.get(
 featureFlagRouter.get(
   "/:key",
   adminMiddleware,
+  validateRequest({ params: featureFlagKeyParamsSchema }),
   FeatureFlagService.getFeatureFlagByKey
 );
 
@@ -57,6 +66,7 @@ featureFlagRouter.get(
 featureFlagRouter.put(
   "/:key",
   adminMiddleware,
+  validateRequest({ params: featureFlagKeyParamsSchema, body: updateFeatureFlagBodySchema }),
   FeatureFlagService.updateFeatureFlag
 );
 
@@ -68,6 +78,7 @@ featureFlagRouter.put(
 featureFlagRouter.delete(
   "/:key",
   adminMiddleware,
+  validateRequest({ params: featureFlagKeyParamsSchema }),
   FeatureFlagService.deleteFeatureFlag
 );
 
@@ -79,6 +90,7 @@ featureFlagRouter.delete(
 featureFlagRouter.post(
   "/bulk-update",
   adminMiddleware,
+  validateRequest({ body: bulkUpdateFeatureFlagsSchema }),
   FeatureFlagService.bulkUpdateFeatureFlags
 );
 

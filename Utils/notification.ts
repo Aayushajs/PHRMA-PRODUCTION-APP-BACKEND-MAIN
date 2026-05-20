@@ -146,15 +146,27 @@ export const sendPushNotification = async (
   }
 };
 
+// PERF-AUDIT-2026-05: 7.2 — chunked concurrency for bulk push.
+// Previous implementation issued Promise.all over ALL tokens at once which, at
+// 10k+ users, caused Firebase throttling / retry storms. We cap concurrency to
+// BULK_CONCURRENCY tokens per wave. Response shape unchanged.
+const BULK_CONCURRENCY = 50;
+
 export const sendBulkNotifications = async (
   fcmTokens: string[],
   title: string,
   body: string,
   data: Record<string, any> = {}
 ): Promise<{ successCount: number; failureCount: number; results: NotificationResult[] }> => {
-  const results = await Promise.all(
-    fcmTokens.map(fcmToken => sendPushNotification(fcmToken, title, body, data))
-  );
+  const results: NotificationResult[] = [];
+
+  for (let i = 0; i < fcmTokens.length; i += BULK_CONCURRENCY) {
+    const chunk = fcmTokens.slice(i, i + BULK_CONCURRENCY);
+    const chunkResults = await Promise.all(
+      chunk.map(fcmToken => sendPushNotification(fcmToken, title, body, data))
+    );
+    results.push(...chunkResults);
+  }
 
   const successCount = results.filter(r => r.success).length;
   const failureCount = results.filter(r => !r.success).length;

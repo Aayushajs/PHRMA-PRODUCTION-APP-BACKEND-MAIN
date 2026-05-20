@@ -90,4 +90,7 @@ export const advertisementSchema = new Schema<IAdvertisement & Document>(
   { timestamps: true }
 );
 
-
+// PERF-AUDIT-2026-05: Section 4.4 — advertisements collection indexes
+advertisementSchema.index({ isActive: 1, startDate: 1, endDate: 1 });   // 4.4 #1 — getCurrentlyRunningAds
+advertisementSchema.index({ isActive: 1, type: 1, createdAt: -1 });     // 4.4 #2 — getActiveAds
+advertisementSchema.index({ categoryId: 1 });                            // 4.4 #3

@@ -17,10 +17,36 @@ const app: Express = express();
 app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// CORS origin is env-driven so ops can tighten it in production.
+// If CORS_ORIGINS is unset we keep the legacy wildcard for backward
+// compatibility, but warn — `credentials: true` + wildcard origin is
+// ignored by browsers, so cookie-based auth will NOT work cross-origin
+// until a specific origin list is configured.
+const corsOriginsEnv = process.env.CORS_ORIGINS;
+const corsOrigin: string[] = corsOriginsEnv
+  ? corsOriginsEnv.split(',').map(o => o.trim()).filter(Boolean)
+  : ['*'];
+
+if (!corsOriginsEnv) {
+  console.warn(
+    "[cors] CORS_ORIGINS env var is not set — falling back to '*'. " +
+    "Cross-origin cookies will NOT work until specific origins are configured."
+  );
+}
+
+// SECURITY (F-01 / F-02): identity headers (`x-user-id`, `x-user-role`,
+// `x-user-email`) and `x-internal-api-key` are NEVER set by browsers —
+// they are set by the API gateway during service-to-service calls.
+// Exposing them via CORS allowedHeaders lets a browser client *try* to
+// send them, which (combined with a leaked internal key) becomes full
+// identity spoofing. We drop them from the browser-visible list.
+// Gateway → service traffic doesn't go through browser CORS, so it is
+// unaffected.
 app.use(cors({
-  origin: ['*'],
+  origin: corsOrigin,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id', 'x-user-role', 'x-user-email', 'x-internal-api-key'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 }));
 app.use(morgan('dev'));

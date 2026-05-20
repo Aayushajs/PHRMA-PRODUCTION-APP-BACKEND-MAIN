@@ -7,7 +7,7 @@
 └───────────────────────────────────────────────────────────────────────┘
 */
 
-import { notificationQueue } from '@services/NotificationServices/notificationQueue.Service';
+import { notificationQueue } from '../Services/NotificationServices/notificationQueue.Service';
 
 // ============================================================================
 // CONFIGURATION
@@ -20,9 +20,18 @@ const ENABLE_QUEUE = process.env.ENABLE_NOTIFICATION_QUEUE !== 'false';
 // QUEUE PROCESSOR
 // ============================================================================
 
+// PERF-AUDIT-2026-05: 11.2 — bound each processQueue tick with a timeout so a
+// hung Firebase call cannot wedge the processor. 11.4 — schedule the existing
+// `recoverStuckProcessing` to drain items stuck in the processing list.
+const PROCESS_TIMEOUT_MS = 60_000;
+const RECOVER_STUCK_INTERVAL_MS = 5 * 60_000;
+const RECOVER_STUCK_THRESHOLD_MIN = 5;
+
 class QueueProcessor {
   private isRunning = false;
   private intervalId: NodeJS.Timeout | null = null;
+  private recoverIntervalId: NodeJS.Timeout | null = null;
+  private tickInFlight = false;
 
   /**
    * Start the queue processor
@@ -40,16 +49,38 @@ class QueueProcessor {
 
     console.log('🚀 Starting notification queue processor...');
     console.log(`   Processing interval: ${PROCESS_INTERVAL_MS}ms`);
-    
+
     this.isRunning = true;
 
     // Process immediately on start
     await this.processQueue();
 
-    // Then process at regular intervals
+    // PERF-AUDIT-2026-05: 11.2 — overlap guard (tickInFlight) + timeout.
     this.intervalId = setInterval(async () => {
-      await this.processQueue();
+      if (this.tickInFlight) return;
+      this.tickInFlight = true;
+      try {
+        await Promise.race([
+          this.processQueue(),
+          new Promise<void>((_, reject) =>
+            setTimeout(() => reject(new Error('processQueue timeout')), PROCESS_TIMEOUT_MS)
+          ),
+        ]);
+      } catch (err) {
+        console.error('processQueue tick error:', err);
+      } finally {
+        this.tickInFlight = false;
+      }
     }, PROCESS_INTERVAL_MS);
+
+    // PERF-AUDIT-2026-05: 11.4 — recover stuck processing items periodically.
+    this.recoverIntervalId = setInterval(async () => {
+      try {
+        await notificationQueue.recoverStuckProcessing(RECOVER_STUCK_THRESHOLD_MIN);
+      } catch (err) {
+        console.error('recoverStuckProcessing error:', err);
+      }
+    }, RECOVER_STUCK_INTERVAL_MS);
 
     console.log('✅ Queue processor started successfully');
   }
@@ -68,6 +99,10 @@ class QueueProcessor {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
+    }
+    if (this.recoverIntervalId) {
+      clearInterval(this.recoverIntervalId);
+      this.recoverIntervalId = null;
     }
 
     this.isRunning = false;

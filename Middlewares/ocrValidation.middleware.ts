@@ -163,15 +163,7 @@ export const ocrValidationMiddleware = (req: Request, res: Response, next: NextF
       return next(
         new ApiError(
           400,
-          "Invalid prescription or non-medical image detected",
-          {
-            details: {
-              message: reason,
-              confidence: validation.confidence,
-              medicinesDetected: medicines.length,
-              reasons: validation.reasons,
-            },
-          }
+          `Invalid prescription or non-medical image detected. Reason: ${reason}`
         )
       );
     }

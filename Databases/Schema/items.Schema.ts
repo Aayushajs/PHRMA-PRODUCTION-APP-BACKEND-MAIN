@@ -177,3 +177,19 @@ export const itemSchema = new Schema<Iitem & Document>(
         },
     },
 )
+
+// PERF-AUDIT-2026-05: Section 4.1 — items collection indexes
+// Compound + text indexes for hottest queries (getAllItems, getItemsByCategory,
+// getDealsOfTheDay, getSearchSuggestions, getDynamicFeed, getSimilarProducts).
+itemSchema.index({ itemCategory: 1, deletedAt: 1, createdAt: -1 }); // 4.1 #1
+itemSchema.index({ deletedAt: 1, itemFinalPrice: 1 });               // 4.1 #2
+itemSchema.index({ itemDiscount: -1, updatedAt: -1 });               // 4.1 #3
+itemSchema.index({ views: -1, itemRatings: -1, createdAt: -1 });     // 4.1 #4
+itemSchema.index({ createdAt: -1 });                                 // 4.1 #5
+itemSchema.index(
+    { itemName: "text", itemCompany: "text", formula: "text", code: "text" },
+    { name: "items_text_index", weights: { itemName: 10, itemCompany: 5, formula: 3, code: 2 } }
+); // 4.1 #6
+itemSchema.index({ updatedAt: 1 });                                  // 4.1 #7
+itemSchema.index({ isTrending: 1, views: -1 });                      // 4.1 #8
+itemSchema.index({ itemCategory: 1, itemFinalPrice: 1, deletedAt: 1 }); // 4.1 #9

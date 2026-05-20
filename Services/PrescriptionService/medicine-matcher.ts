@@ -1,8 +1,12 @@
 import { Worker } from "worker_threads";
 import path from "path";
+import { fileURLToPath } from "url";
 import ItemModel from "../../Databases/Models/item.Model";
 import { extractMedicinesWithRegex, MedicineDetails } from "./ocr.Service";
 import mongoose from "mongoose";
+
+// Handle __filename in ES modules
+const __filename = fileURLToPath(import.meta.url);
 
 // Ensure the worker is resolved properly whether running via TS-Node or compiled JS.
 const workerPath = __filename.replace("medicine-matcher", "medicine-worker");

@@ -85,3 +85,9 @@ export const categorySchema = new Schema<ICategory & Document>(
   },
   { timestamps: true }
 );
+
+// PERF-AUDIT-2026-05: Section 4.3 — categories collection indexes
+// `name` and `code` already have unique field-level indexes.
+categorySchema.index({ isActive: 1, priority: -1, createdAt: -1 }); // 4.3 #1
+categorySchema.index({ isFeatured: 1, priority: -1 });              // 4.3 #2
+

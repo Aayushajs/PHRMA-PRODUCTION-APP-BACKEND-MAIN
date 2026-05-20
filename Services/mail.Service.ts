@@ -36,8 +36,8 @@ export default class MailService {
         return next(new ApiError(400, 'Invalid email format'));
       }
 
-      // Check if user exists
-      const user = await UserModel.findOne({ email }).select('_id email name');
+      // PERF-AUDIT-2026-05: read-only — add .lean() to skip hydration.
+      const user = await UserModel.findOne({ email }).select('_id email name').lean();
       if (!user) {
         return next(new ApiError(404, 'User with this email not found'));
       }
@@ -86,8 +86,8 @@ export default class MailService {
         return next(new ApiError(400, 'Invalid email format'));
       }
 
-      // Fetch user data
-      const user = await UserModel.findOne({ email }).select('name email');
+      // PERF-AUDIT-2026-05: read-only — add .lean().
+      const user = await UserModel.findOne({ email }).select('name email').lean();
       if (!user) {
         return next(new ApiError(404, 'User with this email not found'));
       }
@@ -127,8 +127,8 @@ export default class MailService {
         return next(new ApiError(400, 'Invalid email format'));
       }
 
-      // Fetch user data
-      const user = await UserModel.findOne({ email }).select('name email');
+      // PERF-AUDIT-2026-05: read-only — add .lean().
+      const user = await UserModel.findOne({ email }).select('name email').lean();
       if (!user) {
         return next(new ApiError(404, 'User with this email not found'));
       }

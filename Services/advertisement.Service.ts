@@ -16,6 +16,8 @@ import { catchAsyncErrors } from '../Utils/catchAsyncErrors';
 import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
 import User from '../Databases/Models/user.Models';
 import { NotificationService } from '../Middlewares/LogMedillewares/notificationLogger';
+// PERF-AUDIT-2026-05: 4.9 / 6.3 — broadcast fan-out helper (cursor-streamed).
+import { broadcastToAllUsersWithLog } from '../Utils/broadcastNotifications';
 
 export default class AdvertisementService {
     private static CACHE_PREFIX = "advertisements";
@@ -151,36 +153,21 @@ export default class AdvertisementService {
                 }
             });
 
-            // Fire-and-forget: notify users about new advertisement
+            // PERF-AUDIT-2026-05: 4.9 / 6.3 — cursor-streamed broadcast.
             process.nextTick(async () => {
                 try {
-                    const users = await User.find({ fcmToken: { $ne: null } }).select(
-                        "_id name fcmToken"
-                    );
-
-                    if (!users || users.length === 0) return;
-
                     const title = "New Advertisement";
                     const body = `${advertisement.title} is now live!`;
 
-                    await NotificationService.sendNotificationToMultipleUsers(
-                        users.filter(u => u.fcmToken).map(u => ({
-                            _id: u._id.toString(),
-                            fcmToken: u.fcmToken as string,
-                            name: u.name
-                        })),
-                        title,
-                        body,
-                        {
-                            type: "AD_CREATED",
-                            relatedEntityId: advertisement._id.toString(),
-                            relatedEntityType: "Advertisement",
-                            payload: { 
-                                adId: advertisement._id,
-                                image: advertisement.imageUrl || null
-                            }
-                        }
-                    );
+                    await broadcastToAllUsersWithLog(title, body, {
+                        type: "AD_CREATED",
+                        relatedEntityId: advertisement._id.toString(),
+                        relatedEntityType: "Advertisement",
+                        payload: {
+                            adId: advertisement._id,
+                            image: advertisement.imageUrl || null,
+                        },
+                    });
                 } catch (err) {
                     console.error('Notification (createAd) error:', err);
                 }
@@ -353,38 +340,23 @@ export default class AdvertisementService {
                 }
             });
 
-            // Fire-and-forget: notify users about advertisement update
+            // PERF-AUDIT-2026-05: 4.9 / 6.3 — cursor-streamed broadcast.
             process.nextTick(async () => {
                 try {
-                    const users = await User.find({ fcmToken: { $ne: null } }).select(
-                        "_id name fcmToken"
-                    );
-
-                    if (!users || users.length === 0) return;
-
                     const actorName = (req as any).user?.name || 'Admin';
                     const title = "Advertisement Updated";
                     const body = `${actorName} updated advertisement: ${updatedAd.title || updatedAd.description || ''}`;
 
-                    await NotificationService.sendNotificationToMultipleUsers(
-                        users.filter(u => u.fcmToken).map(u => ({
-                            _id: u._id.toString(),
-                            fcmToken: u.fcmToken as string,
-                            name: u.name
-                        })),
-                        title,
-                        body,
-                        {
-                            type: "AD_UPDATED",
-                            relatedEntityId: updatedAd._id.toString(),
-                            relatedEntityType: "Advertisement",
-                            payload: { 
-                                adId: updatedAd._id, 
-                                updatedBy: actorName,
-                                image: updatedAd.imageUrl || null
-                            }
-                        }
-                    );
+                    await broadcastToAllUsersWithLog(title, body, {
+                        type: "AD_UPDATED",
+                        relatedEntityId: updatedAd._id.toString(),
+                        relatedEntityType: "Advertisement",
+                        payload: {
+                            adId: updatedAd._id,
+                            updatedBy: actorName,
+                            image: updatedAd.imageUrl || null,
+                        },
+                    });
                 } catch (err) {
                     console.error('Notification (updateAd) error:', err);
                 }
@@ -619,15 +591,30 @@ export default class AdvertisementService {
                 ];
             }
 
-            // Get total count
-            const totalAds = await Advertisement.countDocuments(matchStage);
+            // PERF-AUDIT-2026-05: 3.8 — whitelist sortBy so the query can only
+            // use indexed columns (prevents user-supplied COLLSCAN). Falls back
+            // to `createdAt` when an unknown field is requested.
+            const ALLOWED_SORT_FIELDS = new Set([
+                "createdAt",
+                "updatedAt",
+                "startDate",
+                "endDate",
+                "title",
+                "type",
+            ]);
+            const safeSortBy = ALLOWED_SORT_FIELDS.has(String(sortBy))
+                ? String(sortBy)
+                : "createdAt";
 
-            // Get advertisements
-            const ads = await Advertisement.find(matchStage)
-                .sort({ [sortBy as string]: order === 'asc' ? 1 : -1 })
-                .skip(skip)
-                .limit(limitNum)
-                .lean();
+            // PERF-AUDIT-2026-05: 7.1 — count + find in parallel.
+            const [totalAds, ads] = await Promise.all([
+                Advertisement.countDocuments(matchStage),
+                Advertisement.find(matchStage)
+                    .sort({ [safeSortBy]: order === "asc" ? 1 : -1 })
+                    .skip(skip)
+                    .limit(limitNum)
+                    .lean(),
+            ]);
 
             const currentDate = new Date();
 
@@ -731,28 +718,48 @@ export default class AdvertisementService {
                 );
             }
 
-            // Add new click tracking
-            advertisement.adClickTracking.push({
-                userId: new mongoose.Types.ObjectId(userId),
-                timestamp: currentDate
-            } as any);
-
-            await advertisement.save();
+            // PERF-AUDIT-2026-05: 3.6 — atomic $push (single field) instead of
+            // hydrating + rewriting the whole document. Slice the array to the
+            // last 1000 entries (4.11) to keep doc size below the 16MB cap.
+            await Advertisement.updateOne(
+                { _id: adId },
+                {
+                    $push: {
+                        adClickTracking: {
+                            $each: [{
+                                userId: new mongoose.Types.ObjectId(userId),
+                                timestamp: currentDate,
+                            }],
+                            $slice: -1000,
+                        },
+                    },
+                }
+            );
 
             // Notify the advertisement creator and last updater about this click (background)
             process.nextTick(async () => {
                 try {
-                    const actor = await User.findById(userId).select('name fcmToken');
+                    // PERF-AUDIT-2026-05: 3.7 / 7.1 — fold three findById queries
+                    // into a single $in query that returns actor + recipients,
+                    // and drop the user-existence check (auth middleware already
+                    // validated `req.user`).
+                    const ids = [userId];
+                    if (advertisement.createdBy) ids.push(advertisement.createdBy.toString());
+                    if (
+                        advertisement.updatedBy &&
+                        advertisement.updatedBy.toString() !== advertisement.createdBy?.toString()
+                    ) {
+                        ids.push(advertisement.updatedBy.toString());
+                    }
 
-                    const recipients: { _id: any; name?: string; fcmToken?: string }[] = [];
-                    if (advertisement.createdBy) {
-                        const creator = await User.findById(advertisement.createdBy).select('_id name fcmToken');
-                        if (creator) recipients.push(creator as any);
-                    }
-                    if (advertisement.updatedBy && advertisement.updatedBy.toString() !== advertisement.createdBy?.toString()) {
-                        const updater = await User.findById(advertisement.updatedBy).select('_id name fcmToken');
-                        if (updater) recipients.push(updater as any);
-                    }
+                    const fetched = await User.find({ _id: { $in: ids } })
+                        .select('_id name fcmToken')
+                        .lean();
+
+                    const actor = fetched.find(u => String(u._id) === userId.toString());
+                    const recipients = fetched.filter(
+                        u => String(u._id) !== userId.toString() && (u as any).fcmToken
+                    );
 
                     if (recipients.length === 0) return;
 
@@ -761,10 +768,10 @@ export default class AdvertisementService {
                     const body = `Your advertisement "${advertisement.title}" was clicked by ${actorName}`;
 
                     await NotificationService.sendNotificationToMultipleUsers(
-                        recipients.filter(r => (r as any).fcmToken).map(r => ({
+                        recipients.map(r => ({
                             _id: (r as any)._id.toString(),
                             fcmToken: (r as any).fcmToken as string,
-                            name: (r as any).name
+                            name: (r as any).name,
                         })),
                         title,
                         body,
@@ -772,11 +779,11 @@ export default class AdvertisementService {
                             type: 'AD_CLICKED',
                             relatedEntityId: advertisement._id.toString(),
                             relatedEntityType: "Advertisement",
-                            payload: { 
-                                adId: advertisement._id, 
+                            payload: {
+                                adId: advertisement._id,
                                 clickedBy: actorName,
-                                image: advertisement.imageUrl || null
-                            }
+                                image: advertisement.imageUrl || null,
+                            },
                         }
                     );
                 } catch (err) {
