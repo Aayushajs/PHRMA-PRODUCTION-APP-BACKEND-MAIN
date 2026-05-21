@@ -6,7 +6,7 @@
 */
 
 import mongoose from "mongoose";
-import RoleIndex from "../../Utils/Roles.enum";
+import RoleIndex from "../../Utils/auth/Roles.enum";
 
 export interface IFeatureFlag {
   _id?: mongoose.Types.ObjectId;

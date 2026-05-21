@@ -5,8 +5,8 @@
 */
 
 import { Request, Response, NextFunction } from "express";
-import { catchAsyncErrors } from "../../Utils/catchAsyncErrors";
-import { ApiError } from "../../Utils/ApiError";
+import { catchAsyncErrors } from "../../Utils/errors/catchAsyncErrors";
+import { ApiError } from "../../Utils/errors/ApiError";
 import NotificationService from "../../Middlewares/LogMedillewares/notificationLogger";
 import User from "../../Databases/Models/user.Models";
 import { emitCustomEvent } from "../../Utils/socketEmitters";
@@ -15,6 +15,11 @@ import {
   parsePrescriptionText,
 } from "./ocr.Service";
 import { resolveMedicinesStream } from "./medicine-matcher";
+import mongoose from "mongoose";
+import { v4 as uuidv4 } from "uuid";
+import OcrHistoryModel from "../../Databases/Models/ocrHistory.Model";
+import PrescriptionModel from "../../Databases/Models/prescription.Model";
+import AggregationService from "../../Services/aggregation.service";
 
 interface EnrichedMedicine extends MedicineDetails {
   price: number;
@@ -238,22 +243,159 @@ export default class PrescriptionService {
         availability: true,
       }));
 
+      const userId = (req as any).user?._id;
+      const medicinesHash = AggregationService.buildMedicineHash(
+        enriched.map((medicine) => ({ name: medicine.drugName, quantity: 1, dosage: medicine.dosage })),
+      );
+
+      let savedPrescription: any = null;
+      if (userId) {
+        const mongoUserId = new mongoose.Types.ObjectId(String(userId));
+        const imageUrl = req.file?.originalname || req.file?.filename || `ocr-${Date.now()}`;
+        const imageFormat = req.file?.mimetype?.split("/")[1];
+
+        const ocrHistory = await OcrHistoryModel.findOneAndUpdate(
+          { userId: mongoUserId, medicinesHash },
+          {
+            $set: {
+              userId: mongoUserId,
+              medicinesHash,
+              imageUrl,
+              imageName: req.file?.originalname,
+              imageSize: req.file?.size,
+              imageFormat,
+              extractedText: rawText,
+              medicines: enriched.map((medicine) => ({
+                medicineName: medicine.drugName,
+                dosage: medicine.dosage,
+                frequency: medicine.frequency,
+                duration: medicine.duration,
+                quantity: 1,
+                confidence: 100,
+              })),
+              processingTime: Number((ocrResult as any)?.processingTime || 0),
+              accuracy: Number((ocrResult as any)?.accuracy || 100),
+              ocrEngine: (ocrResult as any)?.engine || "fallback-ocr",
+              status: "success",
+              processedDate: new Date(),
+              prescriptionDetails: {
+                doctorName: parsed.doctorInfo?.name,
+                patientName: parsed.patientInfo?.name,
+              },
+              isVerified: false,
+            },
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true },
+        );
+
+        savedPrescription = await PrescriptionModel.findOneAndUpdate(
+          { userId: mongoUserId, ocrHistoryId: ocrHistory?._id },
+          {
+            $setOnInsert: {
+              prescriptionCode: `RX-${uuidv4().slice(0, 8).toUpperCase()}`,
+            },
+            $set: {
+              userId: mongoUserId,
+              ocrHistoryId: ocrHistory?._id,
+              patientDetails: {
+                patientName: parsed.patientInfo?.name || "Unknown",
+                patientAge: parsed.patientInfo?.age ? Number(parsed.patientInfo.age) || undefined : undefined,
+                patientGender: parsed.patientInfo?.gender || undefined,
+                patientPhone: undefined,
+                patientEmail: undefined,
+                patientAddress: undefined,
+              },
+              doctorName: parsed.doctorInfo?.name || "Unknown",
+              doctorLicense: parsed.doctorInfo?.license || undefined,
+              hospitalName: parsed.doctorInfo?.department || "Unknown",
+              hospitalContact: undefined,
+              prescriptionDate: new Date(),
+              expiryDate: undefined,
+              consultationType: "offline",
+              consultationFees: undefined,
+              medicines: enriched.map((medicine) => ({
+                medicineName: medicine.drugName,
+                dosage: medicine.dosage,
+                frequency: medicine.frequency,
+                duration: medicine.duration,
+                quantity: 1,
+                estimatedPrice: medicine.price,
+                notes: medicine.drugName,
+              })),
+              diagnosis: parsed.clinicalFindings?.diagnosis || undefined,
+              clinicalNotes: parsed.clinicalFindings?.symptoms || undefined,
+              attachments: [],
+              status: "active",
+              fulfillmentStatus: "pending",
+              isRecurring: false,
+              totalEstimatedCost: enriched.reduce((total, medicine) => total + Number(medicine.price || 0), 0),
+              bucketCollections: [],
+              bucketSessionId: medicinesHash,
+              totalBucketMedicines: 0,
+              totalBucketQuantity: 0,
+              bucketGrandTotal: 0,
+              totalBucketDiscount: 0,
+              bucketStatus: "active",
+              isBucketExpired: false,
+              bucketExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            },
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true },
+        );
+
+      }
+
+      // Use the new getOrRefreshAggregation for TTL-aware caching
+      let aggregationResult = null;
+      let aggregationMeta = null;
+
+      if (savedPrescription && userId) {
+        try {
+          const aggregationResponse = await AggregationService.getOrRefreshAggregation(
+            {
+              userId: new mongoose.Types.ObjectId(String(userId)),
+              prescriptionId: savedPrescription._id,
+              medicines: enriched.map((medicine) => ({
+                name: medicine.drugName,
+                quantity: 1,
+                dosage: medicine.dosage,
+              })),
+              prescriptionHash: medicinesHash,
+              geoLocation: {
+                latitude: Number((req.body as any)?.latitude || 0),
+                longitude: Number((req.body as any)?.longitude || 0),
+              },
+              radiusKm: Number((req.body as any)?.radiusKm || 10),
+            },
+            { asyncRefresh: false }
+          );
+
+          aggregationResult = aggregationResponse.data;
+          aggregationMeta = aggregationResponse.meta;
+        } catch (error) {
+          console.error("[executeFallbackOcr] Aggregation failed:", error);
+          aggregationResult = null;
+          aggregationMeta = { fromCache: false, refreshed: false, cacheStatus: "failed" };
+        }
+      }
+
+      console.log("ocr extracted medicines : ", enriched);
       const response = {
         event: "medicines_found",
-        prescription: {
-          patientInfo: parsed.patientInfo,
-          clinicalFindings: parsed.clinicalFindings,
-          vitalSigns: parsed.vitalSigns,
-          medicines: enriched,
-          doctorInfo: parsed.doctorInfo,
-        },
+        searchResults: aggregationResult,
         meta: {
           detectedCount: enriched.length,
-          rawText,
+          medicinesHash,
+          aggregationQueued: Boolean(savedPrescription),
+          aggregationReady: Boolean(aggregationResult),
+          prescriptionId: savedPrescription?._id || null,
+          cache: aggregationMeta || {
+            fromCache: false,
+            refreshed: Boolean(aggregationResult),
+            cacheStatus: aggregationResult ? "fresh" : "none",
+          },
         },
       };
-
-      const userId = (req as any).user?._id;
 
       // Emit each medicine in real-time via Socket.io
       if (userId) {

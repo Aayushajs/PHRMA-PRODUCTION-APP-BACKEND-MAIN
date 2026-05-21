@@ -134,7 +134,7 @@ const lookupTokens = (tokens: string[]) => {
                     token: rawToken,
                     matchTier: 'hot_cache', // Treated as hot_cache but it's fuzzy
                     matchedItem: bestFuzzy.item,
-                    similarItems: fuzzyResults.slice(0, 3).map(r => ({ _id: r.item._id, itemName: r.item.itemName, score: r.score }))
+                    similarItems: fuzzyResults.slice(0, 3).map((r: any) => ({ _id: r.item._id, itemName: r.item.itemName, score: r.score }))
                 });
                 continue;
             }

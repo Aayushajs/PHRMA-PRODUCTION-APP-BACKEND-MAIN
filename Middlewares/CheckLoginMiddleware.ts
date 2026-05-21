@@ -3,25 +3,22 @@
  * Supports 2 authentication modes:
  * 1. Gateway Mode: User info from headers (x-user-id, x-user-role, x-user-email)
  * 2. Direct Mode: Token from Authorization header or Cookie
+ *
+ * ┌──────────────────────────────────────────────────────────────────────┐
+ * │  DRY Design: all exported middlewares are thin wrappers around the   │
+ * │  single roleMiddleware() factory — no duplicated try/catch blocks.   │
+ * └──────────────────────────────────────────────────────────────────────┘
  */
 
 import { Request, Response, NextFunction } from "express";
-import { ApiError } from "../Utils/ApiError";
-import { catchAsyncErrors } from "../Utils/catchAsyncErrors";
-import RoleIndex from "../Utils/Roles.enum";
-import { verifyAccessToken } from "../Utils/jwtToken";
+import { ApiError } from "../Utils/errors/ApiError";
+import RoleIndex from "../Utils/auth/Roles.enum";
+import { verifyAccessToken } from "../Utils/auth/jwtToken";
 import dotenv from "dotenv";
 
 dotenv.config({ path: "./config/.env" });
 
-const isValidInternalServiceRequest = (req: Request): boolean => {
-  const expectedKey = process.env.INTERNAL_SERVICE_API_KEY;
-  const providedKey = req.headers["x-internal-api-key"];
-
-  return Boolean(expectedKey && providedKey && providedKey === expectedKey);
-};
-
-// Extend Express Request to include user object
+// ─── Type augmentation ────────────────────────────────────────────────────────
 declare global {
   namespace Express {
     interface Request {
@@ -34,31 +31,30 @@ declare global {
   }
 }
 
-// Extract user info from request headers (Gateway mode)
-const extractUserFromHeaders = (req: Request) => {
-  if (!isValidInternalServiceRequest(req)) {
-    return null;
-  }
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-  const userId = req.headers["x-user-id"] as string;
-  const userRole = req.headers["x-user-role"] as string;
-  const userEmail = req.headers["x-user-email"] as string;
-
-  if (!userId || !userRole) {
-    return null;
-  }
-
-  return {
-    _id: userId,
-    role: userRole,
-    email: userEmail || "",
-  };
+const isValidInternalServiceRequest = (req: Request): boolean => {
+  const expectedKey = process.env.INTERNAL_SERVICE_API_KEY;
+  const providedKey = req.headers["x-internal-api-key"];
+  return Boolean(expectedKey && providedKey && providedKey === expectedKey);
 };
 
-// Extract and verify user from JWT token (Direct mode)
+/** Extract user from trusted Gateway headers (only when x-internal-api-key matches). */
+const extractUserFromHeaders = (req: Request) => {
+  if (!isValidInternalServiceRequest(req)) return null;
+
+  const userId    = req.headers["x-user-id"]    as string;
+  const userRole  = req.headers["x-user-role"]  as string;
+  const userEmail = req.headers["x-user-email"] as string;
+
+  if (!userId || !userRole) return null;
+
+  return { _id: userId, role: userRole, email: userEmail || "" };
+};
+
+/** Extract and verify user from a JWT (Bearer header → accessToken cookie → legacy userToken cookie). */
 const extractUserFromToken = (req: Request) => {
   try {
-    // Priority: Authorization Bearer → accessToken cookie → legacy userToken cookie.
     let token = req.headers.authorization?.split(" ")[1];
 
     if (!token && req.cookies?.accessToken) {
@@ -70,152 +66,72 @@ const extractUserFromToken = (req: Request) => {
       token = req.cookies.userToken;
     }
 
-    if (!token) {
-      return null;
-    }
+    if (!token) return null;
 
-    // Verify token signature with pinned HS256 algorithm.
+    // Verify with pinned HS256 algorithm (rejects RS256/HS512/alg:none attacks).
     const decoded = verifyAccessToken(token) as any;
     return {
-      _id: decoded._id,
-      role: decoded.role,
+      _id:   decoded._id,
+      role:  decoded.role,
       email: decoded.email,
     };
-  } catch (error) {
+  } catch {
     return null;
   }
 };
 
-// Get user info using multiple fallback methods
-const getUserInfo = (req: Request) => {
-  // First try getting user from Gateway headers
-  let user = extractUserFromHeaders(req);
-  
-  // Fall back to token-based authentication
-  if (!user) {
-    user = extractUserFromToken(req);
-  }
+/** Gateway headers take priority; falls back to JWT token. */
+const getUserInfo = (req: Request) =>
+  extractUserFromHeaders(req) ?? extractUserFromToken(req);
 
-  return user;
-};
+// ─── Core factory ─────────────────────────────────────────────────────────────
 
-// Middleware: Allow only CUSTOMER role users
-export const customersMiddleware = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const user = getUserInfo(req);
-
-    if (!user) {
-      return next(new ApiError(401, "Unauthorized: Please login first"));
-    }
-
-    if (user.role !== RoleIndex.CUSTOMER) {
-      return next(new ApiError(403, "Forbidden: Customer access required"));
-    }
-
-    req.user = user;
-    next();
-  } catch (error) {
-    return next(new ApiError(500, "Internal server error"));
-  }
-};
-
-// Middleware: Allow only ADMIN role users
-export const adminMiddleware = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const user = getUserInfo(req);
-
-    if (!user) {
-      return next(new ApiError(401, "Unauthorized: Please login first"));
-    }
-
-    if (user.role !== RoleIndex.ADMIN) {
-      return next(new ApiError(403, "Forbidden: Admin access required"));
-    }
-
-    req.user = user;
-    next();
-  } catch (error) {
-    return next(new ApiError(500, "Internal server error"));
-  }
-};
-
-// Middleware: Allow both CUSTOMER and ADMIN users
-export const userMiddleware = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const user = getUserInfo(req);
-
-    if (!user) {
-      return next(new ApiError(401, "Unauthorized: Please login first"));
-    }
-
-    const allowedRoles = [RoleIndex.CUSTOMER, RoleIndex.ADMIN];
-    if (!allowedRoles.includes(user.role as any)) {
-      return next(new ApiError(403, "Forbidden: Access denied"));
-    }
-
-    req.user = user;
-    next();
-  } catch (error) {
-    return next(new ApiError(500, "Internal server error"));
-  }
-};
-
-// Middleware: Allow any authenticated user (any role)
-export const authenticatedUserMiddleware = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const user = getUserInfo(req);
-
-    if (!user) {
-      return next(new ApiError(401, "Unauthorized: Please login first"));
-    }
-
-    req.user = user;
-    next();
-  } catch (error) {
-    return next(new ApiError(500, "Internal server error"));
-  }
-};
-
-// Flexible role middleware - allow specific roles
-// Usage: roleMiddleware(RoleIndex.ADMIN, RoleIndex.VENDOR)
+/**
+ * Role-based middleware factory.
+ *
+ * - Pass no roles  → any authenticated user is allowed  (authenticatedUserMiddleware)
+ * - Pass one role  → only that role is allowed           (adminMiddleware / customersMiddleware)
+ * - Pass N roles   → any of those roles is allowed       (userMiddleware)
+ *
+ * Usage:
+ *   router.get('/admin-only', roleMiddleware(RoleIndex.ADMIN), handler);
+ *   router.get('/users',      roleMiddleware(RoleIndex.ADMIN, RoleIndex.CUSTOMER), handler);
+ *   router.get('/me',         roleMiddleware(), handler);  // any auth
+ */
 export const roleMiddleware = (...allowedRoles: string[]) => {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
     try {
       const user = getUserInfo(req);
 
       if (!user) {
-        return next(new ApiError(401, "Unauthorized: Please login first"));
+        next(new ApiError(401, "Unauthorized: Please login first"));
+        return;
       }
 
-      if (!allowedRoles.includes(user.role)) {
-        return next(
-          new ApiError(
-            403,
-            `Forbidden: Only ${allowedRoles.join(", ")} can access this`
-          )
-        );
+      if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
+        const who = allowedRoles.join(", ");
+        next(new ApiError(403, `Forbidden: Only ${who} can access this`));
+        return;
       }
 
       req.user = user;
       next();
-    } catch (error) {
-      return next(new ApiError(500, "Internal server error"));
+    } catch {
+      next(new ApiError(500, "Internal server error"));
     }
   };
 };
+
+// ─── Named convenience exports (backward-compatible) ─────────────────────────
+
+/** Allow only CUSTOMER role. */
+export const customersMiddleware = roleMiddleware(RoleIndex.CUSTOMER);
+
+/** Allow only ADMIN role. */
+export const adminMiddleware = roleMiddleware(RoleIndex.ADMIN);
+
+/** Allow CUSTOMER or ADMIN. */
+export const userMiddleware = roleMiddleware(RoleIndex.CUSTOMER, RoleIndex.ADMIN);
+
+/** Allow any authenticated user (any role). */
+export const authenticatedUserMiddleware = roleMiddleware();

@@ -12,6 +12,8 @@ import categoryRouter from './Routers/category.Routes';
 import itemsRouter from './Routers/item.Routes';
 import advertisementRouter from './Routers/advertisement.Routes';
 import prescriptionRouter from './Routers/prescription.Routes';
+import searchRouter from './Routers/search.Routes';
+import bucketRouter from './Routers/bucket.Routes';
 import notification from "./Routers/notificationLog.Routes";
 import notificationServiceRouter from "./Routers/notification.Routes";
 import featureFlagRouter from './Routers/featureFlag.Routes';
@@ -19,6 +21,8 @@ import featuresRouter from './Routers/features.Routes';
 import mailServiceRouter from './Routers/mail.Routes';
 const mainRouter = Router();
 
+import { globalLimiter } from '../Middlewares/rateLimiter';
+mainRouter.use(globalLimiter);
 // Health check endpoint to prevent cold starts
 mainRouter.get('/health', (req, res) => {
   res.status(200).json({ 
@@ -35,6 +39,8 @@ mainRouter.use('/categories', categoryRouter);
 mainRouter.use('/items', itemsRouter);
 mainRouter.use('/advertisements', advertisementRouter);
 mainRouter.use('/prescriptions', prescriptionRouter);
+mainRouter.use('/search', searchRouter);
+mainRouter.use('/bucket', bucketRouter);
 mainRouter.use('/notifications',notification)
 
 // Internal Notification Service (for inter-service communication)

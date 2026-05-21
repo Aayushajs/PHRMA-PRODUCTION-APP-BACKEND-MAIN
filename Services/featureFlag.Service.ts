@@ -7,12 +7,12 @@
 */
 
 import { Response, Request, NextFunction } from "express";
-import { catchAsyncErrors } from "../Utils/catchAsyncErrors";
-import { ApiError } from "../Utils/ApiError";
+import { catchAsyncErrors } from "../Utils/errors/catchAsyncErrors";
+import { ApiError } from "../Utils/errors/ApiError";
 import FeatureFlagModel from "../Databases/Models/featureFlag.Models";
 import { redis, isRedisAvailable } from "../config/redis";
 import { IFeatureFlag } from "../Databases/Entities/featureFlag.Interface";
-import RoleIndex from "../Utils/Roles.enum";
+import RoleIndex from "../Utils/auth/Roles.enum";
 
 // Redis cache configuration
 const CACHE_PREFIX = "feature_flag:";

@@ -8,7 +8,7 @@ import {
     forgotPasswordSchema,
     verifyOtpSchema,
     resetPasswordSchema,
-} from "../Validators/user.Validator";
+} from "../Utils/lib/validators/user.Validator";
 
 describe("user.Validator", () => {
     describe("signupSchema", () => {

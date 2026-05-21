@@ -20,6 +20,9 @@ import CategoryLogModel from './categoryLog.model';
 import FeaturedLogModel from './feturedLog.model';
 import NotificationLogModel from './notificationLog.model';
 import RefreshTokenModel from './refreshToken.Model';
+import OcrHistoryModel from './ocrHistory.Model';
+import PrescriptionModel from './prescription.Model';
+import AggregatedResultModel from './aggregatedResult.Model';
 
 // Export all models for convenience
 export {
@@ -35,4 +38,7 @@ export {
   FeaturedLogModel,
   NotificationLogModel,
   RefreshTokenModel,
+  OcrHistoryModel,
+  PrescriptionModel,
+  AggregatedResultModel,
 };

@@ -8,7 +8,7 @@
 
 import { Schema, Document } from "mongoose";
 import { IFeatureFlag } from "../Entities/featureFlag.Interface";
-import RoleIndex from "../../Utils/Roles.enum";
+import RoleIndex from "../../Utils/auth/Roles.enum";
 
 export const featureFlagSchema = new Schema<IFeatureFlag & Document>(
   {

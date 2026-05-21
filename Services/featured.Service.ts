@@ -8,18 +8,18 @@
 import { Request, Response, NextFunction } from "express";
 import FeaturedMedicine from "../Databases/Models/FeaturedMedicine.model";
 import FeaturedMedicineLog from "../Databases/Models/feturedLog.model";
-import { getCache, setCache, deleteCache } from "../Utils/cache";
-import { catchAsyncErrors } from "../Utils/catchAsyncErrors";
-import { ApiError } from "../Utils/ApiError";
-import { handleResponse } from "../Utils/handleResponse";
-import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
+import { getCache, setCache, deleteCache } from "../Utils/cache/cache";
+import { catchAsyncErrors } from "../Utils/errors/catchAsyncErrors";
+import { ApiError } from "../Utils/errors/ApiError";
+import { handleResponse } from "../Utils/responses/handleResponse";
+import { uploadToCloudinary } from "../Utils/providers/cloudinaryUpload";
 import crypto from "crypto";
 import mongoose from "mongoose";
 import NotificationService from "../Middlewares/LogMedillewares/notificationLogger";
 
 import User from "../Databases/Models/user.Models";
 // PERF-AUDIT-2026-05: 4.9 / 6.3 — broadcast fan-out helper (cursor-streamed).
-import { broadcastToAllUsersWithLog } from "../Utils/broadcastNotifications";
+import { broadcastToAllUsersWithLog } from "../Utils/providers/broadcastNotifications";
 
 const CACHE_KEY = "featuredMedicines";
 const CACHE_TTL = 3000;

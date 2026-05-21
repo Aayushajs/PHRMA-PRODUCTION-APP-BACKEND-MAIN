@@ -8,11 +8,11 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { notificationQueue } from './notificationQueue.Service';
-import { ApiError } from '../../Utils/ApiError';
-import { handleResponse } from '../../Utils/handleResponse';
-import { catchAsyncErrors } from '../../Utils/catchAsyncErrors';
+import { ApiError } from '../../Utils/errors/ApiError';
+import { handleResponse } from '../../Utils/responses/handleResponse';
+import { catchAsyncErrors } from '../../Utils/errors/catchAsyncErrors';
 import UserModel from '../../Databases/Models/user.Models';
-import { sendPushNotification, sendBulkNotifications } from '../../Utils/notification';
+import { sendPushNotification, sendBulkNotifications } from '../../Utils/providers/notification';
 
 // Check if queue is enabled (default: true)
 const ENABLE_QUEUE = process.env.ENABLE_NOTIFICATION_QUEUE !== 'false';

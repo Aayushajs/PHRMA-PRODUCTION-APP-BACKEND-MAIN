@@ -6,7 +6,7 @@
 */
 
 import { Request, Response, NextFunction } from 'express';
-import { ApiError } from '../Utils/ApiError';
+import { ApiError } from '../Utils/errors/ApiError';
 
 /**
  * Middleware to authenticate internal service-to-service API calls

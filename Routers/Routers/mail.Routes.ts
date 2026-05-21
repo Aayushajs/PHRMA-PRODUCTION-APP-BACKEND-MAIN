@@ -14,7 +14,7 @@ import {
   singleEmailSchema,
   sendNotificationEmailSchema,
   sendBulkNotificationEmailSchema,
-} from '../../Validators/mail.Validator';
+} from '../../Utils/lib/validators/mail.Validator';
 
 const router = Router();
 

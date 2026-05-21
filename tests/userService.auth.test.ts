@@ -19,7 +19,7 @@ process.env.REDIS_PORT = process.env.REDIS_PORT || "6379";
 import bcrypt from "bcryptjs";
 import UserModel from "../Databases/Models/user.Models";
 import * as redisMod from "../config/redis";
-import * as notificationMod from "../Utils/notification";
+import * as notificationMod from "../Utils/providers/notification";
 
 // --- helpers ---------------------------------------------------------------
 
@@ -285,7 +285,7 @@ describe("UserService auth (login / refresh / logout)", () => {
     const RefreshTokenModel = await getRefreshTokenModel();
     if (!RefreshTokenModel) return; // implementation not landed
 
-    const { hashRefreshToken, generateRefreshToken } = await import("../Utils/jwtToken");
+    const { hashRefreshToken, generateRefreshToken } = await import("../Utils/auth/jwtToken");
     const rawOld = generateRefreshToken();
     const oldHash = hashRefreshToken(rawOld);
 
@@ -304,18 +304,22 @@ describe("UserService auth (login / refresh / logout)", () => {
     spyOn(RefreshTokenModel, "findOne").mockImplementation((() => oldRow) as any);
     const createSpy = spyOn(RefreshTokenModel, "create").mockImplementation(async (doc: any) => doc);
 
+    const fullUser = {
+      _id: oldRow.userId,
+      name: "T",
+      email: "t@x.com",
+      role: "CUSTOMER",
+      phone: "+15551112222",
+      fcmToken: null,
+      lastLogin: null,
+      address: {},
+      ProfileImage: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
     spyOn(UserModel, "findById").mockImplementation((() => ({
-      lean: async () => ({
-        _id: oldRow.userId,
-        name: "T",
-        email: "t@x.com",
-        role: "CUSTOMER",
-      }),
-      select: async () => ({
-        _id: oldRow.userId,
-        email: "t@x.com",
-        role: "CUSTOMER",
-      }),
+      lean: async () => fullUser,
+      select: async () => fullUser,
     })) as any);
 
     const refreshFn: any = (UserService as any).refreshToken;
@@ -454,7 +458,7 @@ describe("UserService auth (login / refresh / logout)", () => {
     const refreshFn: any = (UserService as any).refreshToken;
     if (typeof refreshFn !== "function") return;
 
-    const { hashRefreshToken, generateRefreshToken } = await import("../Utils/jwtToken");
+    const { hashRefreshToken, generateRefreshToken } = await import("../Utils/auth/jwtToken");
     const raw = generateRefreshToken();
     const row: any = {
       _id: "rt4",
@@ -468,18 +472,22 @@ describe("UserService auth (login / refresh / logout)", () => {
     };
     spyOn(RefreshTokenModel, "findOne").mockImplementation((() => row) as any);
     spyOn(RefreshTokenModel, "create").mockImplementation(async (doc: any) => doc);
+    const fullUser2 = {
+      _id: row.userId,
+      name: "T",
+      email: "t@x.com",
+      role: "CUSTOMER",
+      phone: "+15551112222",
+      fcmToken: null,
+      lastLogin: null,
+      address: {},
+      ProfileImage: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
     spyOn(UserModel, "findById").mockImplementation((() => ({
-      lean: async () => ({
-        _id: row.userId,
-        name: "T",
-        email: "t@x.com",
-        role: "CUSTOMER",
-      }),
-      select: async () => ({
-        _id: row.userId,
-        email: "t@x.com",
-        role: "CUSTOMER",
-      }),
+      lean: async () => fullUser2,
+      select: async () => fullUser2,
     })) as any);
 
     const req = mockReq({ body: { refreshToken: raw }, cookies: {} } as any);
@@ -497,7 +505,7 @@ describe("UserService auth (login / refresh / logout)", () => {
     const UserService = (await import("../Services/user.Service")).default;
     const RefreshTokenModel = await getRefreshTokenModel();
 
-    const { hashRefreshToken, generateRefreshToken } = await import("../Utils/jwtToken");
+    const { hashRefreshToken, generateRefreshToken } = await import("../Utils/auth/jwtToken");
     const raw = generateRefreshToken();
     const row: any = {
       _id: "rt5",

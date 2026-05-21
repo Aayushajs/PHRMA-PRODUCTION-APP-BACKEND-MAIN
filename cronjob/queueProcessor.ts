@@ -38,7 +38,7 @@ class QueueProcessor {
    */
   async start(): Promise<void> {
     if (!ENABLE_QUEUE) {
-      console.log('⏭️  Queue processing disabled (ENABLE_NOTIFICATION_QUEUE=false)');
+      console.log('⏭ Queue processing disabled (ENABLE_NOTIFICATION_QUEUE=false)');
       return;
     }
 
@@ -47,7 +47,7 @@ class QueueProcessor {
       return;
     }
 
-    console.log('🚀 Starting notification queue processor...');
+    console.log(' Starting notification queue processor...');
     console.log(`   Processing interval: ${PROCESS_INTERVAL_MS}ms`);
 
     this.isRunning = true;
@@ -116,19 +116,19 @@ class QueueProcessor {
     try {
       // Get queue stats first
       const stats = await notificationQueue.getStats();
-      
+
       if (stats.waiting === 0) {
         // No notifications to process
         return;
       }
 
-      console.log(`📊 Queue stats: ${stats.waiting} waiting, ${stats.processing} processing, ${stats.failed} failed`);
+      console.log(` Queue stats: ${stats.waiting} waiting, ${stats.processing} processing, ${stats.failed} failed`);
 
       // Process the queue
       await notificationQueue.processQueue();
 
     } catch (error) {
-      console.error('❌ Error in queue processor:', error);
+      console.error(' Error in queue processor:', error);
       // Don't stop the processor on error, just log and continue
     }
   }
@@ -156,24 +156,24 @@ export const queueProcessor = new QueueProcessor();
 
 // Handle process termination signals
 process.on('SIGINT', async () => {
-  console.log('\n📢 SIGINT received, shutting down queue processor...');
+  console.log(' SIGINT received, shutting down queue processor...');
   await queueProcessor.stop();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-  console.log('\n📢 SIGTERM received, shutting down queue processor...');
+  console.log(' SIGTERM received, shutting down queue processor...');
   await queueProcessor.stop();
   process.exit(0);
 });
 
 // Handle uncaught errors
 process.on('uncaughtException', (error) => {
-  console.error('❌ Uncaught exception in queue processor:', error);
+  console.error(' Uncaught exception in queue processor:', error);
   // Don't exit, let the processor continue
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ Unhandled rejection in queue processor:', reason);
+  console.error(' Unhandled rejection in queue processor:', reason);
   // Don't exit, let the processor continue
 });

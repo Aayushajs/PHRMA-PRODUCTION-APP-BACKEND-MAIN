@@ -22,9 +22,11 @@ import {
     saveRecentSearchSchema,
     recentSearchesQuerySchema,
     deleteRecentSearchParamsSchema,
-} from "../../Validators/item.Validator";
+} from "../../Utils/lib/validators/item.Validator";
 
 
+
+import { apiLimiter } from "../../Middlewares/rateLimiter";
 
 const itemsRouter = express.Router();
 itemsRouter.get("/", validateRequest({ query: listItemsQuerySchema }), ItemServices.getAllItems);
@@ -42,11 +44,11 @@ itemsRouter.delete("/search/recent/:query", authenticatedUserMiddleware, validat
 itemsRouter.get('/deals-of-the-day', ItemServices.getDealsOfTheDay);
 
 itemsRouter.get("/details/:itemId", validateRequest({ params: itemDetailsParamsSchema }), ItemServices.getItemDetails);
-itemsRouter.get("/trending/AiPersonalized", ItemServices.getAITrendingProducts);
-itemsRouter.get("/GetItemFeed", authenticatedUserMiddleware, ItemServices.getDynamicFeed);
+itemsRouter.get("/trending/AiPersonalized", apiLimiter, ItemServices.getAITrendingProducts);
+itemsRouter.get("/GetItemFeed", authenticatedUserMiddleware, apiLimiter, ItemServices.getDynamicFeed);
 
 // Similar Products API - O(n) complexity with smart scoring
-itemsRouter.get("/similar/:itemId", validateRequest({ params: similarItemsParamsSchema }), ItemServices.getSimilarProducts);
+itemsRouter.get("/similar/:itemId", apiLimiter, validateRequest({ params: similarItemsParamsSchema }), ItemServices.getSimilarProducts);
 
 itemsRouter.get("/GetRecentlyViewedItems", authenticatedUserMiddleware, ItemServices.getRecentlyViewedItems);
 

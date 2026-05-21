@@ -7,8 +7,8 @@
 import { Server as SocketIOServer } from 'socket.io';
 import { Server as HTTPServer } from 'http';
 import dotenv from 'dotenv';
-import { verifyAccessToken } from '../Utils/jwtToken';
-import RoleIndex from '../Utils/Roles.enum';
+import { verifyAccessToken } from '../Utils/auth/jwtToken';
+import RoleIndex from '../Utils/auth/Roles.enum';
 
 dotenv.config({ path: './config/.env' });
 

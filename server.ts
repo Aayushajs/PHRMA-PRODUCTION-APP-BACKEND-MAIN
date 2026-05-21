@@ -13,6 +13,16 @@ const httpServer = createServer(app);
 
 initializeSocket(httpServer);
 
+httpServer.on('error', (error: any) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(`\n❌ PORT ${PORT} IS ALREADY IN USE!`);
+    console.error(`Please kill the existing process running on port ${PORT} and try again.\n`);
+    process.exit(1);
+  } else {
+    console.error('❌ Server error:', error);
+  }
+});
+
 httpServer.listen(PORT, '0.0.0.0', async () => {
   console.log(`Server is running on http://0.0.0.0:${PORT}`);
   console.log(`WebSocket server ready on ws://localhost:${PORT}`);

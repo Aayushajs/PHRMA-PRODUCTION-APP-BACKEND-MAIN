@@ -20,7 +20,7 @@ dotenv.config({ path: "./config/.env" });
 // ─── ENV / CONSTANTS ───────────────────────────────────────────────────
 const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
 const REDIS_CACHE_ENABLED = process.env.REDIS_CACHE_ENABLED !== "false";
-const REDIS_COMMAND_TIMEOUT_MS = Number(process.env.REDIS_COMMAND_TIMEOUT_MS || 250);
+const REDIS_COMMAND_TIMEOUT_MS = Number(process.env.REDIS_COMMAND_TIMEOUT_MS || 1500);
 const REDIS_CIRCUIT_BREAKER_MS = Number(process.env.REDIS_CIRCUIT_BREAKER_MS || 60000);
 const REDIS_QUOTA_DISABLE_MS = Number(process.env.REDIS_QUOTA_DISABLE_MS || 6 * 60 * 60 * 1000);
 const REDIS_SCAN_COUNT = Number(process.env.REDIS_SCAN_COUNT || 200);
@@ -217,7 +217,14 @@ const getFallbackValue = (method: string): unknown => {
 const logRedisErrorThrottled = (method: string, error: unknown) => {
   const now = Date.now();
   if (now - lastRedisErrorLogAt >= REDIS_ERROR_LOG_THROTTLE_MS) {
-    console.error(`Redis ${method} failed. Falling back without cache:`, error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    // Suppress expected transient socket drops
+    if (errorMessage.includes("Socket closed unexpectedly")) {
+        return;
+    }
+
+    console.error(`Redis ${method} failed. Falling back without cache: ${errorMessage}`);
     lastRedisErrorLogAt = now;
   }
 };
@@ -440,8 +447,13 @@ rawRedis.on("error", (err) => {
   openCircuit("client_error", err);
 });
 
+let hasLoggedConnected = false;
+
 rawRedis.on("connect", () => {
-  console.log("✅ Connected to Redis");
+  if (!isRedisConnected && !hasLoggedConnected) {
+    console.log("✅ Connected to Redis");
+    hasLoggedConnected = true;
+  }
   isRedisConnected = true;
   redisDisabledUntil = 0;
 });

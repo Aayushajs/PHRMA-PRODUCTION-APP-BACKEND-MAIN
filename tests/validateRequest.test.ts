@@ -3,8 +3,8 @@ import { describe, it } from "bun:test";
 import assert from "node:assert/strict";
 import { z } from "zod";
 import { validateRequest } from "../Middlewares/validateRequest";
-import { zodObjectId, passthroughObjectNoOperators } from "../Validators/_shared";
-import { ApiError } from "../Utils/ApiError";
+import { zodObjectId, passthroughObjectNoOperators } from "../Utils/lib/validators/_shared";
+import { ApiError } from "../Utils/errors/ApiError";
 
 // Minimal shape compatible with the middleware's expectations.
 const mkReq = (overrides: Partial<any> = {}) =>

@@ -16,7 +16,7 @@ import { Router } from "express";
 import FeatureFlagService from "../../Services/featureFlag.Service";
 import { authenticatedUserMiddleware } from "../../Middlewares/CheckLoginMiddleware";
 import { validateRequest } from "../../Middlewares/validateRequest";
-import { getUserFeaturesQuerySchema } from "../../Validators/features.Validator";
+import { getUserFeaturesQuerySchema } from "../../Utils/lib/validators/features.Validator";
 
 const featuresRouter = Router();
 featuresRouter.get(

@@ -17,7 +17,7 @@ import {
     adLogIdParamsSchema,
     adLogByAdvertisementParamsSchema,
     adListingQuerySchema,
-} from "../../Validators/advertisement.Validator";
+} from "../../Utils/lib/validators/advertisement.Validator";
 
 const router = express.Router();
 const r = router;

@@ -11,7 +11,8 @@ import uploadImage from "../../config/multer";
 import { ocrMiddleware } from "@development-team/bg-remover";
 import sharp from "sharp";
 import { validateRequest } from "../../Middlewares/validateRequest";
-import { uploadPrescriptionBodySchema } from "../../Validators/prescription.Validator";
+import { uploadPrescriptionBodySchema } from "../../Utils/lib/validators/prescription.Validator";
+import { apiLimiter } from "../../Middlewares/rateLimiter";
 
 const prescriptionRouter = Router();
 
@@ -47,6 +48,7 @@ const optimizeImageForOcr = async (
 // Standard JSON Upload (Waits for OCR to finish and returns structured medicines)
 prescriptionRouter.post(
   "/upload",
+  apiLimiter,
   customersMiddleware,
   uploadImage.single("prescription"),
   validateRequest({ body: uploadPrescriptionBodySchema }),
@@ -62,6 +64,7 @@ prescriptionRouter.post(
 // Live Streaming Upload (Pipes real-time updates via SSE + Socket.io)
 prescriptionRouter.post(
   "/upload-stream",
+  apiLimiter,
   customersMiddleware,
   uploadImage.single("prescription"),
   validateRequest({ body: uploadPrescriptionBodySchema }),

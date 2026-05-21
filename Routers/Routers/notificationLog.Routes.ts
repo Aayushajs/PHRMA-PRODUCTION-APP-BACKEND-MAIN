@@ -9,8 +9,8 @@ import { Router, Request, Response } from 'express';
 import NotificationLogService from '../../Services/NotificationServices/notificationLog.Service';
 import NotificationService from '../../Middlewares/LogMedillewares/notificationLogger';
 import { authenticatedUserMiddleware } from '../../Middlewares/CheckLoginMiddleware';
-import { handleResponse } from '../../Utils/handleResponse';
-import { ApiError } from '../../Utils/ApiError';
+import { handleResponse } from '../../Utils/responses/handleResponse';
+import { ApiError } from '../../Utils/errors/ApiError';
 import { validateRequest } from '../../Middlewares/validateRequest';
 import {
   logListQuerySchema,
@@ -18,7 +18,7 @@ import {
   markMultipleReadSchema,
   registerTokenSchema,
   sendTestSchema,
-} from '../../Validators/notificationLog.Validator';
+} from '../../Utils/lib/validators/notificationLog.Validator';
 
 const notificationLog = Router();
 

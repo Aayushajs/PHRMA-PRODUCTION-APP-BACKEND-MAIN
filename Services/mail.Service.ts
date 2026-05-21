@@ -4,17 +4,64 @@
 │  Handles email sending for both Service 1 and Service 2               │
 │  Provides API endpoints for internal service communication             │
 │  Auto-generates OTPs and fetches user data automatically              │
+│                                                                       │
+│  SDE-3 Refactor: single validateEmailInput() helper eliminates the    │
+│  5× duplicated email-format + ApiError pattern in every handler.      │
 └───────────────────────────────────────────────────────────────────────┘
 */
 
 import { Request, Response, NextFunction } from 'express';
-import { sendEmail } from '../Utils/mailer';
-import { generateOtp } from '../Utils/OtpGenerator';
+import { sendEmail } from '../Utils/providers/mailer';
+import { generateOtp } from '../Utils/auth/OtpGenerator';
 import { redis } from '../config/redis';
 import UserModel from '../Databases/Models/user.Models';
-import { catchAsyncErrors } from '../Utils/catchAsyncErrors';
-import { ApiError } from '../Utils/ApiError';
-import { handleResponse } from '../Utils/handleResponse';
+import { catchAsyncErrors } from '../Utils/errors/catchAsyncErrors';
+import { ApiError } from '../Utils/errors/ApiError';
+import { handleResponse } from '../Utils/responses/handleResponse';
+
+// ─── Shared helpers ───────────────────────────────────────────────────────────
+
+/** RFC-5322-lite email regex shared by all handlers. */
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Validate that `email` is present and well-formed.
+ * Returns an ApiError (to be passed to next()) or null.
+ *
+ * Centralises the 5× repeated:
+ *   if (!email) return next(new ApiError(400, ...));
+ *   if (!emailRegex.test(email)) return next(new ApiError(400, ...));
+ */
+function validateEmailInput(email: unknown): ApiError | null {
+  if (!email || typeof email !== 'string' || !email.trim()) {
+    return new ApiError(400, 'Email is required');
+  }
+  if (!EMAIL_REGEX.test(email.trim())) {
+    return new ApiError(400, 'Invalid email format');
+  }
+  return null;
+}
+
+/**
+ * Fetch a user by email (lean, minimal projection) or return a 404 ApiError.
+ * Removes the repeated findOne + null check from every handler.
+ */
+async function findUserByEmail(
+  email: string,
+  select = 'name email'
+): Promise<{ user: any; error: ApiError | null }> {
+  const user = await UserModel
+    .findOne({ email: email.toLowerCase().trim() })
+    .select(select)
+    .lean();
+
+  if (!user) {
+    return { user: null, error: new ApiError(404, 'User with this email not found') };
+  }
+  return { user, error: null };
+}
+
+// ─── Service class ────────────────────────────────────────────────────────────
 
 export default class MailService {
   /**
@@ -26,42 +73,28 @@ export default class MailService {
     async (req: Request, res: Response, next: NextFunction) => {
       const { email } = req.body;
 
-      if (!email) {
-        return next(new ApiError(400, 'Email is required'));
-      }
+      const validationErr = validateEmailInput(email);
+      if (validationErr) return next(validationErr);
 
-      // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        return next(new ApiError(400, 'Invalid email format'));
-      }
+      const { user, error } = await findUserByEmail(email, '_id email name');
+      if (error || !user) return next(error);
 
-      // PERF-AUDIT-2026-05: read-only — add .lean() to skip hydration.
-      const user = await UserModel.findOne({ email }).select('_id email name').lean();
-      if (!user) {
-        return next(new ApiError(404, 'User with this email not found'));
-      }
-
-      // Generate OTP (6 digits)
+      // Generate OTP (6 digits) and cache it (3 minutes TTL)
       const otp = generateOtp(6).toString();
-
-      // Store OTP in Redis (expires in 3 minutes)
       await redis.set(`otp:${user._id}`, otp, { EX: 180 });
-      console.log(`📧 OTP generated for ${email}: ${otp}`);
 
       try {
-        // Send OTP email
-        const result = await sendEmail(email, 'otp', { otp });
+        const result = await sendEmail(email.trim(), 'otp', { otp });
 
         return handleResponse(req, res, 200, 'OTP sent successfully', {
-          provider: result.provider,
+          provider:  result.provider,
           alternated: result.alternated,
           expiresIn: '3 minutes',
         });
-      } catch (error: any) {
-        // Clean up OTP if email failed
+      } catch (err: any) {
+        // Roll back the OTP so the user can retry immediately
         await redis.del(`otp:${user._id}`);
-        console.error('❌ Failed to send OTP email:', error.message);
+        console.error('❌ Failed to send OTP email:', err.message);
         return next(new ApiError(500, 'Failed to send OTP. Please try again.'));
       }
     }
@@ -76,33 +109,22 @@ export default class MailService {
     async (req: Request, res: Response, next: NextFunction) => {
       const { email } = req.body;
 
-      if (!email) {
-        return next(new ApiError(400, 'Email is required'));
-      }
+      const validationErr = validateEmailInput(email);
+      if (validationErr) return next(validationErr);
 
-      // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        return next(new ApiError(400, 'Invalid email format'));
-      }
-
-      // PERF-AUDIT-2026-05: read-only — add .lean().
-      const user = await UserModel.findOne({ email }).select('name email').lean();
-      if (!user) {
-        return next(new ApiError(404, 'User with this email not found'));
-      }
+      const { user, error } = await findUserByEmail(email);
+      if (error || !user) return next(error);
 
       try {
-        // Send welcome email
-        const result = await sendEmail(email, 'welcome', { name: user.name });
+        const result = await sendEmail(email.trim(), 'welcome', { name: user.name });
 
         return handleResponse(req, res, 200, 'Welcome email sent successfully', {
-          provider: result.provider,
+          provider:  result.provider,
           alternated: result.alternated,
-          to: email,
+          to: email.trim(),
         });
-      } catch (error: any) {
-        console.error('❌ Failed to send welcome email:', error.message);
+      } catch (err: any) {
+        console.error('❌ Failed to send welcome email:', err.message);
         return next(new ApiError(500, 'Failed to send welcome email. Please try again.'));
       }
     }
@@ -117,33 +139,30 @@ export default class MailService {
     async (req: Request, res: Response, next: NextFunction) => {
       const { email } = req.body;
 
-      if (!email) {
-        return next(new ApiError(400, 'Email is required'));
-      }
+      const validationErr = validateEmailInput(email);
+      if (validationErr) return next(validationErr);
 
-      // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        return next(new ApiError(400, 'Invalid email format'));
-      }
-
-      // PERF-AUDIT-2026-05: read-only — add .lean().
-      const user = await UserModel.findOne({ email }).select('name email').lean();
-      if (!user) {
-        return next(new ApiError(404, 'User with this email not found'));
-      }
+      const { user, error } = await findUserByEmail(email);
+      if (error || !user) return next(error);
 
       try {
-        // Send password reset confirmation
-        const result = await sendEmail(email, 'password-reset-confirmation', { name: user.name });
+        const result = await sendEmail(
+          email.trim(),
+          'password-reset-confirmation',
+          { name: user.name }
+        );
 
-        return handleResponse(req, res, 200, 'Password reset confirmation sent successfully', {
-          provider: result.provider,
-          alternated: result.alternated,
-          to: email,
-        });
-      } catch (error: any) {
-        console.error('❌ Failed to send password reset confirmation:', error.message);
+        return handleResponse(
+          req, res, 200,
+          'Password reset confirmation sent successfully',
+          {
+            provider:  result.provider,
+            alternated: result.alternated,
+            to: email.trim(),
+          }
+        );
+      } catch (err: any) {
+        console.error('❌ Failed to send password reset confirmation:', err.message);
         return next(new ApiError(500, 'Failed to send confirmation email. Please try again.'));
       }
     }
@@ -158,27 +177,23 @@ export default class MailService {
     async (req: Request, res: Response, next: NextFunction) => {
       const { email, subject, message } = req.body;
 
-      if (!email || !subject || !message) {
+      const validationErr = validateEmailInput(email);
+      if (validationErr) return next(validationErr);
+
+      if (!subject || !message) {
         return next(new ApiError(400, 'Email, subject, and message are required'));
       }
 
-      // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        return next(new ApiError(400, 'Invalid email format'));
-      }
-
       try {
-        // Send notification email
-        const result = await sendEmail(email, 'notification', { subject, message });
+        const result = await sendEmail(email.trim(), 'notification', { subject, message });
 
         return handleResponse(req, res, 200, 'Notification email sent successfully', {
-          provider: result.provider,
+          provider:  result.provider,
           alternated: result.alternated,
-          to: email,
+          to: email.trim(),
         });
-      } catch (error: any) {
-        console.error('❌ Failed to send notification email:', error.message);
+      } catch (err: any) {
+        console.error('❌ Failed to send notification email:', err.message);
         return next(new ApiError(500, 'Failed to send notification. Please try again.'));
       }
     }
@@ -193,7 +208,6 @@ export default class MailService {
     async (req: Request, res: Response, next: NextFunction) => {
       const { emails, subject, message } = req.body;
 
-      // Validate request body
       if (!emails || !Array.isArray(emails) || emails.length === 0) {
         return next(new ApiError(400, 'Emails array is required and cannot be empty'));
       }
@@ -202,10 +216,10 @@ export default class MailService {
         return next(new ApiError(400, 'Subject and message are required'));
       }
 
-      // Validate email format for all recipients
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      const invalidEmails = emails.filter((email) => !emailRegex.test(email));
-      
+      // Validate every email up-front so we fail fast before sending anything
+      const invalidEmails = emails.filter(
+        (e: unknown) => typeof e !== 'string' || !EMAIL_REGEX.test(e.trim())
+      );
       if (invalidEmails.length > 0) {
         return next(
           new ApiError(400, `Invalid email format for: ${invalidEmails.join(', ')}`)
@@ -216,27 +230,18 @@ export default class MailService {
       let successCount = 0;
       let failureCount = 0;
 
-      // Send emails sequentially to avoid rate limits
-      for (const email of emails) {
+      // Sequential sends to respect provider rate limits
+      for (const email of emails as string[]) {
         try {
-          const result = await sendEmail(email, 'notification', { subject, message });
-          results.push({
-            email,
-            success: true,
-            provider: result.provider,
-          });
+          const result = await sendEmail(email.trim(), 'notification', { subject, message });
+          results.push({ email, success: true, provider: result.provider });
           successCount++;
-        } catch (error: any) {
-          results.push({
-            email,
-            success: false,
-            error: error.message || 'Failed to send email',
-          });
+        } catch (err: any) {
+          results.push({ email, success: false, error: err.message || 'Failed to send email' });
           failureCount++;
         }
-
-        // Add small delay to prevent rate limiting
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        // Small back-off to stay within provider rate limits
+        await new Promise<void>((resolve) => setTimeout(resolve, 100));
       }
 
       const responseMessage =
@@ -245,9 +250,9 @@ export default class MailService {
           : `${successCount} notifications sent, ${failureCount} failed`;
 
       return handleResponse(req, res, failureCount === 0 ? 200 : 207, responseMessage, {
-        total: emails.length,
+        total:   emails.length,
         success: successCount,
-        failed: failureCount,
+        failed:  failureCount,
         results,
       });
     }
@@ -255,34 +260,32 @@ export default class MailService {
 
   /**
    * Health Check - Internal API Endpoint
-   * Check if mail service is operational
    * GET /api/v1/mail-service/health
    */
   public static healthCheck = catchAsyncErrors(
-    async (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, _next: NextFunction) => {
       const sendGridReady = !!process.env.SENDGRID_API_KEY && !!process.env.SENDGRID_FROM_EMAIL;
-      const mailjetReady =
+      const mailjetReady  =
         !!process.env.MAILJET_API_KEY &&
         !!process.env.MAILJET_SECRET_KEY &&
         !!process.env.MAILJET_FROM_EMAIL;
       const gmailReady = !!process.env.GMAIL_USER && !!process.env.GMAIL_PASS;
 
-      const availableProviders = [];
+      const availableProviders: string[] = [];
       if (sendGridReady) availableProviders.push('SendGrid');
-      if (mailjetReady) availableProviders.push('Mailjet');
-      if (gmailReady) availableProviders.push('Gmail');
+      if (mailjetReady)  availableProviders.push('Mailjet');
+      if (gmailReady)    availableProviders.push('Gmail');
 
       const isHealthy = availableProviders.length > 0;
 
       return handleResponse(
-        req,
-        res,
+        req, res,
         isHealthy ? 200 : 503,
         isHealthy ? 'Mail service is operational' : 'No email providers configured',
         {
-          healthy: isHealthy,
+          healthy:           isHealthy,
           availableProviders,
-          providerCount: availableProviders.length,
+          providerCount:     availableProviders.length,
         }
       );
     }

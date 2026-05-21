@@ -14,12 +14,12 @@ import {
   setCache,
   deleteCache,
   deleteCachePattern,
-} from "../Utils/cache";
+} from "../Utils/cache/cache";
 import crypto from "crypto";
-import { ApiError } from "../Utils/ApiError";
-import { handleResponse } from "../Utils/handleResponse";
-import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
-import { catchAsyncErrors } from "../Utils/catchAsyncErrors";
+import { ApiError } from "../Utils/errors/ApiError";
+import { handleResponse } from "../Utils/responses/handleResponse";
+import { uploadToCloudinary } from "../Utils/providers/cloudinaryUpload";
+import { catchAsyncErrors } from "../Utils/errors/catchAsyncErrors";
 import mongoose from "mongoose";
 import jwtTokens from "jsonwebtoken";
 import {
@@ -31,7 +31,7 @@ import User from "../Databases/Models/user.Models";
 import { emitCategoryViewUpdate } from "../Utils/socketEmitters";
 import NotificationService from "../Middlewares/LogMedillewares/notificationLogger";
 // PERF-AUDIT-2026-05: 4.9 / 6.3 — broadcast fan-out helper (cursor-streamed).
-import { broadcastToAllUsersWithLog } from "../Utils/broadcastNotifications";
+import { broadcastToAllUsersWithLog } from "../Utils/providers/broadcastNotifications";
 
 const {
   CACHE_PREFIX,
@@ -302,7 +302,7 @@ export default class CategoryService {
 
       let viewedCategoryIds: any[] = [];
       if (userId) {
-        const user = await User.findById(userId).select("viewedCategories");
+        const user = await User.findById(userId).select("viewedCategories").lean();
         if (user?.viewedCategories) {
           viewedCategoryIds = user.viewedCategories;
         }
@@ -607,7 +607,7 @@ export default class CategoryService {
             { _id: { $ne: id } },
             { $or: [{ name }, { code: code || genCodeFromName(name) }] },
           ],
-        });
+        }).lean();
 
         if (conflictCategory) {
           return next(
@@ -705,7 +705,7 @@ export default class CategoryService {
         return next(new ApiError(400, "Category ID is required"));
       }
 
-      const category = await CategoryModel.findById(id);
+      const category = await CategoryModel.findById(id).lean();
       if (!category) {
         return next(new ApiError(404, "Category not found"));
       }
@@ -781,7 +781,7 @@ export default class CategoryService {
       // Validate all category IDs exist
       const existingCategories = await CategoryModel.find({
         _id: { $in: categoryIds },
-      });
+      }).lean();
 
       if (existingCategories.length !== categoryIds.length) {
         const foundIds = existingCategories.map((cat) => cat._id.toString());

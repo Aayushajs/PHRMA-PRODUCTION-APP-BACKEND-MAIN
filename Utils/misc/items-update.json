@@ -1,0 +1,541 @@
+[
+    {
+        "itemId": "6960f6a76cb29e5e90c46d2d",
+        "otherInformation": {
+            "ingredients": [
+                "Paracetamol 500mg"
+            ],
+            "keyFeatures": [
+                "Effective pain reliever",
+                "Reduces fever",
+                "Gentle on stomach"
+            ],
+            "benefits": [
+                "Relieves headache and body pain",
+                "Reduces fever"
+            ],
+            "precautions": [
+                "Do not exceed recommended dose",
+                "Avoid alcohol"
+            ],
+            "sideEffects": [
+                "Nausea",
+                "Stomach discomfort"
+            ],
+            "allergyInfo": [
+                "Paracetamol hypersensitivity"
+            ],
+            "safetyAdvice": [
+                "Safe when taken as prescribed"
+            ]
+        }
+    },
+    {
+        "itemId": "6960f6ab6cb29e5e90c46d33",
+        "otherInformation": {
+            "ingredients": [
+                "Ibuprofen 400mg"
+            ],
+            "keyFeatures": [
+                "Anti-inflammatory",
+                "Fast pain relief"
+            ],
+            "benefits": [
+                "Relieves muscle pain",
+                "Reduces inflammation"
+            ],
+            "precautions": [
+                "Take after food",
+                "Avoid in ulcers"
+            ],
+            "sideEffects": [
+                "Heartburn",
+                "Stomach pain"
+            ],
+            "allergyInfo": [
+                "NSAID allergy"
+            ],
+            "safetyAdvice": [
+                "Not for long-term use without advice"
+            ]
+        }
+    },
+    {
+        "itemId": "6960f6af6cb29e5e90c46d39",
+        "otherInformation": {
+            "ingredients": [
+                "Amoxicillin 500mg"
+            ],
+            "keyFeatures": [
+                "Broad-spectrum antibiotic"
+            ],
+            "benefits": [
+                "Treats bacterial infections"
+            ],
+            "precautions": [
+                "Complete full course",
+                "Avoid if penicillin allergy"
+            ],
+            "sideEffects": [
+                "Diarrhea",
+                "Skin rash"
+            ],
+            "allergyInfo": [
+                "Penicillin allergy"
+            ],
+            "safetyAdvice": [
+                "Use only with prescription"
+            ]
+        }
+    },
+    {
+        "itemId": "6960f6b26cb29e5e90c46d3f",
+        "otherInformation": {
+            "ingredients": [
+                "Azithromycin 500mg"
+            ],
+            "keyFeatures": [
+                "Once-daily antibiotic"
+            ],
+            "benefits": [
+                "Treats respiratory infections"
+            ],
+            "precautions": [
+                "Avoid liver disorders"
+            ],
+            "sideEffects": [
+                "Stomach upset"
+            ],
+            "allergyInfo": [
+                "Macrolide allergy"
+            ],
+            "safetyAdvice": [
+                "Complete prescribed course"
+            ]
+        }
+    },
+    {
+        "itemId": "6960f6b66cb29e5e90c46d45",
+        "otherInformation": {
+            "ingredients": [
+                "Dextromethorphan",
+                "Chlorpheniramine",
+                "Phenylephrine"
+            ],
+            "keyFeatures": [
+                "Relieves dry cough"
+            ],
+            "benefits": [
+                "Soothes throat irritation"
+            ],
+            "precautions": [
+                "May cause drowsiness"
+            ],
+            "sideEffects": [
+                "Dry mouth",
+                "Dizziness"
+            ],
+            "allergyInfo": [
+                "Antihistamine allergy"
+            ],
+            "safetyAdvice": [
+                "Use measuring cup"
+            ]
+        }
+    },
+    {
+        "itemId": "6960f6b96cb29e5e90c46d4b",
+        "otherInformation": {
+            "ingredients": [
+                "Ascorbic Acid (Vitamin C)"
+            ],
+            "keyFeatures": [
+                "Boosts immunity"
+            ],
+            "benefits": [
+                "Improves immune response"
+            ],
+            "precautions": [
+                "Avoid overdose"
+            ],
+            "sideEffects": [
+                "Stomach upset"
+            ],
+            "allergyInfo": [
+                "Rare hypersensitivity"
+            ],
+            "safetyAdvice": [
+                "Safe in recommended dose"
+            ]
+        }
+    },
+    {
+        "itemId": "6960f6bd6cb29e5e90c46d51",
+        "otherInformation": {
+            "ingredients": [
+                "Human Insulin"
+            ],
+            "keyFeatures": [
+                "Controls blood sugar"
+            ],
+            "benefits": [
+                "Manages diabetes"
+            ],
+            "precautions": [
+                "Monitor glucose regularly"
+            ],
+            "sideEffects": [
+                "Hypoglycemia"
+            ],
+            "allergyInfo": [
+                "Rare insulin allergy"
+            ],
+            "safetyAdvice": [
+                "Use under medical supervision"
+            ]
+        }
+    },
+    {
+        "itemId": "6960f6c06cb29e5e90c46d57",
+        "otherInformation": {
+            "ingredients": [
+                "Betamethasone Valerate"
+            ],
+            "keyFeatures": [
+                "Reduces inflammation"
+            ],
+            "benefits": [
+                "Relieves skin allergies"
+            ],
+            "precautions": [
+                "Avoid prolonged use"
+            ],
+            "sideEffects": [
+                "Skin thinning"
+            ],
+            "allergyInfo": [
+                "Corticosteroid allergy"
+            ],
+            "safetyAdvice": [
+                "Use as prescribed"
+            ]
+        }
+    },
+    {
+        "itemId": "6960f6c36cb29e5e90c46d5d",
+        "otherInformation": {
+            "ingredients": [
+                "Levocetirizine 5mg"
+            ],
+            "keyFeatures": [
+                "Non-drowsy antihistamine"
+            ],
+            "benefits": [
+                "Relieves allergies"
+            ],
+            "precautions": [
+                "Avoid alcohol"
+            ],
+            "sideEffects": [
+                "Drowsiness"
+            ],
+            "allergyInfo": [
+                "Cetirizine allergy"
+            ],
+            "safetyAdvice": [
+                "Safe for daily use"
+            ]
+        }
+    },
+    {
+        "itemId": "6960f6c76cb29e5e90c46d63",
+        "otherInformation": {
+            "ingredients": [
+                "Domperidone 10mg"
+            ],
+            "keyFeatures": [
+                "Improves digestion"
+            ],
+            "benefits": [
+                "Prevents nausea"
+            ],
+            "precautions": [
+                "Avoid heart disorders"
+            ],
+            "sideEffects": [
+                "Dry mouth"
+            ],
+            "allergyInfo": [
+                "Domperidone allergy"
+            ],
+            "safetyAdvice": [
+                "Do not exceed dose"
+            ]
+        }
+    },
+    {
+        "itemId": "6960f6ca6cb29e5e90c46d69",
+        "otherInformation": {
+            "ingredients": [
+                "Ferrous Sulfate",
+                "Folic Acid"
+            ],
+            "keyFeatures": [
+                "Treats anemia"
+            ],
+            "benefits": [
+                "Improves hemoglobin"
+            ],
+            "precautions": [
+                "May darken stools"
+            ],
+            "sideEffects": [
+                "Constipation"
+            ],
+            "allergyInfo": [
+                "Iron hypersensitivity"
+            ],
+            "safetyAdvice": [
+                "Take after meals"
+            ]
+        }
+    },
+    {
+        "itemId": "6960f6cd6cb29e5e90c46d6f",
+        "otherInformation": {
+            "ingredients": [
+                "Calcium Carbonate",
+                "Vitamin D3"
+            ],
+            "keyFeatures": [
+                "Strengthens bones"
+            ],
+            "benefits": [
+                "Prevents calcium deficiency"
+            ],
+            "precautions": [
+                "Avoid kidney stones"
+            ],
+            "sideEffects": [
+                "Constipation"
+            ],
+            "allergyInfo": [
+                "Rare allergy"
+            ],
+            "safetyAdvice": [
+                "Shake well before use"
+            ]
+        }
+    },
+    {
+        "itemId": "6960f6d06cb29e5e90c46d75",
+        "otherInformation": {
+            "ingredients": [
+                "Sodium Chloride"
+            ],
+            "keyFeatures": [
+                "Restores fluids"
+            ],
+            "benefits": [
+                "Prevents dehydration"
+            ],
+            "precautions": [
+                "Monitor electrolytes"
+            ],
+            "sideEffects": [
+                "Fluid overload"
+            ],
+            "allergyInfo": [
+                "Rare hypersensitivity"
+            ],
+            "safetyAdvice": [
+                "Use under medical supervision"
+            ]
+        }
+    },
+    {
+        "itemId": "6960f6d36cb29e5e90c46d7b",
+        "otherInformation": {
+            "ingredients": [
+                "Clotrimazole"
+            ],
+            "keyFeatures": [
+                "Antifungal action"
+            ],
+            "benefits": [
+                "Treats fungal infections"
+            ],
+            "precautions": [
+                "Avoid contact with eyes"
+            ],
+            "sideEffects": [
+                "Skin irritation"
+            ],
+            "allergyInfo": [
+                "Clotrimazole allergy"
+            ],
+            "safetyAdvice": [
+                "Apply as directed"
+            ]
+        }
+    },
+    {
+        "itemId": "6960f6d66cb29e5e90c46d81",
+        "otherInformation": {
+            "ingredients": [
+                "Cetirizine 10mg"
+            ],
+            "keyFeatures": [
+                "Fast allergy relief"
+            ],
+            "benefits": [
+                "Relieves sneezing"
+            ],
+            "precautions": [
+                "Avoid alcohol"
+            ],
+            "sideEffects": [
+                "Drowsiness"
+            ],
+            "allergyInfo": [
+                "Cetirizine allergy"
+            ],
+            "safetyAdvice": [
+                "Take once daily"
+            ]
+        }
+    },
+    {
+        "itemId": "6960f6da6cb29e5e90c46d87",
+        "otherInformation": {
+            "ingredients": [
+                "Pantoprazole 40mg"
+            ],
+            "keyFeatures": [
+                "Reduces stomach acid"
+            ],
+            "benefits": [
+                "Relieves acid reflux"
+            ],
+            "precautions": [
+                "Long-term use caution"
+            ],
+            "sideEffects": [
+                "Headache"
+            ],
+            "allergyInfo": [
+                "PPI allergy"
+            ],
+            "safetyAdvice": [
+                "Take before meals"
+            ]
+        }
+    },
+    {
+        "itemId": "6960f6dd6cb29e5e90c46d8d",
+        "otherInformation": {
+            "ingredients": [
+                "Sodium Chloride",
+                "Potassium Chloride",
+                "Glucose"
+            ],
+            "keyFeatures": [
+                "Rehydrates body"
+            ],
+            "benefits": [
+                "Treats dehydration"
+            ],
+            "precautions": [
+                "Use clean water"
+            ],
+            "sideEffects": [
+                "Bloating"
+            ],
+            "allergyInfo": [
+                "Rare allergy"
+            ],
+            "safetyAdvice": [
+                "Consume immediately after mixing"
+            ]
+        }
+    },
+    {
+        "itemId": "6960f6e96cb29e5e90c46d93",
+        "otherInformation": {
+            "ingredients": [
+                "Diclofenac Diethylamine"
+            ],
+            "keyFeatures": [
+                "Topical pain relief"
+            ],
+            "benefits": [
+                "Relieves joint pain"
+            ],
+            "precautions": [
+                "Do not apply on broken skin"
+            ],
+            "sideEffects": [
+                "Skin irritation"
+            ],
+            "allergyInfo": [
+                "NSAID allergy"
+            ],
+            "safetyAdvice": [
+                "Wash hands after use"
+            ]
+        }
+    },
+    {
+        "itemId": "6960f6ed6cb29e5e90c46d99",
+        "otherInformation": {
+            "ingredients": [
+                "Metformin 500mg"
+            ],
+            "keyFeatures": [
+                "Controls blood sugar"
+            ],
+            "benefits": [
+                "Manages type 2 diabetes"
+            ],
+            "precautions": [
+                "Avoid alcohol"
+            ],
+            "sideEffects": [
+                "Nausea"
+            ],
+            "allergyInfo": [
+                "Metformin allergy"
+            ],
+            "safetyAdvice": [
+                "Take with meals"
+            ]
+        }
+    },
+    {
+        "itemId": "6960f6f06cb29e5e90c46d9f",
+        "otherInformation": {
+            "ingredients": [
+                "Vitamins",
+                "Minerals"
+            ],
+            "keyFeatures": [
+                "Daily nutrition support"
+            ],
+            "benefits": [
+                "Improves immunity"
+            ],
+            "precautions": [
+                "Avoid overdose"
+            ],
+            "sideEffects": [
+                "Mild stomach upset"
+            ],
+            "allergyInfo": [
+                "Rare hypersensitivity"
+            ],
+            "safetyAdvice": [
+                "One capsule daily"
+            ]
+        }
+    }
+]

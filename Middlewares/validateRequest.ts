@@ -8,7 +8,7 @@
 
 import type { Request, Response, NextFunction, RequestHandler } from "express";
 import type { ZodTypeAny } from "zod";
-import { ApiError } from "../Utils/ApiError";
+import { ApiError } from "../Utils/errors/ApiError";
 
 export interface ValidationSchemas {
     body?: ZodTypeAny;

@@ -6,15 +6,15 @@
 */
 
 import { Response, Request, NextFunction } from "express";
-import { catchAsyncErrors } from "../Utils/catchAsyncErrors";
-import { ApiError } from "../Utils/ApiError";
-import { handleResponse } from "../Utils/handleResponse";
+import { catchAsyncErrors } from "../Utils/errors/catchAsyncErrors";
+import { ApiError } from "../Utils/errors/ApiError";
+import { handleResponse } from "../Utils/responses/handleResponse";
 import { redis } from "../config/redis";
 import ItemModel from "../Databases/Models/item.Model"
 import userModel from "../Databases/Models/user.Models";
 import mongoose from "mongoose";
 import crypto from 'crypto';
-import { getTimeAgo } from "../Utils/timerHelperFn";
+import { getTimeAgo } from "../Utils/helpers/timerHelperFn";
 import { emitRecentlyViewedUpdate, emitNewProductAdded, emitWishlistUpdate } from '../Utils/socketEmitters';
 
 
@@ -442,7 +442,7 @@ export default class ItemServices {
                                     itemRatings: 1,
                                     views: 1,
                                     isTrending: 1,
-                                    formula: 1,
+                                       formula: 1,
                                     HSNCode: 1,
                                     weight: 1,
                                     itemMfgDate: 1,

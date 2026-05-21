@@ -8,14 +8,14 @@
 import { Router } from "express";
 import FeatureFlagService from "../../Services/featureFlag.Service";
 import { adminMiddleware } from "../../Middlewares/CheckLoginMiddleware";
-import { catchAsyncErrors } from "../../Utils/catchAsyncErrors";
+import { catchAsyncErrors } from "../../Utils/errors/catchAsyncErrors";
 import { validateRequest } from "../../Middlewares/validateRequest";
 import {
   createFeatureFlagSchema,
   updateFeatureFlagBodySchema,
   featureFlagKeyParamsSchema,
   bulkUpdateFeatureFlagsSchema,
-} from "../../Validators/featureFlag.Validator";
+} from "../../Utils/lib/validators/featureFlag.Validator";
 
 const featureFlagRouter = Router();
 

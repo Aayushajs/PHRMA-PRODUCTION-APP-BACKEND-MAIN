@@ -5,7 +5,7 @@
 └───────────────────────────────────────────────────────────────────────┘
 */
 
-import { sendPushNotification, sendBulkNotifications } from '../../Utils/notification';
+import { sendPushNotification, sendBulkNotifications } from '../../Utils/providers/notification';
 import NotificationLogModel from '../../Databases/Models/notificationLog.model';
 import { INotificationLogCreate } from '../../Databases/Entities/notificationLog.interface';
 import mongoose from 'mongoose';

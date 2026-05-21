@@ -6,28 +6,53 @@
 */
 
 import { Response, Request, NextFunction } from "express";
-import { catchAsyncErrors } from "../Utils/catchAsyncErrors";
-import { ApiError } from "../Utils/ApiError";
+import { catchAsyncErrors } from "../Utils/errors/catchAsyncErrors";
+import { ApiError } from "../Utils/errors/ApiError";
 import UserModel from "../Databases/Models/user.Models";
 import RefreshTokenModel from "../Databases/Models/refreshToken.Model";
 import bcrypt from "bcryptjs";
-import { handleResponse } from "../Utils/handleResponse";
+import { handleResponse } from "../Utils/responses/handleResponse";
 import {
   generateAccessToken,
   generateRefreshToken,
   hashRefreshToken,
   REFRESH_TOKEN_TTL_DAYS,
-} from "../Utils/jwtToken";
-import { setAuthCookies, clearAuthCookies } from "../Utils/authCookies";
-import { generateOtp } from "../Utils/OtpGenerator";
+} from "../Utils/auth/jwtToken";
+import { setAuthCookies, clearAuthCookies } from "../Utils/auth/authCookies";
+import { generateOtp } from "../Utils/auth/OtpGenerator";
 import { redis } from "../config/redis";
-import { sendEmail } from "../Utils/mailer";
+import { sendEmail } from "../Utils/providers/mailer";
 import { OAuth2Client, TokenPayload } from "google-auth-library";
-import RoleIndex from "../Utils/Roles.enum";
-import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
-import { sendPushNotification } from "../Utils/notification";
+import RoleIndex from "../Utils/auth/Roles.enum";
+import { uploadToCloudinary } from "../Utils/providers/cloudinaryUpload";
+import { sendPushNotification } from "../Utils/providers/notification";
 
 export default class UserService {
+  /**
+   * Mint a fresh access + refresh token pair for a user and persist the
+   * refresh token (hashed) so it can be revoked / rotated. Returns the
+   * RAW tokens — caller is responsible for transport (cookies + body).
+   */
+  /**
+   * Map a Mongoose user document / plain object to a safe public DTO.
+   * Single source of truth — add/remove fields here once.
+   */
+  private static toUserDTO(user: any) {
+    return {
+      _id:          user._id,
+      name:         user.name,
+      email:        user.email,
+      phone:        user.phone,
+      fcmToken:     user.fcmToken,
+      lastLogin:    user.lastLogin,
+      address:      user.address,
+      role:         user.role,
+      ProfileImage: user.ProfileImage ?? [],
+      createdAt:    (user as any).createdAt,
+      updatedAt:    (user as any).updatedAt,
+    };
+  }
+
   /**
    * Mint a fresh access + refresh token pair for a user and persist the
    * refresh token (hashed) so it can be revoked / rotated. Returns the
@@ -166,19 +191,7 @@ export default class UserService {
 
       const user = await UserModel.create(userData);
 
-      const User = {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        fcmToken: user.fcmToken,
-        lastLogin: user.lastLogin,
-        address: user.address,
-        role: user.role,
-        ProfileImage: user.ProfileImage || [],
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-      };
+      const User = UserService.toUserDTO(user);
 
       try {
         await sendEmail(user.email, 'welcome', { name: user.name });
@@ -240,19 +253,7 @@ export default class UserService {
         req
       );
 
-      const userData = {
-        _id: userObj._id,
-        name: userObj.name,
-        email: userObj.email,
-        phone: userObj.phone,
-        fcmToken: userObj.fcmToken,
-        lastLogin: userObj.lastLogin,
-        address: userObj.address,
-        role: userObj.role,
-        ProfileImage: userObj.ProfileImage || [],
-        createdAt: userObj.createdAt,
-        updatedAt: userObj.updatedAt,
-      };
+      const userData = UserService.toUserDTO(userObj);
 
       setAuthCookies(res, accessToken, refreshToken);
 
@@ -360,19 +361,7 @@ export default class UserService {
       stored.replacedByHash = hashRefreshToken(newRefresh);
       await stored.save();
 
-      const userData = {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        fcmToken: user.fcmToken,
-        lastLogin: user.lastLogin,
-        address: user.address,
-        role: user.role,
-        ProfileImage: user.ProfileImage || [],
-        createdAt: (user as any).createdAt,
-        updatedAt: (user as any).updatedAt,
-      };
+      const userData = UserService.toUserDTO(user);
 
       setAuthCookies(res, accessToken, newRefresh);
 

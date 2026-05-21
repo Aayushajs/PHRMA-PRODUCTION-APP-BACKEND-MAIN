@@ -23,7 +23,7 @@ import {
   listCategoriesQuerySchema,
   categoryLogIdParamsSchema,
   categoryLogsQuerySchema,
-} from "../../Validators/category.Validator";
+} from "../../Utils/lib/validators/category.Validator";
 
 
 const router = express.Router();

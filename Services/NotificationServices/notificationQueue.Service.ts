@@ -8,7 +8,7 @@
 */
 
 import { redis } from '../../config/redis';
-import { sendPushNotification } from '../../Utils/notification';
+import { sendPushNotification } from '../../Utils/providers/notification';
 // allow injection of a redis-like client for tests
 let redisClient: typeof redis = redis;
 
@@ -188,7 +188,7 @@ class NotificationQueue {
     }
 
     try {
-      const { sendPushNotification } = await import('../../Utils/notification');
+      const { sendPushNotification } = await import('../../Utils/providers/notification');
       const result = await sendPushNotification(
         notification.fcmToken,
         notification.title,
@@ -259,7 +259,7 @@ class NotificationQueue {
 
       const fcmTokens = users.map(user => user.fcmToken as string);
       try {
-        const { sendBulkNotifications } = await import('../../Utils/notification');
+        const { sendBulkNotifications } = await import('../../Utils/providers/notification');
         const result = await sendBulkNotifications(
           fcmTokens,
           notification.title,

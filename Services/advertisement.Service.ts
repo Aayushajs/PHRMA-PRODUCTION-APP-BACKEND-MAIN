@@ -9,15 +9,15 @@ import Advertisement from '../Databases/Models/advertisement.model';
 import { Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import crypto from 'crypto';
-import { getCache, setCache, deleteCache, deleteCachePattern } from '../Utils/cache';
-import { ApiError } from '../Utils/ApiError';
-import { handleResponse } from '../Utils/handleResponse';
-import { catchAsyncErrors } from '../Utils/catchAsyncErrors';
-import { uploadToCloudinary } from "../Utils/cloudinaryUpload";
+import { getCache, setCache, deleteCache, deleteCachePattern } from '../Utils/cache/cache';
+import { ApiError } from '../Utils/errors/ApiError';
+import { handleResponse } from '../Utils/responses/handleResponse';
+import { catchAsyncErrors } from '../Utils/errors/catchAsyncErrors';
+import { uploadToCloudinary } from "../Utils/providers/cloudinaryUpload";
 import User from '../Databases/Models/user.Models';
 import { NotificationService } from '../Middlewares/LogMedillewares/notificationLogger';
 // PERF-AUDIT-2026-05: 4.9 / 6.3 — broadcast fan-out helper (cursor-streamed).
-import { broadcastToAllUsersWithLog } from '../Utils/broadcastNotifications';
+import { broadcastToAllUsersWithLog } from '../Utils/providers/broadcastNotifications';
 
 export default class AdvertisementService {
     private static CACHE_PREFIX = "advertisements";

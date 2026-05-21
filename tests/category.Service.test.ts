@@ -10,8 +10,8 @@ process.env.REDIS_PORT = process.env.REDIS_PORT || "6379";
 process.env.FIREBASE_STRING = process.env.FIREBASE_STRING || Buffer.from(JSON.stringify({ "type": "service_account" })).toString("base64");
 
 import { CategoryModel } from "../Databases/Models/Category.model";
-import * as cloudinaryUpload from "../Utils/cloudinaryUpload";
-import * as cache from "../Utils/cache";
+import * as cloudinaryUpload from "../Utils/providers/cloudinaryUpload";
+import * as cache from "../Utils/cache/cache";
 import CategoryService from "../Services/category.Service";
 import NotificationService from "../Middlewares/LogMedillewares/notificationLogger";
 import User from "../Databases/Models/user.Models";
@@ -70,7 +70,7 @@ describe("Category Service", () => {
     ) as any);
     
     spyOn(User, "findById").mockImplementation((() => ({
-      select: async () => Promise.resolve({ viewedCategories: [] })
+      select: () => ({ lean: async () => Promise.resolve({ viewedCategories: [] }) }),
     })) as any);
 
     spyOn(CategoryModel, "countDocuments").mockImplementation((async () => 1) as any);

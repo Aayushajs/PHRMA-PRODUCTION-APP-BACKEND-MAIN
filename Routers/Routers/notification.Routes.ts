@@ -17,7 +17,7 @@ import {
   sendSchema,
   sendToUsersSchema,
   sendBulkSchema,
-} from '../../Validators/notification.Validator';
+} from '../../Utils/lib/validators/notification.Validator';
 
 const notificationRouter = Router();
 

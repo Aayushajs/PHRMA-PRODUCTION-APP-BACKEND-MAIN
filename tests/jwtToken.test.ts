@@ -33,9 +33,9 @@ const b64url = (input: Buffer | string) =>
     .replace(/\//g, "_")
     .replace(/=+$/g, "");
 
-describe("Utils/jwtToken", () => {
+describe("Utils/auth/jwtToken", () => {
   it("generateAccessToken produces a JWT verifiable by verifyAccessToken", async () => {
-    const { generateAccessToken, verifyAccessToken } = await import("../Utils/jwtToken");
+    const { generateAccessToken, verifyAccessToken } = await import("../Utils/auth/jwtToken");
     const token = generateAccessToken({ _id: "u1", role: "CUSTOMER", email: "a@b.c" });
     assert.equal(typeof token, "string");
     assert.equal(token.split(".").length, 3);
@@ -47,7 +47,7 @@ describe("Utils/jwtToken", () => {
   });
 
   it("generated access token has alg:HS256 in header", async () => {
-    const { generateAccessToken } = await import("../Utils/jwtToken");
+    const { generateAccessToken } = await import("../Utils/auth/jwtToken");
     const token = generateAccessToken({ _id: "u1" });
     const [headerB64] = token.split(".");
     const header = JSON.parse(
@@ -58,7 +58,7 @@ describe("Utils/jwtToken", () => {
   });
 
   it("verifyAccessToken rejects a forged alg:none token", async () => {
-    const { verifyAccessToken } = await import("../Utils/jwtToken");
+    const { verifyAccessToken } = await import("../Utils/auth/jwtToken");
 
     const header = b64url(JSON.stringify({ alg: "none", typ: "JWT" }));
     const payload = b64url(JSON.stringify({ _id: "evil", role: "ADMIN" }));
@@ -75,7 +75,7 @@ describe("Utils/jwtToken", () => {
   });
 
   it("verifyAccessToken rejects a token signed with HS512 using same secret (algorithm-confusion)", async () => {
-    const { verifyAccessToken } = await import("../Utils/jwtToken");
+    const { verifyAccessToken } = await import("../Utils/auth/jwtToken");
     const evil = jwt.sign({ _id: "evil", role: "ADMIN" }, process.env.USER_SECRET_KEY as string, {
       algorithm: "HS512",
     });
@@ -89,7 +89,7 @@ describe("Utils/jwtToken", () => {
   });
 
   it("verifyAccessToken rejects an expired token", async () => {
-    const { generateAccessToken, verifyAccessToken } = await import("../Utils/jwtToken");
+    const { generateAccessToken, verifyAccessToken } = await import("../Utils/auth/jwtToken");
     // negative TTL => instantly expired
     const token = generateAccessToken({ _id: "u1" }, "-1s" as any);
     let threw = false;
@@ -104,7 +104,7 @@ describe("Utils/jwtToken", () => {
   });
 
   it("verifyAccessToken rejects tampered payload", async () => {
-    const { generateAccessToken, verifyAccessToken } = await import("../Utils/jwtToken");
+    const { generateAccessToken, verifyAccessToken } = await import("../Utils/auth/jwtToken");
     const token = generateAccessToken({ _id: "u1", role: "CUSTOMER" });
     const [h, , s] = token.split(".");
     const tamperedPayload = b64url(JSON.stringify({ _id: "u1", role: "ADMIN" }));
@@ -119,7 +119,7 @@ describe("Utils/jwtToken", () => {
   });
 
   it("generateRefreshToken returns 128-hex-char string and is unique across 100 calls", async () => {
-    const { generateRefreshToken } = await import("../Utils/jwtToken");
+    const { generateRefreshToken } = await import("../Utils/auth/jwtToken");
     const seen = new Set<string>();
     for (let i = 0; i < 100; i++) {
       const t = generateRefreshToken();
@@ -132,7 +132,7 @@ describe("Utils/jwtToken", () => {
   });
 
   it("hashRefreshToken is deterministic and produces 64-hex chars (SHA-256)", async () => {
-    const { hashRefreshToken } = await import("../Utils/jwtToken");
+    const { hashRefreshToken } = await import("../Utils/auth/jwtToken");
     const sample = "a".repeat(128);
     const h1 = hashRefreshToken(sample);
     const h2 = hashRefreshToken(sample);
@@ -146,7 +146,7 @@ describe("Utils/jwtToken", () => {
   });
 
   it("default access token TTL is 15 minutes", async () => {
-    const { generateAccessToken } = await import("../Utils/jwtToken");
+    const { generateAccessToken } = await import("../Utils/auth/jwtToken");
     const token = generateAccessToken({ _id: "u1" });
     const [, payloadB64] = token.split(".");
     const payload = JSON.parse(
@@ -157,7 +157,7 @@ describe("Utils/jwtToken", () => {
   });
 
   it("legacy generateUserToken still works (back-compat alias)", async () => {
-    const mod: any = await import("../Utils/jwtToken");
+    const mod: any = await import("../Utils/auth/jwtToken");
     assert.equal(typeof mod.generateUserToken, "function");
     const token = mod.generateUserToken({ _id: "u1", role: "CUSTOMER" });
     assert.equal(typeof token, "string");
@@ -169,7 +169,7 @@ describe("Utils/jwtToken", () => {
   });
 
   it("ACCESS_TOKEN_TTL and REFRESH_TOKEN_TTL_DAYS constants exported with correct values", async () => {
-    const mod: any = await import("../Utils/jwtToken");
+    const mod: any = await import("../Utils/auth/jwtToken");
     assert.equal(mod.ACCESS_TOKEN_TTL, "15m");
     assert.equal(mod.REFRESH_TOKEN_TTL_DAYS, 60);
   });

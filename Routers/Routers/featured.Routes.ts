@@ -16,7 +16,7 @@ import {
   featuredIdParamsSchema,
   featuredListQuerySchema,
   featuredLogIdParamsSchema,
-} from "../../Validators/featured.Validator";
+} from "../../Utils/lib/validators/featured.Validator";
 
 const featuredRouter = Router();
 const r = featuredRouter;

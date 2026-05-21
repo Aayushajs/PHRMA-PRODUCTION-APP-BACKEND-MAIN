@@ -7,15 +7,15 @@
 
 import { Request, Response, NextFunction } from "express";
 import NotificationLogModel from "../../Databases/Models/notificationLog.model";
-import { ApiError } from "../../Utils/ApiError";
-import { handleResponse } from "../../Utils/handleResponse";
-import { catchAsyncErrors } from "../../Utils/catchAsyncErrors";
+import { ApiError } from "../../Utils/errors/ApiError";
+import { handleResponse } from "../../Utils/responses/handleResponse";
+import { catchAsyncErrors } from "../../Utils/errors/catchAsyncErrors";
 import {
   getCache,
   setCache,
   deleteCache,
   deleteCachePattern,
-} from "../../Utils/cache";
+} from "../../Utils/cache/cache";
 import mongoose from "mongoose";
 import crypto from "crypto";
 
