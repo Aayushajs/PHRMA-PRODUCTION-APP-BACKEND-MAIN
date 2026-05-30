@@ -12,6 +12,7 @@ export interface Iuser {
   _id?: mongoose.Types.ObjectId;
   name: string;
   userName?: string; // mirror of Service 2's field on the shared users collection
+  kycStatus?: "Pending" | "Verified" | "Rejected"; // shared field (owned by Service 2)
   email: string;
   password: string;
   phone: string;

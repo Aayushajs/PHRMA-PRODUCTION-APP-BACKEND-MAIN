@@ -99,6 +99,13 @@ export const userSchema = new Schema<Iuser & Document>(
       enum: ["ADMIN", "CUSTOMER", "OWNER", "STAFF", "PHARMACIST", "UNKNOWN"],
       default: RoleIndex.UNKNOWN,
     },
+    // Shared field (owned by Service 2 store/KYC flow). Defined here so Service 1
+    // can READ it to enforce the OWNER/PHARMACIST login KYC gate. Optional —
+    // customers don't have/need it.
+    kycStatus: {
+      type: String,
+      enum: ["Pending", "Verified", "Rejected"],
+    },
     ProfileImage: {
       type: [String],
       default: [],

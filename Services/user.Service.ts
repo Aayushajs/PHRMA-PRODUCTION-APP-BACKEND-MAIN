@@ -229,6 +229,20 @@ export default class UserService {
         return next(new ApiError(400, "Invalid email or password"));
       }
 
+      // KYC gate (defense-in-depth; tokens are shared across services via the
+      // same USER_SECRET_KEY). Service 1 is the customer app and cannot see the
+      // store collection, so it only hard-blocks EXPLICITLY rejected store
+      // professionals. Truly-pending owners can't log in anyway (they hold a
+      // placeholder password until approval), and the full store-aware gate
+      // lives in Service 2's login. This keeps the customer flow unbroken.
+      const KYC_GATED_ROLES = ["OWNER", "PHARMACIST"];
+      if (
+        KYC_GATED_ROLES.includes((userExist as any).role) &&
+        (userExist as any).kycStatus === "Rejected"
+      ) {
+        return next(new ApiError(403, "Your store/KYC verification was rejected. Please contact support."));
+      }
+
       // Update fields
       userExist.lastLogin = new Date();
 
