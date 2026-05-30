@@ -8,7 +8,9 @@ enum RoleIndex {
   CUSTOMER = "CUSTOMER",
   ADMIN = "ADMIN",
   PHARMACIST = "PHARMACIST",
-  UNKNOWN = "UNKNOWN", // for googale sign in users
+  OWNER = "OWNER",   // store owner (users created by Service 2 store registration)
+  STAFF = "STAFF",   // store staff/manager
+  UNKNOWN = "UNKNOWN", // for google sign in users
 }
 
 export default RoleIndex;

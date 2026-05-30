@@ -15,7 +15,17 @@ export const userSchema = new Schema<Iuser & Document>(
   {
     name: {
       type: String,
-      required: true,
+      required: function (this: any) {
+        // Users created by Service 2 (store owners) use `userName` instead of
+        // `name` on the shared `users` collection. Don't force `name` when
+        // `userName` is present — prevents cross-service schema drift errors.
+        return !this.userName;
+      },
+      trim: true,
+    },
+    // Mirror of Service 2's field name on the shared collection (tolerant read/write).
+    userName: {
+      type: String,
       trim: true,
     },
     email: {
@@ -84,7 +94,9 @@ export const userSchema = new Schema<Iuser & Document>(
     role: {
       type: String,
       required: true,
-      enum: ["ADMIN", "CUSTOMER"],
+      // Aligned with Service 2 so store-owner/staff/pharmacist users on the
+      // shared collection pass validation (was ["ADMIN","CUSTOMER"] → drift).
+      enum: ["ADMIN", "CUSTOMER", "OWNER", "STAFF", "PHARMACIST", "UNKNOWN"],
       default: RoleIndex.UNKNOWN,
     },
     ProfileImage: {

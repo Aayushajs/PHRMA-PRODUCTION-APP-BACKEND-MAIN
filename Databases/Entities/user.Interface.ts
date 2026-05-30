@@ -11,6 +11,7 @@ import RoleIndex from "../../Utils/auth/Roles.enum";
 export interface Iuser {
   _id?: mongoose.Types.ObjectId;
   name: string;
+  userName?: string; // mirror of Service 2's field on the shared users collection
   email: string;
   password: string;
   phone: string;
