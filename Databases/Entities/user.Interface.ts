@@ -13,6 +13,8 @@ export interface Iuser {
   name: string;
   userName?: string; // mirror of Service 2's field on the shared users collection
   kycStatus?: "Pending" | "Verified" | "Rejected"; // shared field (owned by Service 2)
+  isBlocked?: boolean;       // shared account-block flag (set by Service 2 admin)
+  blockedReason?: string;
   email: string;
   password: string;
   phone: string;

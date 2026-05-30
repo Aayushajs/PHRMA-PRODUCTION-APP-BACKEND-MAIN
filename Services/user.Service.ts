@@ -229,6 +229,12 @@ export default class UserService {
         return next(new ApiError(400, "Invalid email or password"));
       }
 
+      // Account block (admin) — blocks login of any role. Shared flag set by
+      // Service 2; tokens are interchangeable so it must be enforced here too.
+      if ((userExist as any).isBlocked) {
+        return next(new ApiError(403, (userExist as any).blockedReason || "Your account has been blocked. Please contact support."));
+      }
+
       // KYC gate (defense-in-depth; tokens are shared across services via the
       // same USER_SECRET_KEY). Service 1 is the customer app and cannot see the
       // store collection, so it only hard-blocks EXPLICITLY rejected store

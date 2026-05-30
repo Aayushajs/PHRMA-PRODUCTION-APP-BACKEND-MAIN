@@ -106,6 +106,15 @@ export const userSchema = new Schema<Iuser & Document>(
       type: String,
       enum: ["Pending", "Verified", "Rejected"],
     },
+    // Shared account-block flag (set by Service 2 admin). Read here to block
+    // login of blocked accounts (tokens are shared across services).
+    isBlocked: {
+      type: Boolean,
+      default: false,
+    },
+    blockedReason: {
+      type: String,
+    },
     ProfileImage: {
       type: [String],
       default: [],
