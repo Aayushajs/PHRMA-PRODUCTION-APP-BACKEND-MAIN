@@ -111,22 +111,18 @@ class QueueProcessor {
 
   /**
    * Process notifications from queue
+   *
+   * PERF-FIX-2026-06: Removed getStats() (3× LLEN) pre-check.
+   * It was generating ~1.55M Redis commands/month on Upstash free tier by
+   * calling LLEN on all 3 queues every 5 seconds — even when the queue was
+   * completely empty. notificationQueue.processQueue() already handles the
+   * empty-queue case internally via lMove returning null, breaking the while
+   * loop immediately. The getStats() call was 100% redundant.
    */
   private async processQueue(): Promise<void> {
     try {
-      // Get queue stats first
-      const stats = await notificationQueue.getStats();
-
-      if (stats.waiting === 0) {
-        // No notifications to process
-        return;
-      }
-
-      console.log(` Queue stats: ${stats.waiting} waiting, ${stats.processing} processing, ${stats.failed} failed`);
-
-      // Process the queue
+      // Directly process the queue — lMove returns null when empty, loop exits.
       await notificationQueue.processQueue();
-
     } catch (error) {
       console.error(' Error in queue processor:', error);
       // Don't stop the processor on error, just log and continue
