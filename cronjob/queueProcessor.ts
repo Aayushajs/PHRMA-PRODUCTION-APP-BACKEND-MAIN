@@ -13,7 +13,9 @@ import { notificationQueue } from '../Services/NotificationServices/notification
 // CONFIGURATION
 // ============================================================================
 
-const PROCESS_INTERVAL_MS = 5000; // Process queue every 5 seconds
+// Poll interval (env-tunable). 5s = ~518k Redis cmds/month just idle-polling — too
+// much for a metered free Redis. 15s default keeps it frugal; latency stays acceptable.
+const PROCESS_INTERVAL_MS = Number(process.env.NOTIFICATION_QUEUE_INTERVAL_MS) || 15000;
 const ENABLE_QUEUE = process.env.ENABLE_NOTIFICATION_QUEUE !== 'false';
 
 // ============================================================================

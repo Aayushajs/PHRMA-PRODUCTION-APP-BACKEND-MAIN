@@ -93,8 +93,9 @@ class NotificationQueue {
     }
 
     this.isProcessing = true;
-    console.log('🔄 Processing notification queue...');
 
+    // Only log when there is actual work — avoids spamming the log every empty tick.
+    let processed = 0;
     try {
       while (true) {
         // Move notification from queue to processing
@@ -111,6 +112,7 @@ class NotificationQueue {
         }
 
         const notification: QueuedNotification = JSON.parse(item);
+        processed++;
         console.log(`🔄 Processing notification ${notification.id} (attempt ${notification.attempts + 1}/${notification.maxAttempts})`);
 
         // Process notification
@@ -145,7 +147,9 @@ class NotificationQueue {
         // throughput at ~10/s. Firebase batching + bulk semantics already throttle.
       }
 
-      console.log(' Queue processing complete');
+      if (processed > 0) {
+        console.log(`✅ Queue processing complete - ${processed} notification(s) handled`);
+      }
     } catch (error) {
       console.error(' Queue processing error:', error);
     } finally {
